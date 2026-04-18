@@ -1,0 +1,21 @@
+{
+  "name": "CampusRPG.Editor",
+  "rootNamespace": "CampusRPG.Editor",
+  "references": [
+    "CampusRPG.Runtime",
+    "CampusRPG.Runtime.Input",
+    "CampusRPG.Runtime.Core",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

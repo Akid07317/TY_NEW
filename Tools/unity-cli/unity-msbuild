@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+PROJECT_VERSION_FILE="$PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
+
+if [ ! -f "$PROJECT_VERSION_FILE" ]; then
+  echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
+  exit 1
+fi
+
+UNITY_VERSION=$(sed -n 's/^m_EditorVersion: //p' "$PROJECT_VERSION_FILE" | head -n 1)
+MONO_ROOT="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/Resources/Scripting/MonoBleedingEdge"
+MONO_BIN="$MONO_ROOT/bin"
+MONO="$MONO_BIN/mono"
+MSBUILD_DLL="$MONO_ROOT/lib/mono/msbuild/Current/bin/MSBuild.dll"
+XBUILD="$MONO_BIN/xbuild"
+
+if [ -f "$MSBUILD_DLL" ] && [ -x "$MONO" ]; then
+  exec "$MONO" "$MSBUILD_DLL" "$@"
+fi
+
+if [ -x "$XBUILD" ]; then
+  exec "$XBUILD" "$@"
+fi
+
+echo "Neither Unity bundled MSBuild nor xbuild could be found." >&2
+exit 1

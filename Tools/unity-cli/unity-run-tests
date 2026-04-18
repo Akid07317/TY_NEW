@@ -1,0 +1,268 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/unity-run-tests <EditMode|PlayMode> [--group-filter <regex>] [--assembly-names <name1,name2>] [--results <path>] [--log <path>] [--use-temp-clone] [--clone-root <path>] [--startup-timeout <seconds>] [--sandbox-home] [--fresh-sandbox-home]
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+PROJECT_VERSION_FILE="$PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
+PROJECT_NAME=$(basename "$PROJECT_ROOT")
+PROJECT_ROOT_TO_RUN="$PROJECT_ROOT"
+USE_TEMP_CLONE=0
+CLONE_ROOT="${TMPDIR:-/tmp}"
+CAN_INSPECT_PROCESSES=1
+STARTUP_TIMEOUT=45
+UNITY_PID=""
+USE_SANDBOX_HOME=0
+FRESH_SANDBOX_HOME=0
+ORIGINAL_HOME="$HOME"
+ACTIVE_HOME="$HOME"
+TMP_WRITE_ROOT="${TMPDIR:-/tmp}"
+ACTIVE_TMPDIR="${TMPDIR:-/tmp}"
+ACTIVE_XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+ACTIVE_XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+
+if [ ! -f "$PROJECT_VERSION_FILE" ]; then
+  echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
+  exit 1
+fi
+
+if [ $# -lt 1 ]; then
+  usage
+fi
+
+MODE_INPUT=$1
+shift
+
+case "$MODE_INPUT" in
+  EditMode|editmode|EDITMODE)
+    TEST_PLATFORM="EditMode"
+    MODE_KEY="editmode"
+    ;;
+  PlayMode|playmode|PLAYMODE)
+    TEST_PLATFORM="PlayMode"
+    MODE_KEY="playmode"
+    ;;
+  *)
+    echo "Unsupported test platform: $MODE_INPUT" >&2
+    usage
+    ;;
+esac
+
+RESULTS_FILE="/tmp/$(basename "$PROJECT_ROOT")_${MODE_KEY}_tests.xml"
+LOG_FILE="/tmp/$(basename "$PROJECT_ROOT")_${MODE_KEY}_tests.log"
+GROUP_FILTER=""
+ASSEMBLY_NAMES=""
+
+create_temp_clone() {
+  mkdir -p "$CLONE_ROOT"
+  CLONE_PATH=$(mktemp -d "$CLONE_ROOT/${PROJECT_NAME}_tests_clone.XXXXXX")
+
+  if ! command -v rsync >/dev/null 2>&1; then
+    echo "rsync is required to create a temporary clone for batch tests." >&2
+    exit 1
+  fi
+
+  rsync -a \
+    --exclude '.git/' \
+    --exclude 'Library/' \
+    --exclude 'Logs/' \
+    --exclude 'Temp/' \
+    --exclude 'obj/' \
+    --exclude '.DS_Store' \
+    "$PROJECT_ROOT/" "$CLONE_PATH/"
+
+  PROJECT_ROOT_TO_RUN="$CLONE_PATH"
+}
+
+create_sandbox_home() {
+  SANDBOX_HOME=$(mktemp -d "$TMP_WRITE_ROOT/${PROJECT_NAME}_unity_home.XXXXXX")
+  mkdir -p "$SANDBOX_HOME/Library/Application Support/Unity"
+  mkdir -p "$SANDBOX_HOME/tmp" "$SANDBOX_HOME/.cache" "$SANDBOX_HOME/.config"
+
+  if [ "$FRESH_SANDBOX_HOME" -eq 0 ] && [ -d "$ORIGINAL_HOME/Library/Unity" ]; then
+    cp -R "$ORIGINAL_HOME/Library/Unity" "$SANDBOX_HOME/Library/"
+  fi
+
+  if [ "$FRESH_SANDBOX_HOME" -eq 0 ] && [ -d "$ORIGINAL_HOME/Library/Logs/Unity" ]; then
+    mkdir -p "$SANDBOX_HOME/Library/Logs"
+    cp -R "$ORIGINAL_HOME/Library/Logs/Unity" "$SANDBOX_HOME/Library/Logs/"
+  fi
+
+  ACTIVE_HOME="$SANDBOX_HOME"
+  ACTIVE_TMPDIR="$SANDBOX_HOME/tmp"
+  ACTIVE_XDG_CACHE_HOME="$SANDBOX_HOME/.cache"
+  ACTIVE_XDG_CONFIG_HOME="$SANDBOX_HOME/.config"
+}
+
+cleanup_child() {
+  if [ -n "$UNITY_PID" ] && kill -0 "$UNITY_PID" >/dev/null 2>&1; then
+    kill "$UNITY_PID" >/dev/null 2>&1 || true
+    wait "$UNITY_PID" >/dev/null 2>&1 || true
+  fi
+}
+
+log_contains() {
+  PATTERN=$1
+  [ -f "$LOG_FILE" ] && grep -F "$PATTERN" "$LOG_FILE" >/dev/null 2>&1
+}
+
+print_startup_failure() {
+  echo "Unity batchmode startup failed before TestRunner initialized." >&2
+  echo "Log: $LOG_FILE" >&2
+
+  if log_contains "Found 0 entitlement groups and 0 free entitlements"; then
+    echo "Detected entitlement resolution failure: Licensing returned 0 entitlement groups." >&2
+  fi
+
+  if log_contains "'com.unity.editor.headless' was not found."; then
+    echo "Detected missing headless entitlement for the current licensing session." >&2
+  fi
+
+  if log_contains "attempt to write a readonly database"; then
+    echo "Detected a readonly database write during Unity startup. Check Unity user-data/cache permissions." >&2
+  fi
+
+  echo "Suggested recovery: run Tools/unity-cli/unity-license-warmup first, then retry this command." >&2
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --group-filter|--test-filter)
+      [ $# -ge 2 ] || usage
+      GROUP_FILTER=$2
+      shift 2
+      ;;
+    --assembly-names)
+      [ $# -ge 2 ] || usage
+      ASSEMBLY_NAMES=$2
+      shift 2
+      ;;
+    --results)
+      [ $# -ge 2 ] || usage
+      RESULTS_FILE=$2
+      shift 2
+      ;;
+    --log)
+      [ $# -ge 2 ] || usage
+      LOG_FILE=$2
+      shift 2
+      ;;
+    --use-temp-clone)
+      USE_TEMP_CLONE=1
+      shift
+      ;;
+    --clone-root)
+      [ $# -ge 2 ] || usage
+      CLONE_ROOT=$2
+      shift 2
+      ;;
+    --startup-timeout)
+      [ $# -ge 2 ] || usage
+      STARTUP_TIMEOUT=$2
+      shift 2
+      ;;
+    --sandbox-home)
+      USE_SANDBOX_HOME=1
+      shift
+      ;;
+    --fresh-sandbox-home)
+      USE_SANDBOX_HOME=1
+      FRESH_SANDBOX_HOME=1
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+if ! ps -axo comm= >/dev/null 2>&1; then
+  CAN_INSPECT_PROCESSES=0
+  USE_TEMP_CLONE=1
+  USE_SANDBOX_HOME=1
+  echo "Process inspection is unavailable in this shell; falling back to a temporary clone for batch tests."
+fi
+
+if [ "$CAN_INSPECT_PROCESSES" -eq 1 ] && ps -axo comm= 2>/dev/null | grep -Fx "Unity Hub" >/dev/null 2>&1; then
+  echo "Unity Hub is running. Quit Unity Hub before running batch tests on macOS." >&2
+  exit 1
+fi
+
+if [ "$USE_TEMP_CLONE" -eq 1 ]; then
+  create_temp_clone
+  echo "Using temporary clone for batch tests: $PROJECT_ROOT_TO_RUN"
+elif pgrep -f "Contents/MacOS/Unity .* -projectPath $PROJECT_ROOT" >/dev/null 2>&1; then
+  create_temp_clone
+  echo "Detected another Unity Editor instance for $PROJECT_ROOT; using temporary clone: $PROJECT_ROOT_TO_RUN"
+fi
+
+if [ "$USE_SANDBOX_HOME" -eq 1 ]; then
+  create_sandbox_home
+  echo "Using sandbox HOME for batch tests: $ACTIVE_HOME"
+fi
+
+UNITY_VERSION=$(sed -n 's/^m_EditorVersion: //p' "$PROJECT_VERSION_FILE" | head -n 1)
+UNITY_EDITOR="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/MacOS/Unity"
+
+if [ ! -x "$UNITY_EDITOR" ]; then
+  echo "Unity editor not found: $UNITY_EDITOR" >&2
+  exit 1
+fi
+
+set -- \
+  "$UNITY_EDITOR" \
+  -batchmode \
+  -projectPath "$PROJECT_ROOT_TO_RUN" \
+  -runTests \
+  -testPlatform "$TEST_PLATFORM" \
+  -testResults "$RESULTS_FILE" \
+  -logFile "$LOG_FILE"
+
+if [ -n "$GROUP_FILTER" ]; then
+  set -- "$@" -testFilter "$GROUP_FILTER"
+fi
+
+if [ -n "$ASSEMBLY_NAMES" ]; then
+  set -- "$@" -assemblyNames "$ASSEMBLY_NAMES"
+fi
+
+echo "Running $TEST_PLATFORM tests for $PROJECT_ROOT_TO_RUN"
+echo "Results: $RESULTS_FILE"
+echo "Log: $LOG_FILE"
+echo "Startup timeout: ${STARTUP_TIMEOUT}s"
+echo "Note: unity-run-tests intentionally omits -quit because com.unity.test-framework exits the editor after the run, and -quit prevents the test run from starting."
+echo "Note: --group-filter forwards Unity's -testFilter regex, which matches groups/fixtures rather than individual test methods."
+
+trap cleanup_child INT TERM EXIT
+env HOME="$ACTIVE_HOME" TMPDIR="$ACTIVE_TMPDIR" XDG_CACHE_HOME="$ACTIVE_XDG_CACHE_HOME" XDG_CONFIG_HOME="$ACTIVE_XDG_CONFIG_HOME" "$@" &
+UNITY_PID=$!
+START_TIME=$(date +%s)
+
+while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
+  if log_contains "COMMAND LINE ARGUMENTS:" || log_contains "[Package Manager] Connected to IPC stream" || log_contains "Successfully changed project path to:"; then
+    break
+  fi
+
+  if log_contains "Found 0 entitlement groups and 0 free entitlements" || log_contains "'com.unity.editor.headless' was not found." || log_contains "attempt to write a readonly database"; then
+    print_startup_failure
+    exit 1
+  fi
+
+  NOW=$(date +%s)
+  if [ $((NOW - START_TIME)) -ge "$STARTUP_TIMEOUT" ]; then
+    echo "Unity batchmode startup timed out after ${STARTUP_TIMEOUT}s before TestRunner initialized." >&2
+    echo "Log: $LOG_FILE" >&2
+    exit 1
+  fi
+
+  sleep 2
+done
+
+trap - INT TERM EXIT
+wait "$UNITY_PID"

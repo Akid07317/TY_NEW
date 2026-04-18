@@ -1,0 +1,47 @@
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Unity-generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Mm]emoryCaptures/
+UserSettings/
+
+# Unity-generated files
+*.booproj
+*.csproj
+*.mdb
+*.opendb
+*.pdb
+*.pidb
+*.sln
+*.suo
+*.svd
+*.tmp
+*.unityproj
+*.user
+*.userprefs
+*.VC.db
+sysinfo.txt
+
+# IDE caches
+.idea/
+.vs/
+.consulo/
+ExportedObj/
+
+# Test and coverage output
+TestResults/
+coverage/
+
+# Local build artifacts
+*.aab
+*.apk
+*.app
+*.exe
+*.unitypackage

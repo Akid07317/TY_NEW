@@ -1,0 +1,24 @@
+{
+  "name": "CampusRPG.Tests.EditMode",
+  "rootNamespace": "CampusRPG.Tests",
+  "references": [
+    "CampusRPG.Runtime",
+    "CampusRPG.Runtime.Core",
+    "CampusRPG.Runtime.Input",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

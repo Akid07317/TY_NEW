@@ -1,0 +1,16 @@
+{
+  "name": "CampusRPG.Runtime.Core",
+  "rootNamespace": "CampusRPG.Core",
+  "references": [
+    "CampusRPG.Runtime.Input"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

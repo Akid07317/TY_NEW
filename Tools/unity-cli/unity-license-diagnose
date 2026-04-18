@@ -1,0 +1,1870 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/unity-license-diagnose [--log <path>] [--use-temp-clone] [--clone-root <path>] [--startup-timeout <seconds>] [--sandbox-home] [--fresh-sandbox-home] [--override-user <name>] [--override-hostname <name>] [--hostaliases-local] [--override-localdomain <value>] [--override-res-options <value>]
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+PROJECT_VERSION_FILE="$PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
+PROJECT_NAME=$(basename "$PROJECT_ROOT")
+PROJECT_ROOT_TO_RUN="$PROJECT_ROOT"
+USE_TEMP_CLONE=0
+CLONE_ROOT="${TMPDIR:-/tmp}"
+STARTUP_TIMEOUT=20
+LOG_FILE="/tmp/${PROJECT_NAME}_license_probe.log"
+UNITY_PID=""
+USE_SANDBOX_HOME=0
+ORIGINAL_HOME="$HOME"
+ACTIVE_HOME="$HOME"
+LICENSE_FILE=""
+PACL_FILE=""
+CLIENT_LOG_FILE=""
+METRICS_DIR=""
+METRICS_DB=""
+METRICS_WAL=""
+METRICS_SHM=""
+TMP_WRITE_PROBE_DIR="${TMPDIR:-/tmp}"
+OVERRIDE_USER=""
+FRESH_SANDBOX_HOME=0
+OVERRIDE_HOSTNAME=""
+USE_HOSTALIASES_LOCAL=0
+HOSTALIASES_FILE=""
+OVERRIDE_LOCALDOMAIN=""
+OVERRIDE_RES_OPTIONS=""
+
+if [ ! -f "$PROJECT_VERSION_FILE" ]; then
+  echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
+  exit 1
+fi
+
+create_temp_clone() {
+  mkdir -p "$CLONE_ROOT"
+  CLONE_PATH=$(mktemp -d "$CLONE_ROOT/${PROJECT_NAME}_license_clone.XXXXXX")
+
+  if ! command -v rsync >/dev/null 2>&1; then
+    echo "rsync is required to create a temporary clone for license diagnostics." >&2
+    exit 1
+  fi
+
+  rsync -a \
+    --exclude '.git/' \
+    --exclude 'Library/' \
+    --exclude 'Logs/' \
+    --exclude 'Temp/' \
+    --exclude 'obj/' \
+    --exclude '.DS_Store' \
+    "$PROJECT_ROOT/" "$CLONE_PATH/"
+
+  PROJECT_ROOT_TO_RUN="$CLONE_PATH"
+}
+
+refresh_home_paths() {
+  LICENSE_FILE="$ACTIVE_HOME/Library/Unity/licenses/UnityEntitlementLicense.xml"
+  PACL_FILE="$ACTIVE_HOME/Library/Unity/licenses/packages/packageAccessControlList.xml"
+  CLIENT_LOG_FILE="$ACTIVE_HOME/Library/Logs/Unity/Unity.Licensing.Client.log"
+  METRICS_DIR="$ACTIVE_HOME/Library/Application Support/Unity"
+  METRICS_DB="$ACTIVE_HOME/Library/Application Support/Unity/CoreBusinessMetrics.db"
+  METRICS_WAL="$ACTIVE_HOME/Library/Application Support/Unity/CoreBusinessMetrics.db-wal"
+  METRICS_SHM="$ACTIVE_HOME/Library/Application Support/Unity/CoreBusinessMetrics.db-shm"
+}
+
+create_sandbox_home() {
+  SANDBOX_HOME=$(mktemp -d "$TMP_WRITE_PROBE_DIR/${PROJECT_NAME}_unity_home.XXXXXX")
+  mkdir -p "$SANDBOX_HOME/Library"
+  mkdir -p "$SANDBOX_HOME/Library/Application Support/Unity"
+
+  if [ "$FRESH_SANDBOX_HOME" -eq 0 ] && [ -d "$ORIGINAL_HOME/Library/Unity" ]; then
+    cp -R "$ORIGINAL_HOME/Library/Unity" "$SANDBOX_HOME/Library/"
+  fi
+
+  if [ "$FRESH_SANDBOX_HOME" -eq 0 ] && [ -f "$ORIGINAL_HOME/Library/Logs/Unity/Unity.Licensing.Client.log" ]; then
+    mkdir -p "$SANDBOX_HOME/Library/Logs/Unity"
+    cp "$ORIGINAL_HOME/Library/Logs/Unity/Unity.Licensing.Client.log" "$SANDBOX_HOME/Library/Logs/Unity/"
+  fi
+
+  ACTIVE_HOME="$SANDBOX_HOME"
+  refresh_home_paths
+}
+
+cleanup_child() {
+  if [ -n "$UNITY_PID" ] && kill -0 "$UNITY_PID" >/dev/null 2>&1; then
+    kill "$UNITY_PID" >/dev/null 2>&1 || true
+    wait "$UNITY_PID" >/dev/null 2>&1 || true
+  fi
+
+  if [ -n "$HOSTALIASES_FILE" ] && [ -f "$HOSTALIASES_FILE" ]; then
+    rm -f "$HOSTALIASES_FILE" >/dev/null 2>&1 || true
+  fi
+}
+
+log_contains() {
+  PATTERN=$1
+  [ -f "$LOG_FILE" ] && grep -F "$PATTERN" "$LOG_FILE" >/dev/null 2>&1
+}
+
+license_contains() {
+  PATTERN=$1
+  [ -f "$LICENSE_FILE" ] && grep -F "$PATTERN" "$LICENSE_FILE" >/dev/null 2>&1
+}
+
+extract_last_entitlement_snapshot() {
+  SOURCE_FILE=$1
+
+  if [ ! -f "$SOURCE_FILE" ]; then
+    return
+  fi
+
+  SNAPSHOT_LINE=$(grep -E "Found [0-9]+ entitlement groups and [0-9]+ free entitlements" "$SOURCE_FILE" | tail -n 1 || true)
+  if [ -z "$SNAPSHOT_LINE" ]; then
+    return
+  fi
+
+  ENTITLEMENT_GROUPS=$(printf '%s\n' "$SNAPSHOT_LINE" | sed -E 's/.*Found ([0-9]+) entitlement groups and ([0-9]+) free entitlements.*/\1/')
+  FREE_ENTITLEMENTS=$(printf '%s\n' "$SNAPSHOT_LINE" | sed -E 's/.*Found ([0-9]+) entitlement groups and ([0-9]+) free entitlements.*/\2/')
+
+  printf '%s|%s|%s\n' "$ENTITLEMENT_GROUPS" "$FREE_ENTITLEMENTS" "$SNAPSHOT_LINE"
+}
+
+print_local_license_summary() {
+  if [ -f "$LICENSE_FILE" ]; then
+    echo "LOCAL_LICENSE: present ($LICENSE_FILE)"
+    if license_contains "com.unity.editor.headless"; then
+      echo "LOCAL_HEADLESS: present"
+    else
+      echo "LOCAL_HEADLESS: missing"
+    fi
+  else
+    echo "LOCAL_LICENSE: missing ($LICENSE_FILE)"
+    echo "LOCAL_HEADLESS: unknown"
+  fi
+
+  if [ -f "$PACL_FILE" ]; then
+    PACL_COUNT=$(grep -c '<Package Id=' "$PACL_FILE" 2>/dev/null || true)
+    echo "LOCAL_PACL: present ($PACL_FILE)"
+    echo "LOCAL_PACL_PACKAGES: $PACL_COUNT"
+  else
+    echo "LOCAL_PACL: missing ($PACL_FILE)"
+    echo "LOCAL_PACL_PACKAGES: 0"
+  fi
+}
+
+print_log_evidence() {
+  if [ ! -f "$LOG_FILE" ]; then
+    return
+  fi
+
+  EVIDENCE=$(grep -E "Found [0-9]+ entitlement groups|com\\.unity\\.editor\\.headless|readonly database" "$LOG_FILE" | tail -n 5 || true)
+  if [ -n "$EVIDENCE" ]; then
+    echo "EVIDENCE:"
+    printf '%s\n' "$EVIDENCE"
+  fi
+}
+
+print_client_log_evidence() {
+  if [ ! -f "$CLIENT_LOG_FILE" ]; then
+    echo "CLIENT_LOG: missing ($CLIENT_LOG_FILE)"
+    return
+  fi
+
+  echo "CLIENT_LOG: present ($CLIENT_LOG_FILE)"
+  CLIENT_EVIDENCE=$(grep -E "Found [0-9]+ entitlement groups|Successfully parsed license|Skipping download|No ULF license found|Token not found in cache" "$CLIENT_LOG_FILE" | tail -n 8 || true)
+  if [ -n "$CLIENT_EVIDENCE" ]; then
+    echo "CLIENT_EVIDENCE:"
+    printf '%s\n' "$CLIENT_EVIDENCE"
+  fi
+}
+
+print_process_evidence() {
+  echo "PROCESS_EVIDENCE:"
+
+  if ! command -v pgrep >/dev/null 2>&1; then
+    echo "pgrep unavailable"
+    return
+  fi
+
+  PROCESS_OUTPUT_FILE=$(mktemp)
+  if pgrep -af "Unity Hub|Unity\\.Licensing\\.Client|Unity\\.app/Contents/MacOS/Unity" >"$PROCESS_OUTPUT_FILE" 2>/dev/null; then
+    PROCESS_LINES=$(cat "$PROCESS_OUTPUT_FILE")
+    rm -f "$PROCESS_OUTPUT_FILE"
+    if [ -n "$PROCESS_LINES" ]; then
+      printf '%s\n' "$PROCESS_LINES"
+    else
+      echo "no-matching-processes"
+    fi
+  else
+    PROCESS_LINES=$(cat "$PROCESS_OUTPUT_FILE" 2>/dev/null || true)
+    rm -f "$PROCESS_OUTPUT_FILE"
+    if [ -n "$PROCESS_LINES" ]; then
+      printf '%s\n' "$PROCESS_LINES"
+    else
+      echo "process-inspection-unavailable"
+    fi
+  fi
+}
+
+print_metrics_db_evidence() {
+  echo "METRICS_DB_EVIDENCE:"
+
+  for TARGET in "$METRICS_DIR" "$METRICS_DB" "$METRICS_WAL" "$METRICS_SHM"; do
+    if [ -e "$TARGET" ]; then
+      if [ -w "$TARGET" ]; then
+        WRITABLE="yes"
+      else
+        WRITABLE="no"
+      fi
+
+      STAT_LINE=$(stat -f 'MODE=%Sp OWNER=%Su GROUP=%Sg PATH=%N' "$TARGET" 2>/dev/null || true)
+      if [ -n "$STAT_LINE" ]; then
+        echo "$STAT_LINE WRITABLE=$WRITABLE"
+      else
+        echo "PATH=$TARGET WRITABLE=$WRITABLE"
+      fi
+    else
+      echo "PATH=$TARGET missing"
+    fi
+  done
+}
+
+print_write_probe_evidence() {
+  echo "WRITE_PROBE_EVIDENCE:"
+
+  METRICS_PROBE="$METRICS_DIR/.codex_write_probe"
+  TMP_PROBE="$TMP_WRITE_PROBE_DIR/codex_write_probe.$$"
+
+  if touch "$TMP_PROBE" >/dev/null 2>&1; then
+    echo "TMP_WRITE_PROBE: success ($TMP_PROBE)"
+    rm -f "$TMP_PROBE" >/dev/null 2>&1 || true
+  else
+    echo "TMP_WRITE_PROBE: failed ($TMP_PROBE)"
+  fi
+
+  if touch "$METRICS_PROBE" >/dev/null 2>&1; then
+    echo "METRICS_WRITE_PROBE: success ($METRICS_PROBE)"
+    rm -f "$METRICS_PROBE" >/dev/null 2>&1 || true
+  else
+    echo "METRICS_WRITE_PROBE: failed ($METRICS_PROBE)"
+  fi
+}
+
+print_home_db_inventory() {
+  echo "HOME_DB_INVENTORY:"
+
+  SEARCH_ROOT="$ACTIVE_HOME/Library"
+  if [ ! -d "$SEARCH_ROOT" ]; then
+    echo "HOME_DB_SEARCH_ROOT: missing ($SEARCH_ROOT)"
+    return
+  fi
+
+  DB_INVENTORY=$(find "$SEARCH_ROOT" -maxdepth 5 \
+    \( -name '*.db' -o -name '*.db-*' -o -name '*.sqlite' -o -name '*.sqlite-*' -o -name '*.lock' -o -name '*.lck' \) \
+    2>/dev/null | sort || true)
+
+  DB_COUNT=$(printf '%s\n' "$DB_INVENTORY" | sed '/^$/d' | wc -l | tr -d ' ')
+  echo "HOME_DB_FILE_COUNT: $DB_COUNT"
+
+  if [ -n "$DB_INVENTORY" ]; then
+    echo "HOME_DB_FILES:"
+    printf '%s\n' "$DB_INVENTORY"
+  else
+    echo "HOME_DB_FILES: none"
+  fi
+}
+
+print_identity_summary() {
+  echo "IDENTITY_SUMMARY:"
+  echo "ORIGINAL_USER: ${USER:-unknown}"
+  echo "ORIGINAL_LOGNAME: ${LOGNAME:-unknown}"
+
+  if [ -n "$OVERRIDE_USER" ]; then
+    echo "OVERRIDE_USER: $OVERRIDE_USER"
+    echo "ACTIVE_USER: $OVERRIDE_USER"
+  else
+    echo "OVERRIDE_USER: none"
+    echo "ACTIVE_USER: ${USER:-unknown}"
+  fi
+
+  echo "ACTIVE_LOGNAME: ${LOGNAME:-unknown}"
+  if [ -n "$OVERRIDE_HOSTNAME" ]; then
+    echo "OVERRIDE_HOSTNAME: $OVERRIDE_HOSTNAME"
+  else
+    echo "OVERRIDE_HOSTNAME: none"
+  fi
+  if [ "$USE_HOSTALIASES_LOCAL" -eq 1 ]; then
+    echo "HOSTALIASES_LOCAL: enabled"
+  else
+    echo "HOSTALIASES_LOCAL: disabled"
+  fi
+  if [ -n "$OVERRIDE_LOCALDOMAIN" ]; then
+    echo "OVERRIDE_LOCALDOMAIN: $OVERRIDE_LOCALDOMAIN"
+  else
+    echo "OVERRIDE_LOCALDOMAIN: none"
+  fi
+  if [ -n "$OVERRIDE_RES_OPTIONS" ]; then
+    echo "OVERRIDE_RES_OPTIONS: $OVERRIDE_RES_OPTIONS"
+  else
+    echo "OVERRIDE_RES_OPTIONS: none"
+  fi
+  if [ "$USE_SANDBOX_HOME" -eq 1 ]; then
+    if [ "$FRESH_SANDBOX_HOME" -eq 1 ]; then
+      echo "SANDBOX_HOME_MODE: fresh"
+    else
+      echo "SANDBOX_HOME_MODE: copied"
+    fi
+  fi
+}
+
+prepare_hostaliases_file() {
+  if [ "$USE_HOSTALIASES_LOCAL" -ne 1 ]; then
+    return
+  fi
+
+  LOCAL_HOSTNAME_VALUE=$(scutil --get LocalHostName 2>/dev/null || true)
+  if [ -z "$LOCAL_HOSTNAME_VALUE" ]; then
+    return
+  fi
+
+  SHORT_HOSTNAME_VALUE=$(hostname 2>/dev/null | sed 's/\..*$//' || true)
+  if [ -z "$SHORT_HOSTNAME_VALUE" ]; then
+    return
+  fi
+
+  HOSTALIASES_FILE=$(mktemp "${TMPDIR:-/tmp}/unity_hostaliases.XXXXXX")
+  printf '%s %s.local\n' "$SHORT_HOSTNAME_VALUE" "$LOCAL_HOSTNAME_VALUE" >"$HOSTALIASES_FILE"
+}
+
+print_system_identity_summary() {
+  echo "SYSTEM_IDENTITY_SUMMARY:"
+
+  HOSTNAME_VALUE=$(hostname 2>/dev/null || true)
+  if [ -n "$HOSTNAME_VALUE" ]; then
+    echo "SYSTEM_HOSTNAME: $HOSTNAME_VALUE"
+  else
+    echo "SYSTEM_HOSTNAME: unavailable"
+  fi
+
+  COMPUTER_NAME=$(scutil --get ComputerName 2>/dev/null || true)
+  if [ -n "$COMPUTER_NAME" ]; then
+    echo "SYSTEM_COMPUTER_NAME: $COMPUTER_NAME"
+  else
+    echo "SYSTEM_COMPUTER_NAME: unavailable"
+  fi
+
+  LOCAL_HOSTNAME=$(scutil --get LocalHostName 2>/dev/null || true)
+  if [ -n "$LOCAL_HOSTNAME" ]; then
+    echo "SYSTEM_LOCAL_HOSTNAME: $LOCAL_HOSTNAME"
+  else
+    echo "SYSTEM_LOCAL_HOSTNAME: unavailable"
+  fi
+
+  HOSTNAME_OUTPUT_FILE=$(mktemp)
+  if scutil --get HostName >"$HOSTNAME_OUTPUT_FILE" 2>&1; then
+    SYSTEM_HOST_NAME=$(cat "$HOSTNAME_OUTPUT_FILE")
+    rm -f "$HOSTNAME_OUTPUT_FILE"
+    if [ -n "$SYSTEM_HOST_NAME" ]; then
+      echo "SYSTEM_HOST_NAME: $SYSTEM_HOST_NAME"
+    else
+      echo "SYSTEM_HOST_NAME: empty"
+    fi
+  else
+    SYSTEM_HOST_NAME_ERROR=$(cat "$HOSTNAME_OUTPUT_FILE" 2>/dev/null || true)
+    rm -f "$HOSTNAME_OUTPUT_FILE"
+    if [ -n "$SYSTEM_HOST_NAME_ERROR" ]; then
+      echo "SYSTEM_HOST_NAME_ERROR: $SYSTEM_HOST_NAME_ERROR"
+    else
+      echo "SYSTEM_HOST_NAME_ERROR: unavailable"
+    fi
+  fi
+
+  if [ -n "$HOSTNAME_VALUE" ]; then
+    HOST_QUERY_OUTPUT=$(dscacheutil -q host -a name "$HOSTNAME_VALUE" 2>/dev/null || true)
+    if [ -n "$HOST_QUERY_OUTPUT" ]; then
+      FIRST_IP=$(printf '%s\n' "$HOST_QUERY_OUTPUT" | sed -n 's/^ip_address: //p' | head -n 1)
+      FIRST_IPV6=$(printf '%s\n' "$HOST_QUERY_OUTPUT" | sed -n 's/^ipv6_address: //p' | head -n 1)
+      if [ -n "$FIRST_IP" ]; then
+        echo "SYSTEM_HOST_QUERY_IPV4: $FIRST_IP"
+      fi
+      if [ -n "$FIRST_IPV6" ]; then
+        echo "SYSTEM_HOST_QUERY_IPV6: $FIRST_IPV6"
+      fi
+    else
+      echo "SYSTEM_HOST_QUERY: no-match"
+    fi
+  fi
+}
+
+run_with_timeout_capture() {
+  TIMEOUT_SECONDS=$1
+  shift
+
+  OUTPUT_FILE=$(mktemp)
+  "$@" >"$OUTPUT_FILE" 2>&1 &
+  CMD_PID=$!
+  ELAPSED=0
+
+  while kill -0 "$CMD_PID" >/dev/null 2>&1; do
+    if [ "$ELAPSED" -ge "$TIMEOUT_SECONDS" ]; then
+      kill "$CMD_PID" >/dev/null 2>&1 || true
+      wait "$CMD_PID" >/dev/null 2>&1 || true
+      printf '__TIMEOUT__\n'
+      cat "$OUTPUT_FILE"
+      rm -f "$OUTPUT_FILE"
+      return 124
+    fi
+
+    sleep 1
+    ELAPSED=$((ELAPSED + 1))
+  done
+
+  wait "$CMD_PID"
+  CMD_RC=$?
+  cat "$OUTPUT_FILE"
+  rm -f "$OUTPUT_FILE"
+  return "$CMD_RC"
+}
+
+print_timed_probe_result() {
+  FIELD_PREFIX=$1
+  shift
+
+  PROBE_FILE=$(mktemp)
+  set +e
+  "$@" >"$PROBE_FILE" 2>&1
+  PROBE_RC=$?
+  set -e
+  PROBE_OUTPUT=$(cat "$PROBE_FILE")
+  rm -f "$PROBE_FILE"
+  PROBE_OUTPUT=$(printf '%s\n' "$PROBE_OUTPUT" | sed '/^$/d')
+
+  if [ "$PROBE_RC" -eq 0 ]; then
+    echo "${FIELD_PREFIX}_STATUS: ok"
+    if [ -n "$PROBE_OUTPUT" ]; then
+      echo "${FIELD_PREFIX}_VALUE: $PROBE_OUTPUT"
+    else
+      echo "${FIELD_PREFIX}_VALUE: empty"
+    fi
+  elif [ "$PROBE_RC" -eq 124 ]; then
+    echo "${FIELD_PREFIX}_STATUS: timeout"
+    if [ -n "$PROBE_OUTPUT" ]; then
+      echo "${FIELD_PREFIX}_VALUE: $PROBE_OUTPUT"
+    else
+      echo "${FIELD_PREFIX}_VALUE: timeout"
+    fi
+  else
+    echo "${FIELD_PREFIX}_STATUS: failed"
+    if [ -n "$PROBE_OUTPUT" ]; then
+      echo "${FIELD_PREFIX}_VALUE: $PROBE_OUTPUT"
+    else
+      echo "${FIELD_PREFIX}_VALUE: unavailable"
+    fi
+  fi
+}
+
+print_host_api_summary() {
+  echo "HOST_API_SUMMARY:"
+
+  print_timed_probe_result "HOST_API_HOSTNAME_F" run_with_timeout_capture 3 hostname -f
+  print_timed_probe_result "HOST_API_SCUTIL_HOSTNAME" run_with_timeout_capture 3 scutil --get HostName
+  print_timed_probe_result "HOST_API_PY_SOCKET_HOSTNAME" run_with_timeout_capture 3 python3 -c 'import socket; print(socket.gethostname())'
+  print_timed_probe_result "HOST_API_PY_SOCKET_FQDN" run_with_timeout_capture 3 python3 -c 'import socket; print(socket.getfqdn())'
+}
+
+print_resolver_path_summary() {
+  echo "RESOLVER_PATH_SUMMARY:"
+
+  CURRENT_HOSTNAME=$(hostname 2>/dev/null || true)
+  CURRENT_HOSTNAME_LOWER=$(printf '%s\n' "$CURRENT_HOSTNAME" | tr '[:upper:]' '[:lower:]')
+  SHORT_HOSTNAME_LOWER=$(printf '%s\n' "$CURRENT_HOSTNAME_LOWER" | sed 's/\..*$//')
+  LOCAL_HOSTNAME_LOWER=$(scutil --get LocalHostName 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)
+
+  if [ -f /etc/hosts ]; then
+    echo "ETC_HOSTS_PRESENT: yes"
+    ETC_HOSTS_MATCH_COUNT=0
+    if [ -n "$CURRENT_HOSTNAME_LOWER" ]; then
+      ETC_HOSTS_MATCH_COUNT=$(rg -n "$CURRENT_HOSTNAME_LOWER" /etc/hosts 2>/dev/null | wc -l | tr -d ' ')
+    fi
+    echo "ETC_HOSTS_HOSTNAME_MATCHES: $ETC_HOSTS_MATCH_COUNT"
+    if [ -n "$LOCAL_HOSTNAME_LOWER" ]; then
+      LOCALHOSTNAME_MATCH_COUNT=$(rg -n "$LOCAL_HOSTNAME_LOWER" /etc/hosts 2>/dev/null | wc -l | tr -d ' ')
+      echo "ETC_HOSTS_LOCALHOSTNAME_MATCHES: $LOCALHOSTNAME_MATCH_COUNT"
+    fi
+  else
+    echo "ETC_HOSTS_PRESENT: no"
+  fi
+
+  SEARCH_DOMAIN=$(scutil --dns 2>/dev/null | sed -n 's/.*search domain\[[0-9][0-9]*\] : //p' | head -n 1)
+  if [ -n "$SEARCH_DOMAIN" ]; then
+    echo "RESOLVER_SEARCH_DOMAIN: $SEARCH_DOMAIN"
+  else
+    echo "RESOLVER_SEARCH_DOMAIN: unavailable"
+  fi
+
+  LOCAL_RESOLVER_REACH=$(scutil --dns 2>/dev/null | awk '
+    /domain   : local/ { in_local = 1; next }
+    in_local && /reach/ { print; exit }
+    in_local && /^resolver/ { exit }
+  ')
+  if [ -n "$LOCAL_RESOLVER_REACH" ]; then
+    echo "RESOLVER_LOCAL_REACH: $LOCAL_RESOLVER_REACH"
+  else
+    echo "RESOLVER_LOCAL_REACH: unavailable"
+  fi
+
+  if [ -n "$SHORT_HOSTNAME_LOWER" ]; then
+    SHORT_HOST_LOOKUP=$(python3 - "$SHORT_HOSTNAME_LOWER" <<'PY'
+import subprocess
+import sys
+
+name = sys.argv[1]
+try:
+    proc = subprocess.run(
+        ["dscacheutil", "-q", "host", "-a", "name", name],
+        capture_output=True,
+        text=True,
+        timeout=3,
+        check=False,
+    )
+    output = "\n".join(line for line in proc.stdout.splitlines() if line.strip())
+    if output:
+        print("ok|" + output.replace("\n", " || "))
+    else:
+        print("empty|")
+except subprocess.TimeoutExpired:
+    print("timeout|")
+except Exception as exc:
+    print("error|" + str(exc))
+PY
+)
+    SHORT_HOST_LOOKUP_STATUS=$(printf '%s\n' "$SHORT_HOST_LOOKUP" | cut -d'|' -f1)
+    SHORT_HOST_LOOKUP_VALUE=$(printf '%s\n' "$SHORT_HOST_LOOKUP" | cut -d'|' -f2-)
+    echo "SHORT_HOST_LOOKUP_STATUS: $SHORT_HOST_LOOKUP_STATUS"
+    if [ -n "$SHORT_HOST_LOOKUP_VALUE" ]; then
+      echo "SHORT_HOST_LOOKUP_VALUE: $SHORT_HOST_LOOKUP_VALUE"
+    else
+      echo "SHORT_HOST_LOOKUP_VALUE: empty"
+    fi
+  fi
+
+  LOCAL_FQDN_LOOKUP=$(python3 - "$CURRENT_HOSTNAME_LOWER" "$LOCAL_HOSTNAME_LOWER" <<'PY'
+import subprocess
+import sys
+
+hostname = sys.argv[1]
+localhostname = sys.argv[2]
+targets = []
+if hostname:
+    targets.append(hostname)
+if localhostname:
+    targets.append(localhostname + ".local")
+
+for target in targets:
+    try:
+        proc = subprocess.run(
+            ["dscacheutil", "-q", "host", "-a", "name", target],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+        output = "\n".join(line for line in proc.stdout.splitlines() if line.strip())
+        if output:
+            print(f"{target}|ok|{output.replace(chr(10), ' || ')}")
+        else:
+            print(f"{target}|empty|")
+    except subprocess.TimeoutExpired:
+        print(f"{target}|timeout|")
+    except Exception as exc:
+        print(f"{target}|error|{exc}")
+PY
+)
+  if [ -n "$LOCAL_FQDN_LOOKUP" ]; then
+    echo "LOCAL_NAME_LOOKUPS:"
+    printf '%s\n' "$LOCAL_FQDN_LOOKUP"
+  else
+    echo "LOCAL_NAME_LOOKUPS: unavailable"
+  fi
+}
+
+print_network_scope_summary() {
+  echo "NETWORK_SCOPE_SUMMARY:"
+
+  GLOBAL_DNS_STATE=$(scutil <<'EOF' 2>/dev/null
+show State:/Network/Global/DNS
+EOF
+)
+  GLOBAL_DNS_SEARCH_DOMAINS=$(printf '%s\n' "$GLOBAL_DNS_STATE" | sed -n 's/^[[:space:]]*[0-9][[:space:]]*: //p' | head -n 1)
+  GLOBAL_DNS_SERVERS=$(printf '%s\n' "$GLOBAL_DNS_STATE" | sed -n '/ServerAddresses : <array> {/,/}/{s/^[[:space:]]*[0-9][[:space:]]*: //p;}' | paste -sd ',' -)
+  GLOBAL_DNS_CONFIG_ID=$(printf '%s\n' "$GLOBAL_DNS_STATE" | sed -n 's/^[[:space:]]*__CONFIGURATION_ID__ : //p' | head -n 1)
+  GLOBAL_DNS_CONFIG_SERVICE_ID=$(printf '%s\n' "$GLOBAL_DNS_CONFIG_ID" | sed -n 's/^Default: \([0-9A-F-][0-9A-F-]*\) .*/\1/p' | head -n 1)
+  if [ -n "$GLOBAL_DNS_SEARCH_DOMAINS" ]; then
+    echo "GLOBAL_DNS_SEARCH_DOMAIN: $GLOBAL_DNS_SEARCH_DOMAINS"
+  else
+    echo "GLOBAL_DNS_SEARCH_DOMAIN: none"
+  fi
+  if [ -n "$GLOBAL_DNS_SERVERS" ]; then
+    echo "GLOBAL_DNS_SERVERS: $GLOBAL_DNS_SERVERS"
+  else
+    echo "GLOBAL_DNS_SERVERS: none"
+  fi
+  if [ -n "$GLOBAL_DNS_CONFIG_ID" ]; then
+    echo "GLOBAL_DNS_CONFIG_ID: $GLOBAL_DNS_CONFIG_ID"
+  else
+    echo "GLOBAL_DNS_CONFIG_ID: none"
+  fi
+  if [ -n "$GLOBAL_DNS_CONFIG_SERVICE_ID" ]; then
+    echo "GLOBAL_DNS_CONFIG_SERVICE_ID: $GLOBAL_DNS_CONFIG_SERVICE_ID"
+  else
+    echo "GLOBAL_DNS_CONFIG_SERVICE_ID: none"
+  fi
+
+  DNS_STATE_KEYS=$(scutil <<'EOF' 2>/dev/null
+list State:/Network/Service/.*/DNS
+EOF
+)
+  DNS_SERVICE_IDS=$(printf '%s\n' "$DNS_STATE_KEYS" | sed -n 's/.*State:\/Network\/Service\/\([^/]*\)\/DNS.*/\1/p')
+  DNS_SERVICE_COUNT=$(printf '%s\n' "$DNS_SERVICE_IDS" | sed '/^$/d' | wc -l | tr -d ' ')
+  echo "DNS_SERVICE_COUNT: $DNS_SERVICE_COUNT"
+
+  SERVICE_INDEX=0
+  PRIMARY_SERVICE_ID=""
+  PRIMARY_SERVICE_DOMAIN=""
+  PRIMARY_SERVICE_INTERFACES=""
+  PRIMARY_SERVICE_SERVERS=""
+  VPN_SERVICE_ID=""
+  VPN_SERVICE_INTERFACE=""
+  VPN_SERVICE_SERVERS=""
+  VPN_SERVICE_STATE_ADDRESS=""
+  VPN_SERVICE_STATE_SERVER_ADDRESS=""
+  VPN_SERVICE_ROUTE_COUNT=""
+
+  for SERVICE_ID in $DNS_SERVICE_IDS; do
+    SERVICE_INDEX=$((SERVICE_INDEX + 1))
+    SERVICE_DNS=$(scutil <<EOF 2>/dev/null
+show State:/Network/Service/$SERVICE_ID/DNS
+EOF
+)
+    SERVICE_IPV4_SETUP=$(scutil <<EOF 2>/dev/null
+show Setup:/Network/Service/$SERVICE_ID/IPv4
+EOF
+)
+    SERVICE_IPV4_STATE=$(scutil <<EOF 2>/dev/null
+show State:/Network/Service/$SERVICE_ID/IPv4
+EOF
+)
+
+    SERVICE_DOMAIN=$(printf '%s\n' "$SERVICE_DNS" | sed -n 's/^[[:space:]]*DomainName : //p' | head -n 1)
+    SERVICE_INTERFACE=$(printf '%s\n' "$SERVICE_DNS" | sed -n 's/^[[:space:]]*InterfaceName : //p' | head -n 1)
+    SERVICE_SERVERS=$(printf '%s\n' "$SERVICE_DNS" | sed -n 's/^[[:space:]]*[0-9][[:space:]]*: //p' | paste -sd ',' -)
+    SERVICE_CONFIG_METHOD=$(printf '%s\n' "$SERVICE_IPV4_SETUP" | sed -n 's/^[[:space:]]*ConfigMethod : //p' | head -n 1)
+    SERVICE_STATE_ADDRESS=$(printf '%s\n' "$SERVICE_IPV4_STATE" | sed -n '/Addresses : <array> {/,/}/{s/^[[:space:]]*[0-9][[:space:]]*: //p;}' | head -n 1)
+    SERVICE_STATE_SERVER_ADDRESS=$(printf '%s\n' "$SERVICE_IPV4_STATE" | sed -n 's/^[[:space:]]*ServerAddress : //p' | head -n 1)
+    SERVICE_ROUTE_COUNT=$(printf '%s\n' "$SERVICE_IPV4_STATE" | rg -c 'DestinationAddress :' 2>/dev/null || true)
+
+    echo "DNS_SERVICE_${SERVICE_INDEX}_ID: $SERVICE_ID"
+    if [ -n "$SERVICE_INTERFACE" ]; then
+      echo "DNS_SERVICE_${SERVICE_INDEX}_INTERFACE: $SERVICE_INTERFACE"
+    else
+      echo "DNS_SERVICE_${SERVICE_INDEX}_INTERFACE: none"
+    fi
+    if [ -n "$SERVICE_CONFIG_METHOD" ]; then
+      echo "DNS_SERVICE_${SERVICE_INDEX}_CONFIG_METHOD: $SERVICE_CONFIG_METHOD"
+    else
+      echo "DNS_SERVICE_${SERVICE_INDEX}_CONFIG_METHOD: none"
+    fi
+    if [ -n "$SERVICE_STATE_ADDRESS" ]; then
+      echo "DNS_SERVICE_${SERVICE_INDEX}_STATE_ADDRESS: $SERVICE_STATE_ADDRESS"
+    else
+      echo "DNS_SERVICE_${SERVICE_INDEX}_STATE_ADDRESS: none"
+    fi
+    if [ -n "$SERVICE_STATE_SERVER_ADDRESS" ]; then
+      echo "DNS_SERVICE_${SERVICE_INDEX}_STATE_SERVER_ADDRESS: $SERVICE_STATE_SERVER_ADDRESS"
+    else
+      echo "DNS_SERVICE_${SERVICE_INDEX}_STATE_SERVER_ADDRESS: none"
+    fi
+    if [ -n "$SERVICE_ROUTE_COUNT" ]; then
+      echo "DNS_SERVICE_${SERVICE_INDEX}_STATE_ROUTE_COUNT: $SERVICE_ROUTE_COUNT"
+    else
+      echo "DNS_SERVICE_${SERVICE_INDEX}_STATE_ROUTE_COUNT: 0"
+    fi
+    if [ -n "$SERVICE_DOMAIN" ]; then
+      echo "DNS_SERVICE_${SERVICE_INDEX}_DOMAIN: $SERVICE_DOMAIN"
+    else
+      echo "DNS_SERVICE_${SERVICE_INDEX}_DOMAIN: none"
+    fi
+    if [ -n "$SERVICE_SERVERS" ]; then
+      echo "DNS_SERVICE_${SERVICE_INDEX}_SERVERS: $SERVICE_SERVERS"
+    else
+      echo "DNS_SERVICE_${SERVICE_INDEX}_SERVERS: none"
+    fi
+
+    if [ -z "$PRIMARY_SERVICE_ID" ] && [ -n "$SERVICE_DOMAIN" ]; then
+      PRIMARY_SERVICE_ID=$SERVICE_ID
+      PRIMARY_SERVICE_DOMAIN=$SERVICE_DOMAIN
+      PRIMARY_SERVICE_INTERFACES=$SERVICE_INTERFACE
+      PRIMARY_SERVICE_SERVERS=$SERVICE_SERVERS
+    fi
+
+    if [ "$SERVICE_CONFIG_METHOD" = "VPN" ] && [ -z "$VPN_SERVICE_ID" ]; then
+      VPN_SERVICE_ID=$SERVICE_ID
+      VPN_SERVICE_INTERFACE=$SERVICE_INTERFACE
+      VPN_SERVICE_SERVERS=$SERVICE_SERVERS
+      VPN_SERVICE_STATE_ADDRESS=$SERVICE_STATE_ADDRESS
+      VPN_SERVICE_STATE_SERVER_ADDRESS=$SERVICE_STATE_SERVER_ADDRESS
+      VPN_SERVICE_ROUTE_COUNT=$SERVICE_ROUTE_COUNT
+    fi
+  done
+
+  if [ -n "$PRIMARY_SERVICE_ID" ]; then
+    echo "PRIMARY_DOMAIN_SERVICE_ID: $PRIMARY_SERVICE_ID"
+    echo "PRIMARY_DOMAIN_SERVICE_DOMAIN: $PRIMARY_SERVICE_DOMAIN"
+    if [ -n "$PRIMARY_SERVICE_INTERFACES" ]; then
+      echo "PRIMARY_DOMAIN_SERVICE_INTERFACE: $PRIMARY_SERVICE_INTERFACES"
+    else
+      echo "PRIMARY_DOMAIN_SERVICE_INTERFACE: none"
+    fi
+    if [ -n "$PRIMARY_SERVICE_SERVERS" ]; then
+      echo "PRIMARY_DOMAIN_SERVICE_SERVERS: $PRIMARY_SERVICE_SERVERS"
+    else
+      echo "PRIMARY_DOMAIN_SERVICE_SERVERS: none"
+    fi
+  else
+    echo "PRIMARY_DOMAIN_SERVICE_ID: unavailable"
+    echo "PRIMARY_DOMAIN_SERVICE_DOMAIN: unavailable"
+    echo "PRIMARY_DOMAIN_SERVICE_INTERFACE: unavailable"
+    echo "PRIMARY_DOMAIN_SERVICE_SERVERS: unavailable"
+  fi
+
+  SCOPED_DNS=$(scutil --dns 2>/dev/null | awk '
+    /^DNS configuration \(for scoped queries\)/ { in_scoped = 1; next }
+    in_scoped { print }
+  ')
+  SCOPED_RESOLVER_COUNT=$(printf '%s\n' "$SCOPED_DNS" | rg -c '^resolver #' 2>/dev/null || true)
+  if [ -z "$SCOPED_RESOLVER_COUNT" ]; then
+    SCOPED_RESOLVER_COUNT=0
+  fi
+  echo "SCOPED_RESOLVER_COUNT: $SCOPED_RESOLVER_COUNT"
+
+  if [ "$SCOPED_RESOLVER_COUNT" -gt 0 ]; then
+    python3 - <<'PY'
+import re
+import subprocess
+
+try:
+    output = subprocess.run(
+        ["scutil", "--dns"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    ).stdout
+except Exception:
+    output = ""
+
+if "DNS configuration (for scoped queries)" in output:
+    scoped = output.split("DNS configuration (for scoped queries)", 1)[1]
+else:
+    scoped = ""
+
+blocks = []
+current = []
+for line in scoped.splitlines():
+    if line.startswith("resolver #"):
+        if current:
+            blocks.append(current)
+        current = [line]
+    elif current:
+        current.append(line)
+if current:
+    blocks.append(current)
+
+for idx, block in enumerate(blocks, start=1):
+    text = "\n".join(block)
+    if_index = re.search(r"if_index : \d+ \(([^)]+)\)", text)
+    search_domain = re.search(r"search domain\[\d+\] : (.+)", text)
+    nameserver = re.search(r"nameserver\[\d+\] : (.+)", text)
+    flags = re.search(r"flags\s+: (.+)", text)
+    reach = re.search(r"reach\s+: (.+)", text)
+    print(f"SCOPED_RESOLVER_{idx}_INTERFACE: {if_index.group(1) if if_index else 'unknown'}")
+    print(f"SCOPED_RESOLVER_{idx}_SEARCH_DOMAIN: {search_domain.group(1) if search_domain else 'none'}")
+    print(f"SCOPED_RESOLVER_{idx}_NAMESERVER: {nameserver.group(1) if nameserver else 'none'}")
+    print(f"SCOPED_RESOLVER_{idx}_FLAGS: {flags.group(1) if flags else 'none'}")
+    print(f"SCOPED_RESOLVER_{idx}_REACH: {reach.group(1) if reach else 'none'}")
+PY
+  fi
+
+  PRIMARY_SCOPED_INTERFACE=""
+  PRIMARY_SCOPED_SEARCH_DOMAIN=""
+  PRIMARY_SCOPED_NAMESERVER=""
+  if [ "$SCOPED_RESOLVER_COUNT" -gt 0 ]; then
+    PRIMARY_SCOPED_FIELDS=$(python3 - <<'PY'
+import re
+import subprocess
+
+try:
+    output = subprocess.run(
+        ["scutil", "--dns"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    ).stdout
+except Exception:
+    output = ""
+
+if "DNS configuration (for scoped queries)" in output:
+    scoped = output.split("DNS configuration (for scoped queries)", 1)[1]
+else:
+    scoped = ""
+
+blocks = []
+current = []
+for line in scoped.splitlines():
+    if line.startswith("resolver #"):
+        if current:
+            blocks.append(current)
+        current = [line]
+    elif current:
+        current.append(line)
+if current:
+    blocks.append(current)
+
+if blocks:
+    text = "\n".join(blocks[0])
+    iface = re.search(r"if_index : \d+ \(([^)]+)\)", text)
+    search_domain = re.search(r"search domain\[\d+\] : (.+)", text)
+    nameserver = re.search(r"nameserver\[\d+\] : (.+)", text)
+    print(f"interface|{iface.group(1) if iface else 'none'}")
+    print(f"search_domain|{search_domain.group(1) if search_domain else 'none'}")
+    print(f"nameserver|{nameserver.group(1) if nameserver else 'none'}")
+PY
+)
+    PRIMARY_SCOPED_INTERFACE=$(printf '%s\n' "$PRIMARY_SCOPED_FIELDS" | sed -n 's/^interface|//p' | head -n 1)
+    PRIMARY_SCOPED_SEARCH_DOMAIN=$(printf '%s\n' "$PRIMARY_SCOPED_FIELDS" | sed -n 's/^search_domain|//p' | head -n 1)
+    PRIMARY_SCOPED_NAMESERVER=$(printf '%s\n' "$PRIMARY_SCOPED_FIELDS" | sed -n 's/^nameserver|//p' | head -n 1)
+  fi
+  if [ -n "$PRIMARY_SCOPED_INTERFACE" ]; then
+    echo "PRIMARY_SCOPED_INTERFACE: $PRIMARY_SCOPED_INTERFACE"
+  else
+    echo "PRIMARY_SCOPED_INTERFACE: none"
+  fi
+  if [ -n "$PRIMARY_SCOPED_SEARCH_DOMAIN" ]; then
+    echo "PRIMARY_SCOPED_SEARCH_DOMAIN: $PRIMARY_SCOPED_SEARCH_DOMAIN"
+  else
+    echo "PRIMARY_SCOPED_SEARCH_DOMAIN: none"
+  fi
+  if [ -n "$PRIMARY_SCOPED_NAMESERVER" ]; then
+    echo "PRIMARY_SCOPED_NAMESERVER: $PRIMARY_SCOPED_NAMESERVER"
+  else
+    echo "PRIMARY_SCOPED_NAMESERVER: none"
+  fi
+
+  if [ -n "$PRIMARY_SERVICE_SERVERS" ] && [ -n "$GLOBAL_DNS_SERVERS" ]; then
+    if [ "$PRIMARY_SERVICE_SERVERS" = "$GLOBAL_DNS_SERVERS" ]; then
+      echo "SERVICE_GLOBAL_DNS_MATCH: yes"
+    else
+      echo "SERVICE_GLOBAL_DNS_MATCH: no"
+    fi
+  else
+    echo "SERVICE_GLOBAL_DNS_MATCH: unknown"
+  fi
+
+  if [ -n "$PRIMARY_SERVICE_SERVERS" ] && [ -n "$PRIMARY_SCOPED_NAMESERVER" ]; then
+    if printf '%s\n' "$PRIMARY_SERVICE_SERVERS" | grep -F "$PRIMARY_SCOPED_NAMESERVER" >/dev/null 2>&1; then
+      echo "SERVICE_SCOPED_DNS_MATCH: yes"
+    else
+      echo "SERVICE_SCOPED_DNS_MATCH: no"
+    fi
+  else
+    echo "SERVICE_SCOPED_DNS_MATCH: unknown"
+  fi
+
+  if [ -n "$VPN_SERVICE_ID" ]; then
+    echo "VPN_DNS_SERVICE_ID: $VPN_SERVICE_ID"
+    if [ -n "$VPN_SERVICE_INTERFACE" ]; then
+      echo "VPN_DNS_SERVICE_INTERFACE: $VPN_SERVICE_INTERFACE"
+    else
+      echo "VPN_DNS_SERVICE_INTERFACE: none"
+    fi
+    if [ -n "$VPN_SERVICE_SERVERS" ]; then
+      echo "VPN_DNS_SERVICE_SERVERS: $VPN_SERVICE_SERVERS"
+    else
+      echo "VPN_DNS_SERVICE_SERVERS: none"
+    fi
+    if [ -n "$VPN_SERVICE_STATE_ADDRESS" ]; then
+      echo "VPN_DNS_SERVICE_STATE_ADDRESS: $VPN_SERVICE_STATE_ADDRESS"
+    else
+      echo "VPN_DNS_SERVICE_STATE_ADDRESS: none"
+    fi
+    if [ -n "$VPN_SERVICE_STATE_SERVER_ADDRESS" ]; then
+      echo "VPN_DNS_SERVICE_STATE_SERVER_ADDRESS: $VPN_SERVICE_STATE_SERVER_ADDRESS"
+    else
+      echo "VPN_DNS_SERVICE_STATE_SERVER_ADDRESS: none"
+    fi
+    if [ -n "$VPN_SERVICE_ROUTE_COUNT" ]; then
+      echo "VPN_DNS_SERVICE_ROUTE_COUNT: $VPN_SERVICE_ROUTE_COUNT"
+    else
+      echo "VPN_DNS_SERVICE_ROUTE_COUNT: 0"
+    fi
+  else
+    echo "VPN_DNS_SERVICE_ID: none"
+    echo "VPN_DNS_SERVICE_INTERFACE: none"
+    echo "VPN_DNS_SERVICE_SERVERS: none"
+    echo "VPN_DNS_SERVICE_STATE_ADDRESS: none"
+    echo "VPN_DNS_SERVICE_STATE_SERVER_ADDRESS: none"
+    echo "VPN_DNS_SERVICE_ROUTE_COUNT: 0"
+  fi
+
+  if [ -n "$VPN_SERVICE_SERVERS" ] && [ -n "$GLOBAL_DNS_SERVERS" ]; then
+    if [ "$VPN_SERVICE_SERVERS" = "$GLOBAL_DNS_SERVERS" ]; then
+      echo "GLOBAL_DNS_MATCHES_VPN_SERVICE: yes"
+    else
+      echo "GLOBAL_DNS_MATCHES_VPN_SERVICE: no"
+    fi
+  else
+    echo "GLOBAL_DNS_MATCHES_VPN_SERVICE: unknown"
+  fi
+
+  if [ -n "$VPN_SERVICE_SERVERS" ] && [ -n "$PRIMARY_SCOPED_NAMESERVER" ]; then
+    if printf '%s\n' "$VPN_SERVICE_SERVERS" | grep -F "$PRIMARY_SCOPED_NAMESERVER" >/dev/null 2>&1; then
+      echo "SCOPED_DNS_MATCHES_VPN_SERVICE: yes"
+    else
+      echo "SCOPED_DNS_MATCHES_VPN_SERVICE: no"
+    fi
+  else
+    echo "SCOPED_DNS_MATCHES_VPN_SERVICE: unknown"
+  fi
+
+  if [ "$VPN_SERVICE_STATE_SERVER_ADDRESS" = "127.0.0.1" ]; then
+    echo "VPN_SERVICE_HAS_LOOPBACK_SERVER: yes"
+  elif [ -n "$VPN_SERVICE_STATE_SERVER_ADDRESS" ]; then
+    echo "VPN_SERVICE_HAS_LOOPBACK_SERVER: no"
+  else
+    echo "VPN_SERVICE_HAS_LOOPBACK_SERVER: unknown"
+  fi
+
+  if [ -n "$GLOBAL_DNS_CONFIG_SERVICE_ID" ] && [ -n "$PRIMARY_SERVICE_ID" ]; then
+    if [ "$GLOBAL_DNS_CONFIG_SERVICE_ID" = "$PRIMARY_SERVICE_ID" ]; then
+      echo "GLOBAL_CONFIG_POINTS_TO_PRIMARY_SERVICE: yes"
+    else
+      echo "GLOBAL_CONFIG_POINTS_TO_PRIMARY_SERVICE: no"
+    fi
+  else
+    echo "GLOBAL_CONFIG_POINTS_TO_PRIMARY_SERVICE: unknown"
+  fi
+
+  UTUN_INTERFACES=$(ifconfig -l 2>/dev/null | tr ' ' '\n' | rg '^utun' 2>/dev/null | paste -sd ',' -)
+  if [ -n "$UTUN_INTERFACES" ]; then
+    echo "ACTIVE_UTUN_INTERFACES: $UTUN_INTERFACES"
+  else
+    echo "ACTIVE_UTUN_INTERFACES: none"
+  fi
+
+  NWI_OUTPUT_FILE=$(mktemp)
+  if scutil --nwi >"$NWI_OUTPUT_FILE" 2>&1; then
+    NWI_FIRST_LINE=$(sed -n '1p' "$NWI_OUTPUT_FILE")
+    rm -f "$NWI_OUTPUT_FILE"
+    if [ -n "$NWI_FIRST_LINE" ]; then
+      echo "NWI_STATUS: ok"
+      echo "NWI_FIRST_LINE: $NWI_FIRST_LINE"
+    else
+      echo "NWI_STATUS: ok"
+      echo "NWI_FIRST_LINE: empty"
+    fi
+  else
+    NWI_ERROR=$(sed -n '1p' "$NWI_OUTPUT_FILE")
+    rm -f "$NWI_OUTPUT_FILE"
+    if [ -n "$NWI_ERROR" ]; then
+      echo "NWI_STATUS: failed"
+      echo "NWI_FIRST_LINE: $NWI_ERROR"
+    else
+      echo "NWI_STATUS: failed"
+      echo "NWI_FIRST_LINE: unavailable"
+    fi
+  fi
+}
+
+print_env_fallback_summary() {
+  echo "ENV_FALLBACK_SUMMARY:"
+
+  HOSTNAME_OVERRIDE_RESULT=$(python3 - <<'PY'
+import subprocess
+import textwrap
+
+script = textwrap.dedent("""
+import socket
+print(socket.getfqdn())
+""")
+proc = subprocess.Popen(
+    ["env", "HOSTNAME=Dons-MacBook-Pro.local", "python3", "-c", script],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+try:
+    out, err = proc.communicate(timeout=4)
+    value = out.strip() or err.strip() or "<empty>"
+    print(f"rc|{proc.returncode}|{value}")
+except subprocess.TimeoutExpired:
+    proc.kill()
+    proc.communicate()
+    print("timeout||")
+PY
+)
+  HOSTNAME_OVERRIDE_KIND=$(printf '%s\n' "$HOSTNAME_OVERRIDE_RESULT" | cut -d'|' -f1)
+  HOSTNAME_OVERRIDE_RC=$(printf '%s\n' "$HOSTNAME_OVERRIDE_RESULT" | cut -d'|' -f2)
+  HOSTNAME_OVERRIDE_VALUE=$(printf '%s\n' "$HOSTNAME_OVERRIDE_RESULT" | cut -d'|' -f3-)
+  if [ "$HOSTNAME_OVERRIDE_KIND" = "timeout" ]; then
+    echo "ENV_HOSTNAME_OVERRIDE_FQDN_STATUS: timeout"
+    echo "ENV_HOSTNAME_OVERRIDE_FQDN_VALUE: timeout"
+  else
+    echo "ENV_HOSTNAME_OVERRIDE_FQDN_STATUS: rc-$HOSTNAME_OVERRIDE_RC"
+    echo "ENV_HOSTNAME_OVERRIDE_FQDN_VALUE: $HOSTNAME_OVERRIDE_VALUE"
+  fi
+
+  HOSTALIASES_RESULT=$(python3 - <<'PY'
+import os
+import subprocess
+import tempfile
+import textwrap
+
+fd, path = tempfile.mkstemp()
+os.write(fd, b"myhost Dons-MacBook-Pro.local\n")
+os.close(fd)
+
+script = textwrap.dedent("""
+import socket
+print(socket.gethostbyname_ex('myhost'))
+print(socket.getfqdn())
+""")
+proc = subprocess.Popen(
+    ["env", f"HOSTALIASES={path}", "python3", "-c", script],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+try:
+    out, err = proc.communicate(timeout=4)
+    value = out.strip() or err.strip() or "<empty>"
+    print(f"rc|{proc.returncode}|{value}")
+except subprocess.TimeoutExpired:
+    proc.kill()
+    proc.communicate()
+    print("timeout||")
+finally:
+    os.unlink(path)
+PY
+)
+  HOSTALIASES_KIND=$(printf '%s\n' "$HOSTALIASES_RESULT" | cut -d'|' -f1)
+  HOSTALIASES_RC=$(printf '%s\n' "$HOSTALIASES_RESULT" | cut -d'|' -f2)
+  HOSTALIASES_VALUE=$(printf '%s\n' "$HOSTALIASES_RESULT" | cut -d'|' -f3-)
+  if [ "$HOSTALIASES_KIND" = "timeout" ]; then
+    echo "ENV_HOSTALIASES_FQDN_STATUS: timeout"
+    echo "ENV_HOSTALIASES_FQDN_VALUE: timeout"
+  else
+    echo "ENV_HOSTALIASES_FQDN_STATUS: rc-$HOSTALIASES_RC"
+    echo "ENV_HOSTALIASES_FQDN_VALUE: $HOSTALIASES_VALUE"
+  fi
+}
+
+print_post_run_home_summary() {
+  echo "POST_RUN_HOME_SUMMARY:"
+
+  if [ -f "$LICENSE_FILE" ]; then
+    echo "POST_RUN_LICENSE_FILE: present ($LICENSE_FILE)"
+  else
+    echo "POST_RUN_LICENSE_FILE: missing ($LICENSE_FILE)"
+  fi
+
+  if [ -f "$PACL_FILE" ]; then
+    echo "POST_RUN_PACL_FILE: present ($PACL_FILE)"
+  else
+    echo "POST_RUN_PACL_FILE: missing ($PACL_FILE)"
+  fi
+
+  if [ -f "$CLIENT_LOG_FILE" ]; then
+    echo "POST_RUN_CLIENT_LOG: present ($CLIENT_LOG_FILE)"
+  else
+    echo "POST_RUN_CLIENT_LOG: missing ($CLIENT_LOG_FILE)"
+  fi
+
+  ENTITLEMENTS_AUDIT_FILE="$ACTIVE_HOME/Library/Logs/Unity/Unity.Entitlements.Audit.log"
+  if [ -f "$ENTITLEMENTS_AUDIT_FILE" ]; then
+    echo "POST_RUN_AUDIT_LOG: present ($ENTITLEMENTS_AUDIT_FILE)"
+  else
+    echo "POST_RUN_AUDIT_LOG: missing ($ENTITLEMENTS_AUDIT_FILE)"
+  fi
+
+  POST_RUN_LICENSE_FILE_COUNT=$(find "$ACTIVE_HOME/Library/Unity/licenses" -maxdepth 3 -type f 2>/dev/null | wc -l | tr -d ' ')
+  echo "POST_RUN_LICENSE_FILE_COUNT: $POST_RUN_LICENSE_FILE_COUNT"
+}
+
+print_client_failure_summary() {
+  echo "CLIENT_FAILURE_SUMMARY:"
+
+  CONFIG_ERROR_LINE=$(extract_last_matching_line "$CLIENT_LOG_FILE" 'ClientConfigurationLoader.*Couldn.t download remote config')
+  if [ -n "$CONFIG_ERROR_LINE" ]; then
+    echo "CLIENT_REMOTE_CONFIG_ERROR: $CONFIG_ERROR_LINE"
+  else
+    echo "CLIENT_REMOTE_CONFIG_ERROR: none"
+  fi
+
+  COOKIE_ERROR_LINE=$(extract_last_matching_line "$CLIENT_LOG_FILE" 'System\.InvalidOperationException: GetDomainName: -1')
+  if [ -n "$COOKIE_ERROR_LINE" ]; then
+    echo "CLIENT_COOKIE_DOMAIN_ERROR: $COOKIE_ERROR_LINE"
+  else
+    echo "CLIENT_COOKIE_DOMAIN_ERROR: none"
+  fi
+
+  PACL_ERROR_LINE=$(extract_last_matching_line "$CLIENT_LOG_FILE" 'PackageEnforcer.*Failed to update PACL')
+  if [ -n "$PACL_ERROR_LINE" ]; then
+    echo "CLIENT_PACL_UPDATE_ERROR: $PACL_ERROR_LINE"
+  else
+    echo "CLIENT_PACL_UPDATE_ERROR: none"
+  fi
+
+  NO_VALID_LICENSE_LINE=$(extract_last_matching_line "$CLIENT_LOG_FILE" 'Unable to find valid licenses and remote licensing service is not configured')
+  if [ -n "$NO_VALID_LICENSE_LINE" ]; then
+    echo "CLIENT_NO_VALID_LICENSES: $NO_VALID_LICENSE_LINE"
+  else
+    echo "CLIENT_NO_VALID_LICENSES: none"
+  fi
+
+  TOKEN_CACHE_LINE=$(extract_last_matching_line "$CLIENT_LOG_FILE" 'Token not found in cache')
+  if [ -n "$TOKEN_CACHE_LINE" ]; then
+    echo "CLIENT_TOKEN_CACHE_ERROR: $TOKEN_CACHE_LINE"
+  else
+    echo "CLIENT_TOKEN_CACHE_ERROR: none"
+  fi
+
+  ZERO_LICENSE_FILES_LINE=$(extract_last_matching_line "$CLIENT_LOG_FILE" 'Processed 0 license files')
+  if [ -n "$ZERO_LICENSE_FILES_LINE" ]; then
+    echo "CLIENT_ZERO_LICENSE_FILES: $ZERO_LICENSE_FILES_LINE"
+  else
+    echo "CLIENT_ZERO_LICENSE_FILES: none"
+  fi
+}
+
+extract_last_matching_line() {
+  SOURCE_FILE=$1
+  PATTERN=$2
+
+  if [ ! -f "$SOURCE_FILE" ]; then
+    return
+  fi
+
+  grep -E "$PATTERN" "$SOURCE_FILE" | tail -n 1 || true
+}
+
+extract_remote_urls() {
+  SOURCE_FILE=$1
+
+  if [ ! -f "$SOURCE_FILE" ]; then
+    return
+  fi
+
+  python3 - "$SOURCE_FILE" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text(errors="ignore")
+raw_urls = re.findall(r'https?://[^\s"\'<>]+', text)
+urls = sorted({url.rstrip(':.,);') for url in raw_urls})
+for url in urls:
+    print(url)
+PY
+}
+
+print_remote_connectivity_summary() {
+  echo "REMOTE_CONNECTIVITY_SUMMARY:"
+
+  URL_CANDIDATES=$(printf '%s\n%s\n' \
+    "https://public-cdn.cloud.unity3d.com/config/production" \
+    "https://license.unity3d.com/licenses/v1/packages/acl")
+
+  if [ -f "$CLIENT_LOG_FILE" ]; then
+    LOG_URLS=$(extract_remote_urls "$CLIENT_LOG_FILE" || true)
+    if [ -n "$LOG_URLS" ]; then
+      URL_CANDIDATES=$(printf '%s\n%s\n' "$URL_CANDIDATES" "$LOG_URLS")
+    fi
+  fi
+
+  UNIQUE_URLS=$(printf '%s\n' "$URL_CANDIDATES" | awk 'NF && !seen[$0]++')
+
+  if [ -z "$UNIQUE_URLS" ]; then
+    echo "REMOTE_URL_COUNT: 0"
+    echo "REMOTE_CONNECTIVITY_CONCLUSION: unavailable"
+    return
+  fi
+
+  URL_COUNT=$(printf '%s\n' "$UNIQUE_URLS" | sed '/^$/d' | wc -l | tr -d ' ')
+  echo "REMOTE_URL_COUNT: $URL_COUNT"
+
+  REACHABLE_COUNT=0
+  TOTAL_COUNT=0
+
+  while IFS= read -r URL; do
+    [ -n "$URL" ] || continue
+    TOTAL_COUNT=$((TOTAL_COUNT + 1))
+    echo "REMOTE_URL: $URL"
+
+    HOST=$(python3 - "$URL" <<'PY'
+import sys
+import urllib.parse
+print(urllib.parse.urlparse(sys.argv[1]).hostname or "")
+PY
+)
+
+    if [ -n "$HOST" ]; then
+      echo "REMOTE_HOST: $HOST"
+    else
+      echo "REMOTE_HOST: unavailable"
+      continue
+    fi
+
+    DNS_RESULT=$(python3 - "$HOST" <<'PY'
+import socket
+import sys
+
+host = sys.argv[1]
+try:
+    addrs = sorted({item[4][0] for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)})
+    print("ok|" + ",".join(addrs))
+except Exception as exc:
+    print("error|" + str(exc))
+PY
+)
+
+    DNS_STATUS=$(printf '%s\n' "$DNS_RESULT" | cut -d'|' -f1)
+    DNS_DETAIL=$(printf '%s\n' "$DNS_RESULT" | cut -d'|' -f2-)
+    if [ "$DNS_STATUS" = "ok" ]; then
+      echo "REMOTE_DNS: ok ($DNS_DETAIL)"
+    else
+      echo "REMOTE_DNS: failed ($DNS_DETAIL)"
+    fi
+
+    CURL_OUTPUT_FILE=$(mktemp)
+    if curl -I --max-time 10 -sS "$URL" >"$CURL_OUTPUT_FILE" 2>&1; then
+      HTTP_STATUS_LINE=$(sed -n '1p' "$CURL_OUTPUT_FILE")
+      rm -f "$CURL_OUTPUT_FILE"
+      if [ -n "$HTTP_STATUS_LINE" ]; then
+        echo "REMOTE_HTTP: ok ($HTTP_STATUS_LINE)"
+      else
+        echo "REMOTE_HTTP: ok (status-line-missing)"
+      fi
+      REACHABLE_COUNT=$((REACHABLE_COUNT + 1))
+    else
+      HTTP_ERROR=$(cat "$CURL_OUTPUT_FILE" 2>/dev/null || true)
+      rm -f "$CURL_OUTPUT_FILE"
+      if [ -n "$HTTP_ERROR" ]; then
+        echo "REMOTE_HTTP: failed ($HTTP_ERROR)"
+      else
+        echo "REMOTE_HTTP: failed (unknown)"
+      fi
+    fi
+  done <<EOF
+$UNIQUE_URLS
+EOF
+
+  if [ "$URL_COUNT" -gt 0 ] && [ "$REACHABLE_COUNT" -eq "$URL_COUNT" ]; then
+    echo "REMOTE_CONNECTIVITY_CONCLUSION: reachable"
+  elif [ "$REACHABLE_COUNT" -gt 0 ]; then
+    echo "REMOTE_CONNECTIVITY_CONCLUSION: partial"
+  else
+    echo "REMOTE_CONNECTIVITY_CONCLUSION: failed"
+  fi
+}
+
+print_log_context_summary() {
+  echo "LOG_CONTEXT_SUMMARY:"
+
+  BATCHMODE_CHANNEL_LINE=$(extract_last_matching_line "$LOG_FILE" 'Successfully connected to LicensingClient on channel:')
+  if [ -n "$BATCHMODE_CHANNEL_LINE" ]; then
+    echo "BATCHMODE_CHANNEL_LINE: $BATCHMODE_CHANNEL_LINE"
+  else
+    echo "BATCHMODE_CHANNEL_LINE: missing"
+  fi
+
+  BATCHMODE_NOTIFICATION_LINE=$(extract_last_matching_line "$LOG_FILE" 'Successfully connected to: "LicenseClient-.*-notifications"')
+  if [ -n "$BATCHMODE_NOTIFICATION_LINE" ]; then
+    echo "BATCHMODE_NOTIFICATION_LINE: $BATCHMODE_NOTIFICATION_LINE"
+  else
+    echo "BATCHMODE_NOTIFICATION_LINE: missing"
+  fi
+
+  CLIENT_LICENSE_PATH_LINE=$(extract_last_matching_line "$CLIENT_LOG_FILE" 'Processing license ')
+  if [ -n "$CLIENT_LICENSE_PATH_LINE" ]; then
+    echo "CLIENT_LICENSE_PATH_LINE: $CLIENT_LICENSE_PATH_LINE"
+  else
+    echo "CLIENT_LICENSE_PATH_LINE: missing"
+  fi
+
+  READONLY_LINE=$(extract_last_matching_line "$LOG_FILE" 'readonly database')
+  if [ -n "$READONLY_LINE" ]; then
+    echo "BATCHMODE_READONLY_LINE: $READONLY_LINE"
+    if printf '%s\n' "$READONLY_LINE" | grep -E '/|Library|\.db|\.sqlite' >/dev/null 2>&1; then
+      echo "BATCHMODE_READONLY_PATH_HINT: present"
+    else
+      echo "BATCHMODE_READONLY_PATH_HINT: none"
+    fi
+  else
+    echo "BATCHMODE_READONLY_LINE: missing"
+    echo "BATCHMODE_READONLY_PATH_HINT: unknown"
+  fi
+
+  if [ "$USE_SANDBOX_HOME" -eq 1 ] && [ -n "$BATCHMODE_CHANNEL_LINE" ]; then
+    if printf '%s\n' "$BATCHMODE_CHANNEL_LINE" | grep -F "LicenseClient-$(basename "$ORIGINAL_HOME")" >/dev/null 2>&1; then
+      echo "SANDBOX_HOME_SHARED_USER_CHANNEL: yes"
+    else
+      echo "SANDBOX_HOME_SHARED_USER_CHANNEL: no"
+    fi
+  fi
+}
+
+print_runtime_log_summary() {
+  echo "RUNTIME_LOG_SUMMARY:"
+
+  CLIENT_SNAPSHOT=$(extract_last_entitlement_snapshot "$CLIENT_LOG_FILE")
+  if [ -n "$CLIENT_SNAPSHOT" ]; then
+    CLIENT_GROUPS=$(printf '%s\n' "$CLIENT_SNAPSHOT" | cut -d'|' -f1)
+    CLIENT_FREE=$(printf '%s\n' "$CLIENT_SNAPSHOT" | cut -d'|' -f2)
+    CLIENT_LINE=$(printf '%s\n' "$CLIENT_SNAPSHOT" | cut -d'|' -f3-)
+    echo "CLIENT_LAST_ENTITLEMENT_GROUPS: $CLIENT_GROUPS"
+    echo "CLIENT_LAST_FREE_ENTITLEMENTS: $CLIENT_FREE"
+    echo "CLIENT_LAST_ENTITLEMENT_LINE: $CLIENT_LINE"
+  else
+    echo "CLIENT_LAST_ENTITLEMENT_GROUPS: unknown"
+    echo "CLIENT_LAST_FREE_ENTITLEMENTS: unknown"
+  fi
+
+  BATCHMODE_SNAPSHOT=$(extract_last_entitlement_snapshot "$LOG_FILE")
+  if [ -n "$BATCHMODE_SNAPSHOT" ]; then
+    BATCHMODE_GROUPS=$(printf '%s\n' "$BATCHMODE_SNAPSHOT" | cut -d'|' -f1)
+    BATCHMODE_FREE=$(printf '%s\n' "$BATCHMODE_SNAPSHOT" | cut -d'|' -f2)
+    BATCHMODE_LINE=$(printf '%s\n' "$BATCHMODE_SNAPSHOT" | cut -d'|' -f3-)
+    echo "BATCHMODE_LAST_ENTITLEMENT_GROUPS: $BATCHMODE_GROUPS"
+    echo "BATCHMODE_LAST_FREE_ENTITLEMENTS: $BATCHMODE_FREE"
+    echo "BATCHMODE_LAST_ENTITLEMENT_LINE: $BATCHMODE_LINE"
+  else
+    echo "BATCHMODE_LAST_ENTITLEMENT_GROUPS: unknown"
+    echo "BATCHMODE_LAST_FREE_ENTITLEMENTS: unknown"
+  fi
+
+  if log_contains "attempt to write a readonly database"; then
+    echo "BATCHMODE_READONLY_DATABASE: yes"
+  else
+    echo "BATCHMODE_READONLY_DATABASE: no"
+  fi
+
+  if log_contains "'com.unity.editor.headless' was not found."; then
+    echo "BATCHMODE_HEADLESS_ENTITLEMENT: missing"
+  elif log_contains "Successfully changed project path to:" || log_contains "COMMAND LINE ARGUMENTS:" || log_contains "[Package Manager] Connected to IPC stream"; then
+    echo "BATCHMODE_HEADLESS_ENTITLEMENT: resolved"
+  else
+    echo "BATCHMODE_HEADLESS_ENTITLEMENT: unknown"
+  fi
+
+  if [ "$USE_SANDBOX_HOME" -eq 1 ] && log_contains "attempt to write a readonly database"; then
+    echo "SANDBOX_HOME_READONLY_REPRO: yes"
+  elif [ "$USE_SANDBOX_HOME" -eq 1 ]; then
+    echo "SANDBOX_HOME_READONLY_REPRO: no"
+  fi
+
+  if [ "$USE_SANDBOX_HOME" -eq 1 ] && log_contains "Found 0 entitlement groups and 0 free entitlements"; then
+    echo "SANDBOX_HOME_ZERO_ENTITLEMENT_REPRO: yes"
+  elif [ "$USE_SANDBOX_HOME" -eq 1 ]; then
+    echo "SANDBOX_HOME_ZERO_ENTITLEMENT_REPRO: no"
+  fi
+
+  if [ "$USE_SANDBOX_HOME" -eq 1 ] && [ -w "$METRICS_DIR" ] && log_contains "attempt to write a readonly database"; then
+    echo "SANDBOX_HOME_WRITABLE_BUT_READONLY: yes"
+  elif [ "$USE_SANDBOX_HOME" -eq 1 ] && [ -w "$METRICS_DIR" ]; then
+    echo "SANDBOX_HOME_WRITABLE_BUT_READONLY: no"
+  fi
+}
+
+print_correlation_summary() {
+  echo "CORRELATION_SUMMARY:"
+
+  HOSTNAME_ERROR_TEXT=$(scutil --get HostName 2>&1 || true)
+  if printf '%s\n' "$HOSTNAME_ERROR_TEXT" | grep -F "HostName: not set" >/dev/null 2>&1 && \
+     [ -f "$CLIENT_LOG_FILE" ] && grep -F "GetDomainName: -1" "$CLIENT_LOG_FILE" >/dev/null 2>&1; then
+    echo "CORRELATION_HOSTNAME_CHAIN_SUSPECT: yes"
+  else
+    echo "CORRELATION_HOSTNAME_CHAIN_SUSPECT: no"
+  fi
+
+  if [ "$FRESH_SANDBOX_HOME" -eq 1 ] && [ -n "$OVERRIDE_USER" ] && \
+     [ ! -f "$LICENSE_FILE" ] && [ ! -f "$PACL_FILE" ] && \
+     [ -f "$CLIENT_LOG_FILE" ] && grep -F "Processed 0 license files" "$CLIENT_LOG_FILE" >/dev/null 2>&1; then
+    echo "CORRELATION_FRESH_HOME_STILL_ZERO_LICENSES: yes"
+  else
+    echo "CORRELATION_FRESH_HOME_STILL_ZERO_LICENSES: no"
+  fi
+
+  if [ -f "$CLIENT_LOG_FILE" ] && \
+     grep -F "Token not found in cache" "$CLIENT_LOG_FILE" >/dev/null 2>&1 && \
+     grep -F "Failed to update PACL" "$CLIENT_LOG_FILE" >/dev/null 2>&1; then
+    echo "CORRELATION_EARLY_IDENTITY_OR_NETWORK_FAILURE: yes"
+  else
+    echo "CORRELATION_EARLY_IDENTITY_OR_NETWORK_FAILURE: no"
+  fi
+
+  if [ "$USE_SANDBOX_HOME" -eq 1 ] && [ -n "$OVERRIDE_USER" ] && \
+     grep -F "LicenseClient-$OVERRIDE_USER" "$LOG_FILE" >/dev/null 2>&1 && \
+     log_contains "attempt to write a readonly database"; then
+    echo "CORRELATION_NEW_USER_CHANNEL_STILL_READONLY: yes"
+  else
+    echo "CORRELATION_NEW_USER_CHANNEL_STILL_READONLY: no"
+  fi
+
+  REMOTE_CONCLUSION=$(collect_remote_connectivity_conclusion)
+  if [ "$REMOTE_CONCLUSION" = "reachable" ] && [ -f "$CLIENT_LOG_FILE" ] && \
+     grep -F "GetDomainName: -1" "$CLIENT_LOG_FILE" >/dev/null 2>&1; then
+    echo "CORRELATION_REMOTE_ENDPOINTS_REACHABLE_BUT_CLIENT_INIT_FAILED: yes"
+  else
+    echo "CORRELATION_REMOTE_ENDPOINTS_REACHABLE_BUT_CLIENT_INIT_FAILED: no"
+  fi
+
+  set +e
+  HOSTNAME_F_OUTPUT=$(run_with_timeout_capture 3 hostname -f)
+  HOSTNAME_F_RC=$?
+  PY_FQDN_OUTPUT=$(run_with_timeout_capture 3 python3 -c 'import socket; print(socket.getfqdn())')
+  PY_FQDN_RC=$?
+  set -e
+  if [ "$HOSTNAME_F_RC" -eq 0 ] && printf '%s\n' "$HOSTNAME_ERROR_TEXT" | grep -F "HostName: not set" >/dev/null 2>&1; then
+    echo "CORRELATION_HOSTNAME_API_SPLIT_BRAIN: yes"
+  elif [ "$PY_FQDN_RC" -eq 124 ] && printf '%s\n' "$HOSTNAME_ERROR_TEXT" | grep -F "HostName: not set" >/dev/null 2>&1; then
+    echo "CORRELATION_HOSTNAME_API_SPLIT_BRAIN: yes"
+  else
+    echo "CORRELATION_HOSTNAME_API_SPLIT_BRAIN: no"
+  fi
+
+  SEARCH_DOMAIN=$(scutil --dns 2>/dev/null | sed -n 's/.*search domain\[[0-9][0-9]*\] : //p' | head -n 1)
+  SHORT_HOSTNAME=$(hostname 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\..*$//')
+  LOCAL_HOSTNAME=$(scutil --get LocalHostName 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)
+  SHORT_LOOKUP_OUTPUT=$(python3 - "$SHORT_HOSTNAME" <<'PY'
+import subprocess
+import sys
+name = sys.argv[1]
+if not name:
+    print("")
+    raise SystemExit(0)
+try:
+    proc = subprocess.run(
+        ["dscacheutil", "-q", "host", "-a", "name", name],
+        capture_output=True,
+        text=True,
+        timeout=3,
+        check=False,
+    )
+    print(proc.stdout)
+except Exception:
+    print("")
+PY
+)
+  if [ -n "$SEARCH_DOMAIN" ] && [ -n "$SHORT_HOSTNAME" ] && \
+     printf '%s\n' "$SHORT_LOOKUP_OUTPUT" | grep -F "${SHORT_HOSTNAME}.${SEARCH_DOMAIN}" >/dev/null 2>&1; then
+    echo "CORRELATION_SHORT_HOSTNAME_EXPANDS_TO_SEARCH_DOMAIN: yes"
+  else
+    echo "CORRELATION_SHORT_HOSTNAME_EXPANDS_TO_SEARCH_DOMAIN: no"
+  fi
+
+  LOCAL_RESOLVER_REACH=$(scutil --dns 2>/dev/null | awk '
+    /domain   : local/ { in_local = 1; next }
+    in_local && /reach/ { print; exit }
+    in_local && /^resolver/ { exit }
+  ')
+  if printf '%s\n' "$LOCAL_RESOLVER_REACH" | grep -F "Not Reachable" >/dev/null 2>&1 && \
+     [ -n "$SEARCH_DOMAIN" ] && [ -n "$SHORT_HOSTNAME" ] && \
+     printf '%s\n' "$SHORT_LOOKUP_OUTPUT" | grep -F "${SHORT_HOSTNAME}.${SEARCH_DOMAIN}" >/dev/null 2>&1; then
+    echo "CORRELATION_LOCAL_MDNS_UNREACHABLE_AND_SHORTNAME_DRIFTS: yes"
+  else
+    echo "CORRELATION_LOCAL_MDNS_UNREACHABLE_AND_SHORTNAME_DRIFTS: no"
+  fi
+
+  HOSTNAME_OVERRIDE_RESULT=$(python3 - <<'PY'
+import subprocess
+import textwrap
+
+script = textwrap.dedent("""
+import socket
+print(socket.getfqdn())
+""")
+proc = subprocess.Popen(
+    ["env", "HOSTNAME=Dons-MacBook-Pro.local", "python3", "-c", script],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+try:
+    proc.communicate(timeout=4)
+    print("ok")
+except subprocess.TimeoutExpired:
+    proc.kill()
+    proc.communicate()
+    print("timeout")
+PY
+)
+  HOSTALIASES_RESULT=$(python3 - <<'PY'
+import os
+import subprocess
+import tempfile
+import textwrap
+
+fd, path = tempfile.mkstemp()
+os.write(fd, b"myhost Dons-MacBook-Pro.local\n")
+os.close(fd)
+
+script = textwrap.dedent("""
+import socket
+print(socket.gethostbyname_ex('myhost'))
+print(socket.getfqdn())
+""")
+proc = subprocess.Popen(
+    ["env", f"HOSTALIASES={path}", "python3", "-c", script],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+try:
+    proc.communicate(timeout=4)
+    print("ok")
+except subprocess.TimeoutExpired:
+    proc.kill()
+    proc.communicate()
+    print("timeout")
+finally:
+    os.unlink(path)
+PY
+)
+  if printf '%s\n' "$HOSTNAME_OVERRIDE_RESULT" | grep -F "timeout" >/dev/null 2>&1 && \
+     printf '%s\n' "$HOSTALIASES_RESULT" | grep -F "timeout" >/dev/null 2>&1; then
+    echo "CORRELATION_ENV_HOST_FALLBACKS_DONT_UNBLOCK_FQDN: yes"
+  else
+    echo "CORRELATION_ENV_HOST_FALLBACKS_DONT_UNBLOCK_FQDN: no"
+  fi
+
+  SCOPED_DNS_OUTPUT=$(scutil --dns 2>/dev/null | awk '
+    /^DNS configuration \(for scoped queries\)/ { in_scoped = 1; next }
+    in_scoped { print }
+  ')
+  if printf '%s\n' "$SCOPED_DNS_OUTPUT" | grep -F "(utun" >/dev/null 2>&1 && \
+     [ -n "$SEARCH_DOMAIN" ]; then
+    echo "CORRELATION_SCOPED_UTUN_PRESENT_WITH_SEARCH_DOMAIN: yes"
+  else
+    echo "CORRELATION_SCOPED_UTUN_PRESENT_WITH_SEARCH_DOMAIN: no"
+  fi
+
+  NWI_ERROR_TEXT=$(scutil --nwi 2>&1 || true)
+  if printf '%s\n' "$NWI_ERROR_TEXT" | grep -F "registration failed" >/dev/null 2>&1 && \
+     printf '%s\n' "$SCOPED_DNS_OUTPUT" | grep -F "(utun" >/dev/null 2>&1; then
+    echo "CORRELATION_NWI_FAILED_WHILE_UTUN_ACTIVE: yes"
+  else
+    echo "CORRELATION_NWI_FAILED_WHILE_UTUN_ACTIVE: no"
+  fi
+
+  GLOBAL_DNS_STATE=$(scutil <<'EOF' 2>/dev/null
+show State:/Network/Global/DNS
+EOF
+)
+  GLOBAL_DNS_SERVERS=$(printf '%s\n' "$GLOBAL_DNS_STATE" | sed -n '/ServerAddresses : <array> {/,/}/{s/^[[:space:]]*[0-9][[:space:]]*: //p;}' | paste -sd ',' -)
+  PRIMARY_DOMAIN_SERVICE_ID=$(scutil <<'EOF' 2>/dev/null
+list State:/Network/Service/.*/DNS
+EOF
+)
+  PRIMARY_DOMAIN_SERVICE_ID=$(printf '%s\n' "$PRIMARY_DOMAIN_SERVICE_ID" | sed -n 's/.*State:\/Network\/Service\/\([^/]*\)\/DNS.*/\1/p' | while read -r service_id; do
+    [ -n "$service_id" ] || continue
+    service_dns=$(scutil <<EOS 2>/dev/null
+show State:/Network/Service/$service_id/DNS
+EOS
+)
+    service_domain=$(printf '%s\n' "$service_dns" | sed -n 's/^[[:space:]]*DomainName : //p' | head -n 1)
+    if [ -n "$service_domain" ]; then
+      printf '%s\n' "$service_id"
+      break
+    fi
+  done | head -n 1)
+  PRIMARY_SERVICE_SERVERS=""
+  if [ -n "$PRIMARY_DOMAIN_SERVICE_ID" ]; then
+    PRIMARY_SERVICE_DNS=$(scutil <<EOF 2>/dev/null
+show State:/Network/Service/$PRIMARY_DOMAIN_SERVICE_ID/DNS
+EOF
+)
+    PRIMARY_SERVICE_SERVERS=$(printf '%s\n' "$PRIMARY_SERVICE_DNS" | sed -n '/ServerAddresses : <array> {/,/}/{s/^[[:space:]]*[0-9][[:space:]]*: //p;}' | paste -sd ',' -)
+  fi
+  if [ -n "$GLOBAL_DNS_SERVERS" ] && [ -n "$PRIMARY_SERVICE_SERVERS" ] && [ "$GLOBAL_DNS_SERVERS" != "$PRIMARY_SERVICE_SERVERS" ]; then
+    echo "CORRELATION_GLOBAL_DNS_DIFFERS_FROM_PRIMARY_SERVICE: yes"
+  else
+    echo "CORRELATION_GLOBAL_DNS_DIFFERS_FROM_PRIMARY_SERVICE: no"
+  fi
+
+  GLOBAL_DNS_CONFIG_ID=$(printf '%s\n' "$GLOBAL_DNS_STATE" | sed -n 's/^[[:space:]]*__CONFIGURATION_ID__ : //p' | head -n 1)
+  GLOBAL_DNS_CONFIG_SERVICE_ID=$(printf '%s\n' "$GLOBAL_DNS_CONFIG_ID" | sed -n 's/^Default: \([0-9A-F-][0-9A-F-]*\) .*/\1/p' | head -n 1)
+  if [ -n "$GLOBAL_DNS_CONFIG_SERVICE_ID" ] && [ -n "$PRIMARY_DOMAIN_SERVICE_ID" ] && \
+     [ "$GLOBAL_DNS_CONFIG_SERVICE_ID" = "$PRIMARY_DOMAIN_SERVICE_ID" ] && \
+     [ -n "$GLOBAL_DNS_SERVERS" ] && [ -n "$PRIMARY_SERVICE_SERVERS" ] && \
+     [ "$GLOBAL_DNS_SERVERS" != "$PRIMARY_SERVICE_SERVERS" ]; then
+    echo "CORRELATION_GLOBAL_CONFIG_POINTS_TO_PRIMARY_BUT_DNS_DIFFERS: yes"
+  else
+    echo "CORRELATION_GLOBAL_CONFIG_POINTS_TO_PRIMARY_BUT_DNS_DIFFERS: no"
+  fi
+
+  VPN_SERVICE_ID=""
+  VPN_SERVICE_SERVERS=""
+  VPN_SERVICE_STATE_SERVER_ADDRESS=""
+  DNS_SERVICE_IDS=$(scutil <<'EOF' 2>/dev/null
+list State:/Network/Service/.*/DNS
+EOF
+)
+  DNS_SERVICE_IDS=$(printf '%s\n' "$DNS_SERVICE_IDS" | sed -n 's/.*State:\/Network\/Service\/\([^/]*\)\/DNS.*/\1/p')
+  for service_id in $DNS_SERVICE_IDS; do
+    [ -n "$service_id" ] || continue
+    service_dns=$(scutil <<EOS 2>/dev/null
+show State:/Network/Service/$service_id/DNS
+EOS
+)
+    service_ipv4_setup=$(scutil <<EOS 2>/dev/null
+show Setup:/Network/Service/$service_id/IPv4
+EOS
+)
+    service_ipv4_state=$(scutil <<EOS 2>/dev/null
+show State:/Network/Service/$service_id/IPv4
+EOS
+)
+    service_config_method=$(printf '%s\n' "$service_ipv4_setup" | sed -n 's/^[[:space:]]*ConfigMethod : //p' | head -n 1)
+    if [ "$service_config_method" = "VPN" ]; then
+      VPN_SERVICE_ID=$service_id
+      VPN_SERVICE_SERVERS=$(printf '%s\n' "$service_dns" | sed -n '/ServerAddresses : <array> {/,/}/{s/^[[:space:]]*[0-9][[:space:]]*: //p;}' | paste -sd ',' -)
+      VPN_SERVICE_STATE_SERVER_ADDRESS=$(printf '%s\n' "$service_ipv4_state" | sed -n 's/^[[:space:]]*ServerAddress : //p' | head -n 1)
+      break
+    fi
+  done
+  PRIMARY_SCOPED_NAMESERVER=$(printf '%s\n' "$SCOPED_DNS_OUTPUT" | sed -n 's/.*nameserver\[[0-9][0-9]*\] : //p' | head -n 1)
+  if [ -n "$VPN_SERVICE_SERVERS" ] && [ -n "$GLOBAL_DNS_SERVERS" ] && \
+     [ "$VPN_SERVICE_SERVERS" = "$GLOBAL_DNS_SERVERS" ] && \
+     [ -n "$PRIMARY_SCOPED_NAMESERVER" ] && printf '%s\n' "$VPN_SERVICE_SERVERS" | grep -F "$PRIMARY_SCOPED_NAMESERVER" >/dev/null 2>&1; then
+    echo "CORRELATION_EFFECTIVE_DNS_MATCHES_VPN_SERVICE: yes"
+  else
+    echo "CORRELATION_EFFECTIVE_DNS_MATCHES_VPN_SERVICE: no"
+  fi
+
+  if [ "$VPN_SERVICE_STATE_SERVER_ADDRESS" = "127.0.0.1" ] && \
+     [ -n "$VPN_SERVICE_SERVERS" ] && [ -n "$GLOBAL_DNS_SERVERS" ] && \
+     [ "$VPN_SERVICE_SERVERS" = "$GLOBAL_DNS_SERVERS" ]; then
+    echo "CORRELATION_LOOPBACK_VPN_SERVICE_MATCHES_EFFECTIVE_DNS: yes"
+  else
+    echo "CORRELATION_LOOPBACK_VPN_SERVICE_MATCHES_EFFECTIVE_DNS: no"
+  fi
+}
+
+collect_remote_connectivity_conclusion() {
+  URL_CANDIDATES=$(printf '%s\n%s\n' \
+    "https://public-cdn.cloud.unity3d.com/config/production" \
+    "https://license.unity3d.com/licenses/v1/packages/acl")
+
+  if [ -f "$CLIENT_LOG_FILE" ]; then
+    LOG_URLS=$(extract_remote_urls "$CLIENT_LOG_FILE" || true)
+    if [ -n "$LOG_URLS" ]; then
+      URL_CANDIDATES=$(printf '%s\n%s\n' "$URL_CANDIDATES" "$LOG_URLS")
+    fi
+  fi
+
+  UNIQUE_URLS=$(printf '%s\n' "$URL_CANDIDATES" | awk 'NF && !seen[$0]++')
+  if [ -z "$UNIQUE_URLS" ]; then
+    echo "unavailable"
+    return
+  fi
+
+  URL_COUNT=$(printf '%s\n' "$UNIQUE_URLS" | sed '/^$/d' | wc -l | tr -d ' ')
+  REACHABLE_COUNT=0
+
+  while IFS= read -r URL; do
+    [ -n "$URL" ] || continue
+    if curl -I --max-time 10 -sS "$URL" >/dev/null 2>&1; then
+      REACHABLE_COUNT=$((REACHABLE_COUNT + 1))
+    fi
+  done <<EOF
+$UNIQUE_URLS
+EOF
+
+  if [ "$URL_COUNT" -gt 0 ] && [ "$REACHABLE_COUNT" -eq "$URL_COUNT" ]; then
+    echo "reachable"
+  elif [ "$REACHABLE_COUNT" -gt 0 ]; then
+    echo "partial"
+  else
+    echo "failed"
+  fi
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --log)
+      [ $# -ge 2 ] || usage
+      LOG_FILE=$2
+      shift 2
+      ;;
+    --use-temp-clone)
+      USE_TEMP_CLONE=1
+      shift
+      ;;
+    --clone-root)
+      [ $# -ge 2 ] || usage
+      CLONE_ROOT=$2
+      shift 2
+      ;;
+    --startup-timeout)
+      [ $# -ge 2 ] || usage
+      STARTUP_TIMEOUT=$2
+      shift 2
+      ;;
+    --sandbox-home)
+      USE_SANDBOX_HOME=1
+      shift
+      ;;
+    --fresh-sandbox-home)
+      USE_SANDBOX_HOME=1
+      FRESH_SANDBOX_HOME=1
+      shift
+      ;;
+    --override-user)
+      [ $# -ge 2 ] || usage
+      OVERRIDE_USER=$2
+      shift 2
+      ;;
+    --override-hostname)
+      [ $# -ge 2 ] || usage
+      OVERRIDE_HOSTNAME=$2
+      shift 2
+      ;;
+    --hostaliases-local)
+      USE_HOSTALIASES_LOCAL=1
+      shift
+      ;;
+    --override-localdomain)
+      [ $# -ge 2 ] || usage
+      OVERRIDE_LOCALDOMAIN=$2
+      shift 2
+      ;;
+    --override-res-options)
+      [ $# -ge 2 ] || usage
+      OVERRIDE_RES_OPTIONS=$2
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+refresh_home_paths
+
+if [ "$USE_TEMP_CLONE" -eq 1 ]; then
+  create_temp_clone
+fi
+
+if [ "$USE_SANDBOX_HOME" -eq 1 ]; then
+  create_sandbox_home
+fi
+
+prepare_hostaliases_file
+
+UNITY_VERSION=$(sed -n 's/^m_EditorVersion: //p' "$PROJECT_VERSION_FILE" | head -n 1)
+UNITY_EDITOR="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/MacOS/Unity"
+
+if [ ! -x "$UNITY_EDITOR" ]; then
+  echo "Unity editor not found: $UNITY_EDITOR" >&2
+  exit 1
+fi
+
+echo "Probing Unity batchmode licensing for $PROJECT_ROOT_TO_RUN"
+echo "Log: $LOG_FILE"
+echo "Startup timeout: ${STARTUP_TIMEOUT}s"
+echo "Active HOME: $ACTIVE_HOME"
+print_identity_summary
+print_system_identity_summary
+print_host_api_summary
+print_resolver_path_summary
+print_network_scope_summary
+print_env_fallback_summary
+print_local_license_summary
+print_client_log_evidence
+print_process_evidence
+print_metrics_db_evidence
+print_write_probe_evidence
+print_home_db_inventory
+
+trap cleanup_child INT TERM EXIT
+ACTIVE_USER_VALUE="${OVERRIDE_USER:-${USER:-}}"
+ACTIVE_LOGNAME_VALUE="${LOGNAME:-}"
+ACTIVE_HOSTNAME_VALUE="${OVERRIDE_HOSTNAME:-${HOSTNAME:-}}"
+ACTIVE_HOSTALIASES_VALUE="${HOSTALIASES_FILE:-${HOSTALIASES:-}}"
+ACTIVE_LOCALDOMAIN_VALUE="${OVERRIDE_LOCALDOMAIN:-${LOCALDOMAIN:-}}"
+ACTIVE_RES_OPTIONS_VALUE="${OVERRIDE_RES_OPTIONS:-${RES_OPTIONS:-}}"
+
+env HOME="$ACTIVE_HOME" USER="$ACTIVE_USER_VALUE" LOGNAME="$ACTIVE_LOGNAME_VALUE" HOSTNAME="$ACTIVE_HOSTNAME_VALUE" HOSTALIASES="$ACTIVE_HOSTALIASES_VALUE" LOCALDOMAIN="$ACTIVE_LOCALDOMAIN_VALUE" RES_OPTIONS="$ACTIVE_RES_OPTIONS_VALUE" "$UNITY_EDITOR" \
+  -batchmode \
+  -projectPath "$PROJECT_ROOT_TO_RUN" \
+  -quit \
+  -logFile "$LOG_FILE" &
+UNITY_PID=$!
+START_TIME=$(date +%s)
+
+while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
+  if log_contains "COMMAND LINE ARGUMENTS:" || log_contains "[Package Manager] Connected to IPC stream" || log_contains "Successfully changed project path to:"; then
+    echo "STATUS: startup-ok"
+    echo "DETAIL: Unity passed licensing and entered normal batchmode startup."
+    trap - INT TERM EXIT
+    wait "$UNITY_PID"
+    exit 0
+  fi
+
+  NOW=$(date +%s)
+  if [ $((NOW - START_TIME)) -ge "$STARTUP_TIMEOUT" ]; then
+    break
+  fi
+
+  sleep 1
+done
+
+STATUS="startup-timeout"
+DETAIL="Unity did not reach normal batchmode startup before timeout."
+
+if log_contains "Found 0 entitlement groups and 0 free entitlements"; then
+  STATUS="entitlement-missing"
+  DETAIL="Licensing returned 0 entitlement groups."
+fi
+
+if log_contains "'com.unity.editor.headless' was not found."; then
+  STATUS="headless-entitlement-missing"
+  DETAIL="Current licensing session does not expose com.unity.editor.headless."
+  if license_contains "com.unity.editor.headless"; then
+    DETAIL="$DETAIL Local entitlement file still contains it, so the failure is in runtime resolver/session state rather than the cached license XML."
+  fi
+fi
+
+if log_contains "attempt to write a readonly database"; then
+  if [ "$STATUS" = "startup-timeout" ]; then
+    STATUS="readonly-database"
+    DETAIL="Unity hit a readonly database write during startup."
+  else
+    DETAIL="$DETAIL Also hit a readonly database write during startup."
+  fi
+fi
+
+echo "STATUS: $STATUS"
+echo "DETAIL: $DETAIL"
+echo "LOG: $LOG_FILE"
+print_log_evidence
+print_post_run_home_summary
+print_client_failure_summary
+print_log_context_summary
+print_runtime_log_summary
+print_remote_connectivity_summary
+print_correlation_summary
+exit 1

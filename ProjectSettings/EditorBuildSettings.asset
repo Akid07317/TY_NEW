@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/_Game/Scenes/MainMenu.unity
+    guid: a1b2c3d4e5f6478899aabbccddeeff02
+  - enabled: 1
+    path: Assets/_Game/Scenes/Chapter01_Combined.unity
+    guid: a1b2c3d4e5f6478899aabbccddeeff05
+  - enabled: 1
+    path: Assets/_Game/Scenes/Bootstrap.unity
+    guid: a1b2c3d4e5f6478899aabbccddeeff01
+  - enabled: 1
+    path: Assets/_Game/Scenes/CombatTest.unity
+    guid: a1b2c3d4e5f6478899aabbccddeeff03
+  - enabled: 1
+    path: Assets/_Game/Scenes/BossTest.unity
+    guid: a1b2c3d4e5f6478899aabbccddeeff04
+  m_configObjects:
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: b1c2d3e4f5a6478899aabbccddeeff10, type: 3}

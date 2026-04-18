@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+PROJECT_VERSION_FILE="$PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
+
+if [ ! -f "$PROJECT_VERSION_FILE" ]; then
+  echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
+  exit 1
+fi
+
+UNITY_VERSION=$(sed -n 's/^m_EditorVersion: //p' "$PROJECT_VERSION_FILE" | head -n 1)
+UNITY_ROOT="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/Resources/Scripting"
+DOTNET="$UNITY_ROOT/NetCoreRuntime/dotnet"
+
+if [ ! -x "$DOTNET" ]; then
+  echo "Unity bundled dotnet not found: $DOTNET" >&2
+  exit 1
+fi
+
+exec "$DOTNET" "$@"

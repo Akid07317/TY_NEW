@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: daabb3f4aaa8548cd97645d0702cc643, type: 3}
+  m_Name: SO_BossTelegraphStyle_Gatekeeper
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.BossTelegraphStyleSO
+  cuePanelBackgroundColor: {r: 0.08, g: 0.1, b: 0.12, a: 0.95}
+  defaultCueAccentColor: {r: 0.94, g: 0.84, b: 0.58, a: 1}
+  straightProjectileCueAccentColor: {r: 0.34, g: 0.86, b: 0.97, a: 1}
+  arcProjectileCueAccentColor: {r: 0.97, g: 0.53, b: 0.28, a: 1}
+  rangedCueAccentColor: {r: 0.74, g: 0.91, b: 0.67, a: 1}
+  encounterPulseColor: {r: 0.92, g: 0.62, b: 0.18, a: 0.22}
+  attackPulseColor: {r: 0.9, g: 0.2, b: 0.18, a: 0.26}
+  groundTelegraphVisualPrefab: {fileID: 6709925139911200042, guid: e5b75133dd80e4fb3913a87b3d6b644a, type: 3}
+  impactMarkerVisualPrefab: {fileID: 1411049379075329089, guid: dc47e5b661f7e4c6787200ff3d250cf8, type: 3}
+  spawnFlareVisualPrefab: {fileID: 1201568753340806807, guid: 2f36abe76305146e7a61b8823ea308d5, type: 3}
+  engageTelegraphMaterial: {fileID: 2100000, guid: fc16d5cdf14bf4b5c98b03c3eb170412, type: 2}
+  attackTelegraphMaterial: {fileID: 2100000, guid: d2e2bcd8fb03341388b6c39bc88aef0d, type: 2}
+  impactMarkerMaterial: {fileID: 2100000, guid: 03f6e9b1303a1460a9a3b8648d508a2a, type: 2}
+  spawnFlareMaterial: {fileID: 2100000, guid: 6ccb586dd3d15492a9dbcd4b43c32998, type: 2}
+  engageTelegraphColor: {r: 0.86, g: 0.71, b: 0.28, a: 1}
+  attackTelegraphColor: {r: 0.9, g: 0.24, b: 0.18, a: 1}
+  impactMarkerColor: {r: 1, g: 0.34, b: 0.22, a: 1}
+  spawnFlareColor: {r: 1, g: 0.76, b: 0.3, a: 1}

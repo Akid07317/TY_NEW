@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96d514d6fcbb0426daf45f572a14b033, type: 3}
+  m_Name: SO_Enemy_Ranged
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.AI.EnemyArchetypeSO
+  archetypeType: 2
+  maxHealth: 44
+  baseAttack: 8
+  hitStunSeconds: 0.16
+  moveSpeed: 3.8
+  aggroDistance: 13
+  engageDurationSeconds: 0
+  attackDistance: 4.2
+  attackCooldown: 1.35
+  preferredCombatDistance: 3.2
+  strafeDistance: 0.6
+  strafeDurationSeconds: 0.18
+  attacks:
+  - {fileID: 11400000, guid: 0fc26739ce8d043a2a453f14565862f7, type: 2}
+  dropTableId: Default

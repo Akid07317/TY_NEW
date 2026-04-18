@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 75b42a2545332431492711cadbd4ebba, type: 3}
+  m_Name: SO_Chapter01_Progression
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.ChapterProgressionSO
+  chapterId: Chapter01
+  areas:
+  - areaId: Area01_Entrance
+    displayName: Entrance Tutorial
+  - areaId: Area02_Courtyard
+    displayName: Outdoor Courtyard
+  - areaId: Area03_Interior
+    displayName: School Interior
+  - areaId: Area04_Boss
+    displayName: Boss Arena
+  bossGateRequiredKeyItemId: KeyItem_GateSigil
+  chapterCompletionKeyItemId: KeyItem_RitualCore

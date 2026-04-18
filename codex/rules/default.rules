@@ -1,0 +1,53 @@
+# Common developer read-only inspection commands.
+prefix_rule(
+    pattern = [[
+        "ls", "pwd", "date", "which", "file", "stat", "tree", "wc",
+        "head", "tail", "sort", "uniq", "cut", "jq", "find", "fd",
+        "rg", "cat", "sed", "awk"
+    ]],
+    decision = "allow",
+)
+
+# Common Git inspection commands.
+prefix_rule(
+    pattern = ["git", [
+        "status", "diff", "log", "show", "branch", "rev-parse",
+        "ls-files", "grep"
+    ]],
+    decision = "allow",
+)
+
+# Common build and test entry points across common toolchains.
+prefix_rule(pattern = ["ctest"], decision = "allow")
+prefix_rule(pattern = ["cmake"], decision = "allow")
+prefix_rule(pattern = [["make", "just"]], decision = "allow")
+prefix_rule(pattern = ["cargo", ["build", "check", "test", "run", "clippy", "fmt"]], decision = "allow")
+prefix_rule(pattern = ["go", ["build", "test", "run", "fmt", "vet"]], decision = "allow")
+prefix_rule(pattern = [["pytest", "ruff", "mypy"]], decision = "allow")
+prefix_rule(pattern = ["python", "-m", ["pytest", "ruff", "mypy"]], decision = "allow")
+prefix_rule(pattern = ["python3", "-m", ["pytest", "ruff", "mypy"]], decision = "allow")
+prefix_rule(pattern = ["uv", ["sync", "lock"]], decision = "allow")
+prefix_rule(pattern = ["uv", "run", ["pytest", "ruff", "mypy"]], decision = "allow")
+prefix_rule(pattern = ["npm", ["install", "ci", "test", "run"]], decision = "allow")
+prefix_rule(pattern = ["pnpm", ["install", "test", "run"]], decision = "allow")
+prefix_rule(pattern = ["yarn", ["install", "test", "run", "build", "lint"]], decision = "allow")
+prefix_rule(pattern = ["bun", ["install", "test", "run"]], decision = "allow")
+prefix_rule(pattern = ["dotnet", ["restore", "build", "test", "run", "format"]], decision = "allow")
+prefix_rule(pattern = [["mvn", "./mvnw"], ["compile", "test", "package", "verify"]], decision = "allow")
+prefix_rule(pattern = [["gradle", "./gradlew"], ["build", "test", "run"]], decision = "allow")
+
+# Project-local Unity CLI wrappers.
+prefix_rule(pattern = [["Tools/unity-cli/unity-dotnet", "./Tools/unity-cli/unity-dotnet"]], decision = "allow")
+prefix_rule(pattern = [["Tools/unity-cli/unity-csc", "./Tools/unity-cli/unity-csc"]], decision = "allow")
+prefix_rule(pattern = [["Tools/unity-cli/unity-mcs", "./Tools/unity-cli/unity-mcs"]], decision = "allow")
+prefix_rule(pattern = [["Tools/unity-cli/unity-msbuild", "./Tools/unity-cli/unity-msbuild"]], decision = "allow")
+
+# Project-local high-risk commands should prompt instead of auto-run.
+# Note: global forbidden rules still win over these prompt rules.
+prefix_rule(pattern = ["rm"], decision = "prompt")
+prefix_rule(pattern = ["kill"], decision = "prompt")
+prefix_rule(pattern = ["pkill"], decision = "prompt")
+prefix_rule(pattern = ["killall"], decision = "prompt")
+prefix_rule(pattern = ["git", "reset", "--hard"], decision = "prompt")
+prefix_rule(pattern = ["git", "checkout", "--"], decision = "prompt")
+prefix_rule(pattern = ["git", "clean"], decision = "prompt")

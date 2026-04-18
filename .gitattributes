@@ -1,0 +1,28 @@
+* text=auto
+
+# Keep shell scripts portable across macOS and Windows checkouts.
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+
+# Preserve native Windows line endings for Windows-native scripts.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Unity YAML/text assets should stay normalized to avoid noisy diffs.
+*.asmdef text eol=lf
+*.asmref text eol=lf
+*.asset text eol=lf
+*.controller text eol=lf
+*.cs text diff=csharp eol=lf
+*.inputactions text eol=lf
+*.json text eol=lf
+*.mat text eol=lf
+*.md text eol=lf
+*.meta text eol=lf
+*.prefab text eol=lf
+*.shader text eol=lf
+*.unity text eol=lf
+*.uxml text eol=lf
+*.uss text eol=lf

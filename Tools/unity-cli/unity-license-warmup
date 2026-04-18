@@ -1,0 +1,172 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/unity-license-warmup [--project-path <path>] [--editor-log <path>] [--wait-timeout <seconds>] [--keep-hub]
+EOF
+  exit 1
+}
+
+DEFAULT_PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+PROJECT_ROOT="$DEFAULT_PROJECT_ROOT"
+PROJECT_VERSION_FILE="$DEFAULT_PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
+EDITOR_LOG="$HOME/Library/Logs/Unity/Editor.log"
+WAIT_TIMEOUT=90
+KEEP_HUB=0
+REQUIRE_PROJECT_LOAD=1
+
+if [ ! -f "$PROJECT_VERSION_FILE" ]; then
+  echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
+  exit 1
+fi
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --project-path)
+      [ $# -ge 2 ] || usage
+      PROJECT_ROOT=$2
+      shift 2
+      ;;
+    --editor-log)
+      [ $# -ge 2 ] || usage
+      EDITOR_LOG=$2
+      shift 2
+      ;;
+    --wait-timeout)
+      [ $# -ge 2 ] || usage
+      WAIT_TIMEOUT=$2
+      shift 2
+      ;;
+    --keep-hub)
+      KEEP_HUB=1
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+UNITY_VERSION=$(sed -n 's/^m_EditorVersion: //p' "$PROJECT_VERSION_FILE" | head -n 1)
+UNITY_APP="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app"
+UNITY_EDITOR="$UNITY_APP/Contents/MacOS/Unity"
+
+if [ ! -x "$UNITY_EDITOR" ]; then
+  echo "Unity editor not found: $UNITY_EDITOR" >&2
+  exit 1
+fi
+
+if [ ! -d "$PROJECT_ROOT" ]; then
+  echo "Project path not found: $PROJECT_ROOT" >&2
+  exit 1
+fi
+
+project_editor_pid() {
+  ps -axo pid=,command= \
+    | grep -F "$UNITY_EDITOR" \
+    | grep -F " -projectPath $PROJECT_ROOT" \
+    | grep -Fv "AssetImportWorker" \
+    | head -n 1 \
+    | awk '{print $1}' || true
+}
+
+is_hub_running() {
+  pgrep -x "Unity Hub" >/dev/null 2>&1
+}
+
+new_log_slice() {
+  START_LINE=$1
+
+  if [ ! -f "$EDITOR_LOG" ]; then
+    return
+  fi
+
+  if [ "$START_LINE" -le 1 ]; then
+    cat "$EDITOR_LOG"
+    return
+  fi
+
+  sed -n "${START_LINE},\$p" "$EDITOR_LOG"
+}
+
+find_first_match() {
+  CONTENT=$1
+  PATTERN=$2
+  printf '%s\n' "$CONTENT" | grep -F "$PATTERN" | head -n 1 || true
+}
+
+START_LINE=1
+READY_PROJECT_LINE=""
+READY_LICENSE_LINE=""
+
+EXISTING_EDITOR_PID=$(project_editor_pid)
+if [ -n "$EXISTING_EDITOR_PID" ]; then
+  REQUIRE_PROJECT_LOAD=0
+  echo "Unity editor already running for $PROJECT_ROOT (pid: $EXISTING_EDITOR_PID)"
+else
+  if [ -f "$EDITOR_LOG" ]; then
+    START_LINE=$(( $(wc -l < "$EDITOR_LOG") + 1 ))
+  fi
+
+  echo "Launching Unity editor for $PROJECT_ROOT"
+  open -n -a "$UNITY_APP" --args -projectPath "$PROJECT_ROOT"
+fi
+
+echo "Editor log: $EDITOR_LOG"
+echo "Warmup timeout: ${WAIT_TIMEOUT}s"
+echo "Waiting for project load + licensing recovery..."
+
+START_TIME=$(date +%s)
+
+while :; do
+  CURRENT_EDITOR_PID=$(project_editor_pid)
+  if [ -n "$CURRENT_EDITOR_PID" ]; then
+    LOG_CONTENT=$(new_log_slice "$START_LINE")
+
+    if [ -z "$READY_PROJECT_LINE" ]; then
+      READY_PROJECT_LINE=$(find_first_match "$LOG_CONTENT" "[Project] Loading completed")
+    fi
+
+    if [ -z "$READY_LICENSE_LINE" ]; then
+      READY_LICENSE_LINE=$(find_first_match "$LOG_CONTENT" "[Licensing::Module] Successfully updated access token:")
+      if [ -z "$READY_LICENSE_LINE" ]; then
+        READY_LICENSE_LINE=$(find_first_match "$LOG_CONTENT" "[Licensing::Client] Successfully resolved entitlement details")
+      fi
+    fi
+
+    if [ -n "$READY_LICENSE_LINE" ] && { [ "$REQUIRE_PROJECT_LOAD" -eq 0 ] || [ -n "$READY_PROJECT_LINE" ]; }; then
+      echo "Warmup succeeded for $PROJECT_ROOT"
+      echo "Editor pid: $CURRENT_EDITOR_PID"
+      if [ -n "$READY_PROJECT_LINE" ]; then
+        echo "Project line: $READY_PROJECT_LINE"
+      else
+        echo "Project line: skipped (editor was already open)"
+      fi
+      echo "License line: $READY_LICENSE_LINE"
+
+      if [ "$KEEP_HUB" -eq 0 ] && is_hub_running && command -v osascript >/dev/null 2>&1; then
+        osascript -e 'tell application "Unity Hub" to quit' >/dev/null 2>&1 || true
+        echo "Requested Unity Hub quit to keep batchmode clean."
+      fi
+
+      exit 0
+    fi
+  fi
+
+  NOW=$(date +%s)
+  if [ $((NOW - START_TIME)) -ge "$WAIT_TIMEOUT" ]; then
+    echo "Unity license warmup timed out after ${WAIT_TIMEOUT}s." >&2
+    echo "Editor log: $EDITOR_LOG" >&2
+    if [ -f "$EDITOR_LOG" ]; then
+      echo "--- Last editor log lines ---" >&2
+      tail -n 60 "$EDITOR_LOG" >&2 || true
+    fi
+    echo "--- Unity-related processes ---" >&2
+    pgrep -af "Unity Hub|Unity\\.Licensing\\.Client|Unity\\.app/Contents/MacOS/Unity" >&2 || true
+    exit 1
+  fi
+
+  sleep 2
+done
