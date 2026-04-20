@@ -6,6 +6,8 @@ namespace CampusRPG.Editor
     public static class CombatImportedPlayerVisualUtility
     {
         private const string ImportedVisualRootName = "ImportedVisualRoot";
+        private const string LocalImportedSourcePreferenceKey = "CampusRPG.CombatTest.UseImportedPlayerSources";
+        private const string ToggleImportedSourceMenu = "CampusRPG/Setup/CombatTest/Use Imported Player Sources For Local Preview";
 
         private static readonly string[] PlayerVisualPrefabCandidatePaths =
         {
@@ -19,6 +21,29 @@ namespace CampusRPG.Editor
             "Assets/Kevin Iglesias/Human Animations/Models/HumanM_Model.fbx",
             "Assets/JC_LP_MedievalCharacters_LITE/Models/SM_MedievalMaleLite_01.fbx"
         };
+
+        public static bool UseImportedPlayerSourcesForLocalPreview
+        {
+            get => EditorPrefs.GetBool(LocalImportedSourcePreferenceKey, false);
+            set => EditorPrefs.SetBool(LocalImportedSourcePreferenceKey, value);
+        }
+
+        [MenuItem(ToggleImportedSourceMenu)]
+        private static void ToggleImportedPlayerSourcesForLocalPreview()
+        {
+            UseImportedPlayerSourcesForLocalPreview = !UseImportedPlayerSourcesForLocalPreview;
+            Debug.Log(
+                UseImportedPlayerSourcesForLocalPreview
+                    ? "CombatTest local preview now prefers imported player sources. Do not commit regenerated player clips or imported prefab references."
+                    : "CombatTest local preview reverted to repository-safe proxy player sources.");
+        }
+
+        [MenuItem(ToggleImportedSourceMenu, true)]
+        private static bool ToggleImportedPlayerSourcesForLocalPreviewValidation()
+        {
+            Menu.SetChecked(ToggleImportedSourceMenu, UseImportedPlayerSourcesForLocalPreview);
+            return true;
+        }
 
         public static bool HasPlayerVisualSource()
         {
@@ -81,6 +106,32 @@ namespace CampusRPG.Editor
             }
 
             EditorUtility.SetDirty(visualInstance);
+            return changed;
+        }
+
+        public static bool RemoveImportedVisual(GameObject actor, Animator rootAnimator)
+        {
+            if (actor == null)
+            {
+                return false;
+            }
+
+            bool changed = false;
+            Transform importedVisualRoot = actor.transform.Find(ImportedVisualRootName);
+
+            if (importedVisualRoot != null)
+            {
+                Object.DestroyImmediate(importedVisualRoot.gameObject);
+                changed = true;
+            }
+
+            if (rootAnimator != null && rootAnimator.avatar != null)
+            {
+                rootAnimator.avatar = null;
+                EditorUtility.SetDirty(rootAnimator);
+                changed = true;
+            }
+
             return changed;
         }
 

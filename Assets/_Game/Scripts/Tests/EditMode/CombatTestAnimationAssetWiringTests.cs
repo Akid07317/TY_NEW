@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Linq;
 using CampusRPG.Character;
 using CampusRPG.Combat;
 using NUnit.Framework;
@@ -13,6 +14,17 @@ namespace CampusRPG.Tests.EditMode
         private const string PlayerPrefabPath = "Assets/_Game/Prefabs/Characters/PF_Player_CombatTest.prefab";
         private const string PlayerControllerPath = "Assets/_Game/Animations/Characters/CombatTest/AC_Player_CombatTest.controller";
         private const string PlayerIdleClipPath = "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Idle_CombatTest.anim";
+        private static readonly string[] PlayerBaselineClipPaths =
+        {
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Idle_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Walk_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Run_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Airborne_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Block_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Dodge_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Hit_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Death_CombatTest.anim"
+        };
         private const string LightAttackAssetPath = "Assets/_Game/Data/Combat/SO_Attack_Light_01.asset";
         private const string HeavyAttackAssetPath = "Assets/_Game/Data/Combat/SO_Attack_Heavy_01.asset";
         private const string EnemyMeleeAttackAssetPath = "Assets/_Game/Data/Enemies/SO_Attack_Enemy_Melee.asset";
@@ -61,6 +73,12 @@ namespace CampusRPG.Tests.EditMode
             Assert.IsNotNull(combatController);
             Assert.IsNotNull(animator.runtimeAnimatorController);
             Assert.AreEqual(PlayerControllerPath, AssetDatabase.GetAssetPath(animator.runtimeAnimatorController));
+            Assert.IsNull(animator.avatar);
+            Assert.IsNull(prefab.transform.Find("ImportedVisualRoot"));
+            Assert.IsNotNull(prefab.transform.Find("CombatProxyVisualRoot"));
+            CollectionAssert.IsEmpty(
+                AssetDatabase.GetDependencies(PlayerPrefabPath, true)
+                    .Where(path => path.StartsWith("Assets/Kevin Iglesias/") || path.StartsWith("Assets/JC_LP_MedievalCharacters_LITE/")));
             Assert.AreSame(animator, GetPrivateField<Animator>(relay, "animator"));
             Assert.AreSame(prefab.GetComponent<PlayerCharacter>(), GetPrivateField<PlayerCharacter>(relay, "playerCharacter"));
             Assert.AreSame(combatController, GetPrivateField<PlayerCombatController>(relay, "combatController"));
@@ -143,6 +161,21 @@ namespace CampusRPG.Tests.EditMode
                 Assert.IsNotNull(clip, AttackClipPaths[i]);
                 Assert.Greater(clip.length, 0f, AttackClipPaths[i]);
                 Assert.Greater(clip.frameRate, 0f, AttackClipPaths[i]);
+            }
+        }
+
+        [Test]
+        public void PlayerClips_UseRepositorySafeProxyCurves()
+        {
+            foreach (string clipPath in PlayerBaselineClipPaths.Concat(AttackClipPaths))
+            {
+                AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(clipPath);
+
+                Assert.IsNotNull(clip, clipPath);
+                Assert.That(
+                    AnimationUtility.GetCurveBindings(clip),
+                    Has.Some.Matches<EditorCurveBinding>(binding => binding.path.StartsWith("CombatProxyVisualRoot/")),
+                    clipPath);
             }
         }
 

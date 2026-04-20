@@ -944,7 +944,7 @@ namespace CampusRPG.Editor
 
             return CreateOrUpdatePlaceholderClip(
                 GetPlayerAttackClipPath(attackDefinition.AnimationStateName),
-                duration,
+                ResolvePlaceholderAttackDuration(duration),
                 false,
                 animationEvents,
                 attackDefinition.AnimationStateName,
@@ -1069,9 +1069,12 @@ namespace CampusRPG.Editor
                     System.Array.Empty<AnimationEvent>());
             }
 
+            float placeholderDuration = importedDuration > 0f
+                ? Mathf.Max(fallbackDuration, importedDuration)
+                : fallbackDuration;
             return CreateOrUpdatePlaceholderClip(
                 targetPath,
-                fallbackDuration,
+                placeholderDuration,
                 loopTime,
                 System.Array.Empty<AnimationEvent>(),
                 fallbackName);
@@ -1124,6 +1127,12 @@ namespace CampusRPG.Editor
             return Mathf.Clamp(targetDuration, gameplayDuration, sourceDuration);
         }
 
+        private static float ResolvePlaceholderAttackDuration(float gameplayDuration)
+        {
+            float settleExtension = Mathf.Clamp(gameplayDuration * 0.4f, 0.08f, 0.22f);
+            return gameplayDuration + settleExtension;
+        }
+
         private static void SyncAttackAnimationMetadata(AttackDefinitionSO attackDefinition, AnimationClip attackClip)
         {
             if (attackDefinition == null)
@@ -1148,7 +1157,9 @@ namespace CampusRPG.Editor
 
         private static AnimationClip TryLoadImportedPlayerClip(string[] candidatePaths)
         {
-            if (!CombatImportedPlayerVisualUtility.HasPlayerVisualSource() || candidatePaths == null)
+            if (!CombatImportedPlayerVisualUtility.UseImportedPlayerSourcesForLocalPreview
+                || !CombatImportedPlayerVisualUtility.HasPlayerVisualSource()
+                || candidatePaths == null)
             {
                 return null;
             }

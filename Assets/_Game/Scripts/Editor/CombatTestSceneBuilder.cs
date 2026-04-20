@@ -23,6 +23,7 @@ namespace CampusRPG.Editor
         private const string RootMenu = "CampusRPG/Setup/Build CombatTest Scene";
         private const string ForceRebuildMenu = "CampusRPG/Setup/Build CombatTest Scene (Force Rebuild)";
         private const string RepairPrefabMenu = "CampusRPG/Setup/Repair CombatTest Prefab Wiring";
+        private const string ApplyImportedVisualMenu = "CampusRPG/Setup/Apply Imported Player Visuals To CombatTest Player Prefab (Local Preview)";
         private const string ScenePath = "Assets/_Game/Scenes/CombatTest.unity";
         private const string PlayerPrefabPath = "Assets/_Game/Prefabs/Characters/PF_Player_CombatTest.prefab";
         private const string EnemyMeleePrefabPath = "Assets/_Game/Prefabs/Characters/PF_Enemy_Melee_CombatTest.prefab";
@@ -82,6 +83,39 @@ namespace CampusRPG.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("CombatTest prefab wiring repaired: duplicate required components removed and player animation relay connected.");
+        }
+
+        [MenuItem(ApplyImportedVisualMenu)]
+        public static void ApplyImportedVisualsToCombatTestPlayerPrefab()
+        {
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath) == null)
+            {
+                Debug.LogWarning("CombatTest player prefab does not exist yet.");
+                return;
+            }
+
+            GameObject player = PrefabUtility.LoadPrefabContents(PlayerPrefabPath);
+
+            try
+            {
+                Animator animator = GetOrAddComponent<Animator>(player);
+
+                if (!CombatImportedPlayerVisualUtility.TryApply(player, animator))
+                {
+                    Debug.LogWarning("No imported player visual source was found. Install a supported local package first.");
+                    return;
+                }
+
+                PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(player);
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("Applied imported player visuals to PF_Player_CombatTest for local preview. Do not commit this prefab state to the public repository.");
         }
 
         public static void EnsureCombatTestContent()
@@ -295,7 +329,7 @@ namespace CampusRPG.Editor
 
             SetObjectReference(damageableReceiver, "health", health);
             SetObjectReference(damageableReceiver, "playerCharacter", playerCharacter);
-            CombatImportedPlayerVisualUtility.TryApply(player, animator);
+            CombatImportedPlayerVisualUtility.RemoveImportedVisual(player, animator);
             CombatProxyVisualUtility.Apply(player, CombatProxyVisualKind.Player);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
@@ -406,7 +440,7 @@ namespace CampusRPG.Editor
                 SetObjectReference(damageableReceiver, "health", health);
                 SetObjectReference(damageableReceiver, "playerCharacter", playerCharacter);
                 ConfigurePlayerAnimator(animator, playerAnimatorController);
-                changed |= CombatImportedPlayerVisualUtility.TryApply(player, animator);
+                changed |= CombatImportedPlayerVisualUtility.RemoveImportedVisual(player, animator);
                 changed |= CombatProxyVisualUtility.Apply(player, CombatProxyVisualKind.Player);
 
                 PrefabUtility.SaveAsPrefabAsset(player, prefabPath);
