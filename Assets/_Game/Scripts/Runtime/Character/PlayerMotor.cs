@@ -15,6 +15,8 @@ namespace CampusRPG.Character
 
         public bool IsGrounded => characterController != null && characterController.isGrounded;
 
+        public float VerticalVelocity => verticalVelocity;
+
         private void Awake()
         {
             characterController = GetComponent<CharacterController>();
@@ -55,6 +57,32 @@ namespace CampusRPG.Character
             {
                 characterController.enabled = true;
             }
+        }
+
+        public void AdvanceFacingDirection(float distance)
+        {
+            if (distance <= 0f)
+            {
+                return;
+            }
+
+            Vector3 displacement = transform.forward;
+            displacement.y = 0f;
+
+            if (displacement.sqrMagnitude <= Mathf.Epsilon)
+            {
+                return;
+            }
+
+            displacement = displacement.normalized * distance;
+
+            if (characterController == null || !characterController.enabled)
+            {
+                transform.position += displacement;
+                return;
+            }
+
+            characterController.Move(displacement);
         }
 
         public void Tick(Vector2 moveInput, bool jumpPressed, Transform cameraTransform)

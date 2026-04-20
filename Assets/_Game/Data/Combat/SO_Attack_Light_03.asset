@@ -19,6 +19,7 @@ MonoBehaviour:
   startupSeconds: 0.14
   activeSeconds: 0.1
   recoverySeconds: 0.3
+  animationDurationSeconds: 0.75600004
   hitStopSeconds: 0.05
   forwardMovement: 0.5
   range: 1.9

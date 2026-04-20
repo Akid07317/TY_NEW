@@ -10,6 +10,7 @@ namespace CampusRPG.Character
         private PlayerDodgeState dodgeState;
         private PlayerHitState hitState;
         private PlayerDeathState deathState;
+        private PlayerCombatAnimationRelay animationRelay;
         private bool isInitialized;
         private bool isSubscribed;
 
@@ -23,6 +24,8 @@ namespace CampusRPG.Character
 
         public bool IsInvulnerable => CurrentState is PlayerDodgeState dodgeState && dodgeState.IsInvulnerable;
 
+        public PlayerCombatAnimationRelay AnimationRelay => animationRelay;
+
         public void Initialize(PlayerCharacter player)
         {
             if (isInitialized)
@@ -31,6 +34,7 @@ namespace CampusRPG.Character
             }
 
             owner = player;
+            animationRelay = owner != null ? owner.GetComponent<PlayerCombatAnimationRelay>() : null;
             locomotionState = new PlayerLocomotionState(owner, this);
             blockState = new PlayerBlockState(owner, this);
             dodgeState = new PlayerDodgeState(owner, this);
@@ -64,9 +68,11 @@ namespace CampusRPG.Character
                 return;
             }
 
+            PlayerState previousState = CurrentState;
             CurrentState?.Exit();
             CurrentState = nextState;
             CurrentState?.Enter();
+            animationRelay?.NotifyStateChanged(previousState, CurrentState);
         }
 
         public void SwitchToLocomotion()

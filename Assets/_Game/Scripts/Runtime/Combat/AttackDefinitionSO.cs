@@ -25,6 +25,7 @@ namespace CampusRPG.Combat
         [SerializeField] private float startupSeconds = 0.15f;
         [SerializeField] private float activeSeconds = 0.1f;
         [SerializeField] private float recoverySeconds = 0.25f;
+        [SerializeField] private float animationDurationSeconds;
         [SerializeField] private float hitStopSeconds = 0.05f;
         [SerializeField] private float forwardMovement = 0.5f;
         [SerializeField] private float range = 2f;
@@ -54,6 +55,8 @@ namespace CampusRPG.Combat
         public float ActiveSeconds => activeSeconds;
 
         public float RecoverySeconds => recoverySeconds;
+
+        public float AnimationDurationSeconds => animationDurationSeconds;
 
         public float HitStopSeconds => hitStopSeconds;
 

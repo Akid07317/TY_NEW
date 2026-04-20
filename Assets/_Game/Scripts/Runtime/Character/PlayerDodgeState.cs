@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace CampusRPG.Character
 {
     public sealed class PlayerDodgeState : PlayerState
@@ -21,8 +23,12 @@ namespace CampusRPG.Character
         public override void Enter()
         {
             Combat.CombatBalanceSO balance = Owner.CombatController != null ? Owner.CombatController.Balance : null;
+            float gameplayDuration = balance != null ? balance.DodgeDurationSeconds : 0.25f;
+            float animationDuration = stateMachine.AnimationRelay != null
+                ? stateMachine.AnimationRelay.DodgeAnimationDurationSeconds
+                : 0f;
 
-            remainingTime = balance != null ? balance.DodgeDurationSeconds : 0.25f;
+            remainingTime = Mathf.Max(gameplayDuration, animationDuration);
             invulnerableRemaining = balance != null ? balance.DodgeInvulnerableSeconds : 0.2f;
             hasRegisteredSuccessfulDodge = false;
             Owner.CombatController?.HandleDodgeStarted();

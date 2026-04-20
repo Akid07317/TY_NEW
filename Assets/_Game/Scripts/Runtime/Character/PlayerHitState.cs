@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace CampusRPG.Character
 {
     public sealed class PlayerHitState : PlayerState
@@ -16,7 +18,10 @@ namespace CampusRPG.Character
 
         public void SetDuration(float duration)
         {
-            remainingTime = duration;
+            float animationDuration = stateMachine.AnimationRelay != null
+                ? stateMachine.AnimationRelay.HitAnimationDurationSeconds
+                : 0f;
+            remainingTime = Mathf.Max(duration, animationDuration);
         }
 
         public override void Tick(float deltaTime)

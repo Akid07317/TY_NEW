@@ -71,8 +71,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6698521516315417147}
-  - component: {fileID: 8000083326600758551}
-  - component: {fileID: 4969886551767733402}
   - component: {fileID: 7190418256661067485}
   - component: {fileID: 6239466858358909888}
   - component: {fileID: 1753309315433807489}
@@ -87,7 +85,6 @@ GameObject:
   - component: {fileID: 3630521878624530752}
   - component: {fileID: 7391292868101826915}
   - component: {fileID: 6955240314544066710}
-  - component: {fileID: 6086013583218868764}
   - component: {fileID: 8809387420389142609}
   m_Layer: 0
   m_Name: PF_Player_CombatTest
@@ -111,65 +108,9 @@ Transform:
   m_Children:
   - {fileID: 2775108483176583823}
   - {fileID: 760368784944306453}
+  - {fileID: 3836597907217519253}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &8000083326600758551
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5350621351796418438}
-  m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &4969886551767733402
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5350621351796418438}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 1
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!143 &7190418256661067485
 CharacterController:
   m_ObjectHideFlags: 0
@@ -230,7 +171,7 @@ MonoBehaviour:
   combatController: {fileID: 7005296437211619657}
   skillController: {fileID: 4884020741059801956}
   health: {fileID: 6955240314544066710}
-  mana: {fileID: 6086013583218868764}
+  mana: {fileID: 2245969885682266807}
   gauges: {fileID: 8809387420389142609}
   cameraTransform: {fileID: 0}
 --- !u!114 &106149179355047385
@@ -346,7 +287,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Skills.SkillController
   owner: {fileID: 1753309315433807489}
-  mana: {fileID: 6086013583218868764}
+  mana: {fileID: 2245969885682266807}
   attackExecutor: {fileID: 6003251575421183197}
   lockOnTargetSelector: {fileID: 549989439120567154}
   castOrigin: {fileID: 760368784944306453}
@@ -383,7 +324,7 @@ Animator:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5350621351796418438}
   m_Enabled: 1
-  m_Avatar: {fileID: 0}
+  m_Avatar: {fileID: 9000000, guid: 2faa610713d3b3c439473daa55e8c60a, type: 3}
   m_Controller: {fileID: 9100000, guid: c27e5512332b143abb025ec2e540651a, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
@@ -408,10 +349,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2b361f5d0e67945b2a8fac1470e7e20a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Character.PlayerCombatAnimationRelay
+  playerCharacter: {fileID: 1753309315433807489}
   combatController: {fileID: 7005296437211619657}
+  stateMachine: {fileID: 8124815906595383594}
+  motor: {fileID: 106149179355047385}
   animator: {fileID: 3630521878624530752}
   baseLayerIndex: 0
   crossFadeSeconds: 0.05
+  locomotionDampSeconds: 0.08
+  dodgeAnimationDurationSeconds: 0.48
+  hitAnimationDurationSeconds: 0.38
 --- !u!114 &6955240314544066710
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -424,20 +371,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d80ca84667824ef4a65a8defc5f01de, type: 3}
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Combat.HealthComponent
-  maxValue: 100
-  currentValue: 100
---- !u!114 &6086013583218868764
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5350621351796418438}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e538911674eab4f73bac2c47765abad8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Combat.ManaComponent
   maxValue: 100
   currentValue: 100
 --- !u!114 &8809387420389142609
@@ -456,3 +389,67 @@ MonoBehaviour:
   maxAgilityGauge: 100
   counterGauge: 0
   agilityGauge: 0
+--- !u!1001 &996094284848706309
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 6698521516315417147}
+    m_Modifications:
+    - target: {fileID: 3722035622965246762, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_Name
+      value: ImportedVisualRoot
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents:
+    - {fileID: 7929906376812067818, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+    - {fileID: 3384805646930704044, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+--- !u!4 &3836597907217519253 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4101797402397188496, guid: e76e3a3af8c9c5e42968c424e2b49ef2, type: 3}
+  m_PrefabInstance: {fileID: 996094284848706309}
+  m_PrefabAsset: {fileID: 0}

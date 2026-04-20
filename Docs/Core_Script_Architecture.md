@@ -53,11 +53,11 @@ CampusRPG.UI
 
 | 类名 | 职责 |
 |---|---|
-| `ThirdPersonCameraController` | 管理自由镜头与锁定镜头参数 |
+| `ThirdPersonCameraController` | 管理自由镜头与锁定镜头参数，并在贴墙时维持玩家可见性 |
 | `ThirdPersonCameraOrbitUtility` | 统一第三人称镜头自由视角、锁定视角与跟随位姿计算 |
 | `LockOnTargetSelector` | 搜索、筛选、切换锁定目标 |
 | `LockOnTargetSearchUtility` | 统一锁定目标候选解析、合法性校验与评分搜索 |
-| `CameraObstacleResolver` | 简化版遮挡修正 |
+| `CameraObstacleResolver` | 简化版遮挡修正，负责把镜头收回到墙体内侧而不是让镜头穿到阻挡体外 |
 
 ### 3.4 Character
 
@@ -66,6 +66,7 @@ CampusRPG.UI
 | `PlayerCharacter` | 玩家主入口，聚合主要组件引用 |
 | `PlayerMotor` | 地面移动、朝向、跳跃、重力 |
 | `PlayerCombatController` | 轻重攻击、追击、反击与量表窗口管理 |
+| `PlayerCombatAnimationRelay` | 把玩家状态机与战斗事件同步到 Animator，统一驱动基础动作层与攻击播放 |
 | `PlayerCombatRuntimeUtility` | 统一连段推进、反击/追击派生决策与窗口计时辅助 |
 | `PlayerStateMachine` | 玩家 FSM 宿主 |
 | `PlayerLocomotionState` | 待机、移动、转向 |

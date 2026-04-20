@@ -35,6 +35,31 @@ namespace CampusRPG.Editor
         private const string PlayerAnimationRootFolder = "Assets/_Game/Animations/Characters/CombatTest";
         private const string PlayerAnimatorControllerPath = PlayerAnimationRootFolder + "/AC_Player_CombatTest.controller";
         private const string PlayerIdleClipPath = PlayerAnimationRootFolder + "/AN_Player_Idle_CombatTest.anim";
+        private const string PlayerLocomotionWalkClipPath = PlayerAnimationRootFolder + "/AN_Player_Walk_CombatTest.anim";
+        private const string PlayerLocomotionRunClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_CombatTest.anim";
+        private const string PlayerAirborneClipPath = PlayerAnimationRootFolder + "/AN_Player_Airborne_CombatTest.anim";
+        private const string PlayerBlockClipPath = PlayerAnimationRootFolder + "/AN_Player_Block_CombatTest.anim";
+        private const string PlayerDodgeClipPath = PlayerAnimationRootFolder + "/AN_Player_Dodge_CombatTest.anim";
+        private const string PlayerHitClipPath = PlayerAnimationRootFolder + "/AN_Player_Hit_CombatTest.anim";
+        private const string PlayerDeathClipPath = PlayerAnimationRootFolder + "/AN_Player_Death_CombatTest.anim";
+        private const string PlayerLocomotionBlendTreeName = "BT_Player_Locomotion_CombatTest";
+        private const string PlayerLocomotionStateName = "Locomotion";
+        private const string PlayerBlockStateName = "Block";
+        private const string PlayerAirborneStateName = "Airborne";
+        private const string PlayerDodgeStateName = "Dodge";
+        private const string PlayerHitStateName = "Hit";
+        private const string PlayerDeathStateName = "Death";
+        private const string GroundSpeedParameterName = "GroundSpeed";
+        private const string IsGroundedParameterName = "IsGrounded";
+        private const string IsBlockingParameterName = "IsBlocking";
+        private const string VerticalSpeedParameterName = "VerticalSpeed";
+        private const string PlayerProxyRootPath = "CombatProxyVisualRoot";
+        private const string PlayerProxyTorsoPath = PlayerProxyRootPath + "/Torso";
+        private const string PlayerProxyChestPath = PlayerProxyRootPath + "/Chest";
+        private const string PlayerProxyHeadPath = PlayerProxyRootPath + "/Head";
+        private const string PlayerProxyForwardMarkerPath = PlayerProxyRootPath + "/ForwardMarker";
+        private const string PlayerProxyGuardPath = PlayerProxyRootPath + "/Guard";
+        private const string PlayerProxyBladePath = PlayerProxyRootPath + "/Blade";
 
         [MenuItem(RootMenu)]
         public static void CreateCombatTestAssets()
@@ -367,6 +392,16 @@ namespace CampusRPG.Editor
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(EnhancedDodgePath));
         }
 
+        public static float GetPlayerDodgeAnimationDuration()
+        {
+            return GetConfiguredClipDuration(PlayerDodgeClipPath);
+        }
+
+        public static float GetPlayerHitAnimationDuration()
+        {
+            return GetConfiguredClipDuration(PlayerHitClipPath);
+        }
+
         private static void ConfigurePlayerStats(PlayerBaseStatsSO asset)
         {
             SerializedObject serializedObject = new SerializedObject(asset);
@@ -600,7 +635,14 @@ namespace CampusRPG.Editor
 
         private static RuntimeAnimatorController EnsurePlayerCombatAnimationAssets(params AttackDefinitionSO[] attackDefinitions)
         {
-            AnimationClip idleClip = CreateOrUpdatePlaceholderClip(PlayerIdleClipPath, 1f, true, System.Array.Empty<AnimationEvent>());
+            AnimationClip idleClip = CreateOrUpdatePlayerIdleClip();
+            AnimationClip walkClip = CreateOrUpdatePlayerWalkClip();
+            AnimationClip runClip = CreateOrUpdatePlayerRunClip();
+            AnimationClip airborneClip = CreateOrUpdatePlayerAirborneClip();
+            AnimationClip blockClip = CreateOrUpdatePlayerBlockClip();
+            AnimationClip dodgeClip = CreateOrUpdatePlayerDodgeClip();
+            AnimationClip hitClip = CreateOrUpdatePlayerHitClip();
+            AnimationClip deathClip = CreateOrUpdatePlayerDeathClip();
             AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(PlayerAnimatorControllerPath);
 
             if (controller == null)
@@ -611,10 +653,37 @@ namespace CampusRPG.Editor
             AnimatorControllerLayer layer = EnsureBaseLayer(controller);
             AnimatorStateMachine stateMachine = layer.stateMachine;
             ClearStateMachine(stateMachine);
+            EnsurePlayerAnimatorParameters(controller);
 
-            AnimatorState idleState = stateMachine.AddState("Idle");
-            idleState.motion = idleClip;
-            stateMachine.defaultState = idleState;
+            BlendTree locomotionBlendTree = CreateOrUpdateLocomotionBlendTree(controller, idleClip, walkClip, runClip);
+
+            AnimatorState locomotionState = stateMachine.AddState(PlayerLocomotionStateName);
+            locomotionState.motion = locomotionBlendTree;
+            stateMachine.defaultState = locomotionState;
+
+            AnimatorState blockState = stateMachine.AddState(PlayerBlockStateName);
+            blockState.motion = blockClip;
+
+            AnimatorState airborneState = stateMachine.AddState(PlayerAirborneStateName);
+            airborneState.motion = airborneClip;
+
+            AnimatorState dodgeState = stateMachine.AddState(PlayerDodgeStateName);
+            dodgeState.motion = dodgeClip;
+
+            AnimatorState hitState = stateMachine.AddState(PlayerHitStateName);
+            hitState.motion = hitClip;
+
+            AnimatorState deathState = stateMachine.AddState(PlayerDeathStateName);
+            deathState.motion = deathClip;
+
+            AddBlockingTransition(locomotionState, blockState, true);
+            AddBlockingTransition(blockState, locomotionState, false);
+            AddGroundedTransition(locomotionState, airborneState, false);
+            AddGroundedTransition(blockState, airborneState, false);
+            AddAirborneRecoveryTransition(airborneState, locomotionState, false);
+            AddAirborneRecoveryTransition(airborneState, blockState, true);
+            AddReturnToLocomotionTransition(dodgeState, locomotionState);
+            AddReturnToLocomotionTransition(hitState, locomotionState);
 
             for (int i = 0; i < attackDefinitions.Length; i++)
             {
@@ -626,20 +695,143 @@ namespace CampusRPG.Editor
                 }
 
                 AnimationClip attackClip = CreateOrUpdateAttackClip(attackDefinition);
+                SyncAttackAnimationMetadata(attackDefinition, attackClip);
                 AnimatorState attackState = stateMachine.AddState(attackDefinition.AnimationStateName);
                 attackState.motion = attackClip;
 
-                AnimatorStateTransition toIdleTransition = attackState.AddTransition(idleState);
-                toIdleTransition.hasExitTime = true;
-                toIdleTransition.exitTime = 1f;
-                toIdleTransition.hasFixedDuration = true;
-                toIdleTransition.duration = 0.05f;
-                toIdleTransition.canTransitionToSelf = false;
+                AddReturnToLocomotionTransition(attackState, locomotionState);
             }
 
             EditorUtility.SetDirty(stateMachine);
             EditorUtility.SetDirty(controller);
             return controller;
+        }
+
+        private static void EnsurePlayerAnimatorParameters(AnimatorController controller)
+        {
+            if (controller == null)
+            {
+                return;
+            }
+
+            AnimatorControllerParameter[] parameters = controller.parameters;
+
+            for (int i = parameters.Length - 1; i >= 0; i--)
+            {
+                controller.RemoveParameter(parameters[i]);
+            }
+
+            controller.AddParameter(GroundSpeedParameterName, AnimatorControllerParameterType.Float);
+            controller.AddParameter(IsGroundedParameterName, AnimatorControllerParameterType.Bool);
+            controller.AddParameter(IsBlockingParameterName, AnimatorControllerParameterType.Bool);
+            controller.AddParameter(VerticalSpeedParameterName, AnimatorControllerParameterType.Float);
+        }
+
+        private static BlendTree CreateOrUpdateLocomotionBlendTree(
+            AnimatorController controller,
+            Motion idleMotion,
+            Motion walkMotion,
+            Motion runMotion)
+        {
+            BlendTree blendTree = LoadBlendTreeAsset(PlayerLocomotionBlendTreeName);
+
+            if (blendTree == null)
+            {
+                blendTree = new BlendTree
+                {
+                    name = PlayerLocomotionBlendTreeName
+                };
+                AssetDatabase.AddObjectToAsset(blendTree, controller);
+            }
+
+            blendTree.blendType = BlendTreeType.Simple1D;
+            blendTree.blendParameter = GroundSpeedParameterName;
+            blendTree.useAutomaticThresholds = false;
+            blendTree.children = new[]
+            {
+                CreateBlendChild(idleMotion, 0f),
+                CreateBlendChild(walkMotion, 0.45f),
+                CreateBlendChild(runMotion, 1f)
+            };
+            EditorUtility.SetDirty(blendTree);
+            return blendTree;
+        }
+
+        private static BlendTree LoadBlendTreeAsset(string blendTreeName)
+        {
+            Object[] assets = AssetDatabase.LoadAllAssetsAtPath(PlayerAnimatorControllerPath);
+
+            for (int i = 0; i < assets.Length; i++)
+            {
+                BlendTree blendTree = assets[i] as BlendTree;
+
+                if (blendTree != null && string.Equals(blendTree.name, blendTreeName, global::System.StringComparison.Ordinal))
+                {
+                    return blendTree;
+                }
+            }
+
+            return null;
+        }
+
+        private static ChildMotion CreateBlendChild(Motion motion, float threshold)
+        {
+            return new ChildMotion
+            {
+                motion = motion,
+                threshold = threshold,
+                timeScale = 1f
+            };
+        }
+
+        private static void AddBlockingTransition(AnimatorState fromState, AnimatorState toState, bool blockingValue)
+        {
+            AnimatorStateTransition transition = fromState.AddTransition(toState);
+            transition.hasExitTime = false;
+            transition.hasFixedDuration = true;
+            transition.duration = 0.05f;
+            transition.canTransitionToSelf = false;
+            transition.AddCondition(
+                blockingValue ? AnimatorConditionMode.If : AnimatorConditionMode.IfNot,
+                0f,
+                IsBlockingParameterName);
+        }
+
+        private static void AddGroundedTransition(AnimatorState fromState, AnimatorState toState, bool groundedValue)
+        {
+            AnimatorStateTransition transition = fromState.AddTransition(toState);
+            transition.hasExitTime = false;
+            transition.hasFixedDuration = true;
+            transition.duration = 0.05f;
+            transition.canTransitionToSelf = false;
+            transition.AddCondition(
+                groundedValue ? AnimatorConditionMode.If : AnimatorConditionMode.IfNot,
+                0f,
+                IsGroundedParameterName);
+        }
+
+        private static void AddAirborneRecoveryTransition(AnimatorState fromState, AnimatorState toState, bool blockingValue)
+        {
+            AnimatorStateTransition transition = fromState.AddTransition(toState);
+            transition.hasExitTime = false;
+            transition.hasFixedDuration = true;
+            transition.duration = 0.05f;
+            transition.canTransitionToSelf = false;
+            transition.AddCondition(AnimatorConditionMode.If, 0f, IsGroundedParameterName);
+            transition.AddCondition(
+                blockingValue ? AnimatorConditionMode.If : AnimatorConditionMode.IfNot,
+                0f,
+                IsBlockingParameterName);
+        }
+
+        private static void AddReturnToLocomotionTransition(AnimatorState fromState, AnimatorState locomotionState)
+        {
+            AnimatorStateTransition transition = fromState.AddTransition(locomotionState);
+            transition.hasExitTime = true;
+            transition.exitTime = 1f;
+            transition.hasFixedDuration = true;
+            transition.duration = 0.05f;
+            transition.canTransitionToSelf = false;
         }
 
         private static AnimatorControllerLayer EnsureBaseLayer(AnimatorController controller)
@@ -658,6 +850,33 @@ namespace CampusRPG.Editor
 
             controller.AddLayer(baseLayer);
             return controller.layers[0];
+        }
+
+        private readonly struct ProxyCurveKey
+        {
+            public ProxyCurveKey(float time, float value)
+            {
+                Time = time;
+                Value = value;
+            }
+
+            public float Time { get; }
+
+            public float Value { get; }
+        }
+
+        private enum PlayerProxyMotionProfile
+        {
+            Idle,
+            Light01,
+            Light02,
+            Light03,
+            Heavy01,
+            DodgeFollowUp,
+            DodgeFollowUpEnhanced,
+            Counter,
+            CounterEnhanced,
+            GenericAttack
         }
 
         private static void ClearStateMachine(AnimatorStateMachine stateMachine)
@@ -710,11 +929,27 @@ namespace CampusRPG.Editor
                 }
             };
 
+            AnimationClip importedClip = TryLoadImportedPlayerClip(ResolveImportedAttackClipCandidatePaths(attackDefinition.AnimationStateName));
+
+            if (importedClip != null)
+            {
+                float importedAttackDuration = ResolveImportedAttackDuration(importedClip.length, duration);
+                return CreateOrUpdateImportedClip(
+                    GetPlayerAttackClipPath(attackDefinition.AnimationStateName),
+                    importedClip,
+                    importedAttackDuration,
+                    false,
+                    animationEvents);
+            }
+
             return CreateOrUpdatePlaceholderClip(
                 GetPlayerAttackClipPath(attackDefinition.AnimationStateName),
                 duration,
                 false,
-                animationEvents);
+                animationEvents,
+                attackDefinition.AnimationStateName,
+                openTime,
+                closeTime);
         }
 
         private static string GetPlayerAttackClipPath(string animationStateName)
@@ -722,11 +957,413 @@ namespace CampusRPG.Editor
             return $"{PlayerAnimationRootFolder}/AN_Player_{animationStateName}_CombatTest.anim";
         }
 
+        private static AnimationClip CreateOrUpdatePlayerIdleClip()
+        {
+            AnimationClip importedClip = TryLoadImportedPlayerClip(ResolveImportedIdleClipCandidatePaths());
+
+            if (importedClip != null)
+            {
+                return CreateOrUpdateImportedClip(
+                    PlayerIdleClipPath,
+                    importedClip,
+                    importedClip.length,
+                    true,
+                    System.Array.Empty<AnimationEvent>());
+            }
+
+            return CreateOrUpdatePlaceholderClip(PlayerIdleClipPath, 1f, true, System.Array.Empty<AnimationEvent>());
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerWalkClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionWalkClipPath,
+                ResolveImportedWalkClipCandidatePaths(),
+                0.9f,
+                true,
+                "Player Walk");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerRunClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionRunClipPath,
+                ResolveImportedRunClipCandidatePaths(),
+                0.8f,
+                true,
+                "Player Run");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerAirborneClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerAirborneClipPath,
+                ResolveImportedAirborneClipCandidatePaths(),
+                0.6f,
+                true,
+                "Player Airborne");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerBlockClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerBlockClipPath,
+                ResolveImportedBlockClipCandidatePaths(),
+                0.8f,
+                true,
+                "Player Block");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerDodgeClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerDodgeClipPath,
+                ResolveImportedDodgeClipCandidatePaths(),
+                0.4f,
+                false,
+                "Player Dodge",
+                0.48f);
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerHitClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerHitClipPath,
+                ResolveImportedHitClipCandidatePaths(),
+                0.35f,
+                false,
+                "Player Hit",
+                0.38f);
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerDeathClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerDeathClipPath,
+                ResolveImportedDeathClipCandidatePaths(),
+                1.2f,
+                false,
+                "Player Death");
+        }
+
+        private static AnimationClip CreateOrUpdateMotionClip(
+            string targetPath,
+            string[] candidatePaths,
+            float fallbackDuration,
+            bool loopTime,
+            string fallbackName,
+            float importedDuration = -1f)
+        {
+            AnimationClip importedClip = TryLoadImportedPlayerClip(candidatePaths);
+
+            if (importedClip != null)
+            {
+                float resolvedDuration = importedDuration > 0f
+                    ? Mathf.Min(importedDuration, importedClip.length)
+                    : importedClip.length;
+                return CreateOrUpdateImportedClip(
+                    targetPath,
+                    importedClip,
+                    resolvedDuration,
+                    loopTime,
+                    System.Array.Empty<AnimationEvent>());
+            }
+
+            return CreateOrUpdatePlaceholderClip(
+                targetPath,
+                fallbackDuration,
+                loopTime,
+                System.Array.Empty<AnimationEvent>(),
+                fallbackName);
+        }
+
+        private static AnimationClip CreateOrUpdateImportedClip(
+            string path,
+            AnimationClip sourceClip,
+            float duration,
+            bool loopTime,
+            AnimationEvent[] animationEvents)
+        {
+            if (sourceClip == null)
+            {
+                return null;
+            }
+
+            AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+
+            if (clip == null)
+            {
+                clip = new AnimationClip();
+                AssetDatabase.CreateAsset(clip, path);
+            }
+
+            EditorUtility.CopySerialized(sourceClip, clip);
+            clip.name = System.IO.Path.GetFileNameWithoutExtension(path);
+            AnimationUtility.SetAnimationEvents(clip, animationEvents ?? System.Array.Empty<AnimationEvent>());
+            float clipDuration = Mathf.Max(0.01f, duration);
+
+            if (sourceClip.length > 0f)
+            {
+                clipDuration = Mathf.Min(clipDuration, sourceClip.length);
+            }
+
+            ConfigureClipSettings(clip, clipDuration, loopTime);
+            EditorUtility.SetDirty(clip);
+            return clip;
+        }
+
+        private static float ResolveImportedAttackDuration(float sourceDuration, float gameplayDuration)
+        {
+            if (sourceDuration <= 0f)
+            {
+                return gameplayDuration;
+            }
+
+            float settleExtension = Mathf.Clamp(gameplayDuration * 0.4f, 0.08f, 0.22f);
+            float targetDuration = gameplayDuration + settleExtension;
+            return Mathf.Clamp(targetDuration, gameplayDuration, sourceDuration);
+        }
+
+        private static void SyncAttackAnimationMetadata(AttackDefinitionSO attackDefinition, AnimationClip attackClip)
+        {
+            if (attackDefinition == null)
+            {
+                return;
+            }
+
+            SerializedObject serializedObject = new SerializedObject(attackDefinition);
+            SerializedProperty durationProperty = serializedObject.FindProperty("animationDurationSeconds");
+
+            if (durationProperty == null)
+            {
+                return;
+            }
+
+            durationProperty.floatValue = attackClip != null
+                ? ResolveClipConfiguredDuration(attackClip)
+                : 0f;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(attackDefinition);
+        }
+
+        private static AnimationClip TryLoadImportedPlayerClip(string[] candidatePaths)
+        {
+            if (!CombatImportedPlayerVisualUtility.HasPlayerVisualSource() || candidatePaths == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < candidatePaths.Length; i++)
+            {
+                AnimationClip clip = LoadAnimationClipAsset(candidatePaths[i]);
+
+                if (clip != null)
+                {
+                    return clip;
+                }
+            }
+
+            return null;
+        }
+
+        private static AnimationClip LoadAnimationClipAsset(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return null;
+            }
+
+            string clipName = null;
+            int separatorIndex = assetPath.LastIndexOf('#');
+
+            if (separatorIndex >= 0 && separatorIndex < assetPath.Length - 1)
+            {
+                clipName = assetPath.Substring(separatorIndex + 1);
+                assetPath = assetPath.Substring(0, separatorIndex);
+            }
+
+            AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(assetPath);
+
+            if (clip != null && (clipName == null || string.Equals(clip.name, clipName, global::System.StringComparison.Ordinal)))
+            {
+                return clip;
+            }
+
+            Object[] assets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+
+            for (int i = 0; i < assets.Length; i++)
+            {
+                clip = assets[i] as AnimationClip;
+
+                if (clip == null || string.Equals(clip.name, "__preview__", global::System.StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (clipName == null || string.Equals(clip.name, clipName, global::System.StringComparison.Ordinal))
+                {
+                    return clip;
+                }
+            }
+
+            return null;
+        }
+
+        private static string[] ResolveImportedIdleClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Idle.anim",
+                "Assets/DoubleL/One Hand Up/Movement/Idle/Idle/1Hand_Up_Stand_Idle_A_2.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@CombatIdle1H01.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatIdle01.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedWalkClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_F_InPlace.anim",
+                "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_InPlace.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Forward.fbx",
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Other_Animations/Walk_Forward.anim"
+            };
+        }
+
+        private static string[] ResolveImportedRunClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Run_F_InPlace.anim",
+                "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_InPlace.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Forward.fbx",
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Other_Animations/Run_Forward.anim"
+            };
+        }
+
+        private static string[] ResolveImportedAirborneClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Fall01.fbx",
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Other_Animations/Jump_Loop.anim",
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B_InPlace.anim"
+            };
+        }
+
+        private static string[] ResolveImportedBlockClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Shield_Block_Idle.anim",
+                "Assets/DoubleL/One Hand Up/Sheild/Idle/1Hand_Up_Shield_Block_Idle_1.fbx",
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Block_With_Hands"
+            };
+        }
+
+        private static string[] ResolveImportedDodgeClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Dodge_Sidestep",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx",
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B_InPlace.anim"
+            };
+        }
+
+        private static string[] ResolveImportedHitClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Hit_Reaction_Light",
+                "Assets/DoubleL/Demo/Anim/Hit_F_1_InPlace.anim",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatDamage01.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedDeathClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@Death01.fbx",
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Death_Forward"
+            };
+        }
+
+        private static string[] ResolveImportedAttackClipCandidatePaths(string animationStateName)
+        {
+            switch (animationStateName)
+            {
+                case "Light_01":
+                    return new[]
+                    {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_1_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx"
+                    };
+                case "Light_02":
+                    return new[]
+                    {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx"
+                    };
+                case "Light_03":
+                    return new[]
+                    {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_3_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"
+                    };
+                case "Heavy_01":
+                    return new[]
+                    {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_3_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"
+                    };
+                case "DodgeFollowUp":
+                    return new[]
+                    {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_1_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx"
+                    };
+                case "DodgeFollowUp_Enhanced":
+                    return new[]
+                    {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_2_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx"
+                    };
+                case "Counter":
+                    return new[]
+                    {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_2_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx"
+                    };
+                case "Counter_Enhanced":
+                    return new[]
+                    {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_3_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"
+                    };
+                default:
+                    return null;
+            }
+        }
+
         private static AnimationClip CreateOrUpdatePlaceholderClip(
             string path,
             float duration,
             bool loopTime,
-            AnimationEvent[] animationEvents)
+            AnimationEvent[] animationEvents,
+            string animationStateName = null,
+            float openTime = 0f,
+            float closeTime = 0f)
         {
             AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
 
@@ -747,10 +1384,424 @@ namespace CampusRPG.Editor
             AnimationUtility.SetEditorCurve(clip, scaleXBinding, constantScaleCurve);
             AnimationUtility.SetEditorCurve(clip, scaleYBinding, constantScaleCurve);
             AnimationUtility.SetEditorCurve(clip, scaleZBinding, constantScaleCurve);
+            ApplyPlayerProxyMotionCurves(
+                clip,
+                ResolvePlayerProxyMotionProfile(path, animationStateName),
+                duration,
+                openTime,
+                closeTime);
             AnimationUtility.SetAnimationEvents(clip, animationEvents ?? System.Array.Empty<AnimationEvent>());
             ConfigureClipSettings(clip, duration, loopTime);
             EditorUtility.SetDirty(clip);
             return clip;
+        }
+
+        private static PlayerProxyMotionProfile ResolvePlayerProxyMotionProfile(string path, string animationStateName)
+        {
+            if (string.Equals(path, PlayerIdleClipPath, global::System.StringComparison.Ordinal))
+            {
+                return PlayerProxyMotionProfile.Idle;
+            }
+
+            switch (animationStateName)
+            {
+                case "Light_01":
+                    return PlayerProxyMotionProfile.Light01;
+                case "Light_02":
+                    return PlayerProxyMotionProfile.Light02;
+                case "Light_03":
+                    return PlayerProxyMotionProfile.Light03;
+                case "Heavy_01":
+                    return PlayerProxyMotionProfile.Heavy01;
+                case "DodgeFollowUp":
+                    return PlayerProxyMotionProfile.DodgeFollowUp;
+                case "DodgeFollowUp_Enhanced":
+                    return PlayerProxyMotionProfile.DodgeFollowUpEnhanced;
+                case "Counter":
+                    return PlayerProxyMotionProfile.Counter;
+                case "Counter_Enhanced":
+                    return PlayerProxyMotionProfile.CounterEnhanced;
+                default:
+                    return PlayerProxyMotionProfile.GenericAttack;
+            }
+        }
+
+        private static void ApplyPlayerProxyMotionCurves(
+            AnimationClip clip,
+            PlayerProxyMotionProfile profile,
+            float duration,
+            float openTime,
+            float closeTime)
+        {
+            if (clip == null)
+            {
+                return;
+            }
+
+            if (profile == PlayerProxyMotionProfile.Idle)
+            {
+                ApplyIdleProxyCurves(clip, duration);
+                return;
+            }
+
+            float anticipationTime = Mathf.Clamp(
+                Mathf.Max(duration * 0.16f, openTime * 0.65f),
+                0.03f,
+                Mathf.Max(0.03f, duration * 0.45f));
+            float strikeTime = Mathf.Clamp(
+                closeTime > openTime ? Mathf.Lerp(openTime, closeTime, 0.45f) : duration * 0.5f,
+                anticipationTime + 0.01f,
+                Mathf.Max(anticipationTime + 0.01f, duration * 0.78f));
+            float settleTime = Mathf.Clamp(
+                Mathf.Max(closeTime, strikeTime + duration * 0.14f),
+                strikeTime + 0.01f,
+                duration);
+
+            switch (profile)
+            {
+                case PlayerProxyMotionProfile.Light01:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(-0.04f, 0.85f, 0.02f),
+                        new Vector3(0.08f, 0.9f, 0.12f),
+                        new Vector3(-0.03f, 1.11f, 0.2f),
+                        new Vector3(0.08f, 1.14f, 0.31f),
+                        new Vector3(-0.05f, 1.6f, 0.04f),
+                        new Vector3(0.07f, 1.66f, 0.16f),
+                        new Vector3(-0.05f, 0.93f, 0.5f),
+                        new Vector3(0.03f, 0.96f, 0.98f),
+                        new Vector3(0.11f, 0.18f, 0.44f),
+                        new Vector3(0.14f, 0.18f, 1.12f),
+                        new Vector3(0.22f, 1.02f, 0.3f),
+                        new Vector3(0.48f, 1.08f, 0.8f),
+                        new Vector3(0.06f, 0.07f, 0.64f),
+                        new Vector3(0.08f, 0.07f, 1.24f));
+                    break;
+                case PlayerProxyMotionProfile.Light02:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(0.05f, 0.85f, 0.01f),
+                        new Vector3(-0.09f, 0.9f, 0.12f),
+                        new Vector3(0.05f, 1.11f, 0.18f),
+                        new Vector3(-0.08f, 1.14f, 0.31f),
+                        new Vector3(0.05f, 1.6f, 0.03f),
+                        new Vector3(-0.07f, 1.65f, 0.16f),
+                        new Vector3(0.05f, 0.93f, 0.5f),
+                        new Vector3(-0.04f, 0.96f, 1.02f),
+                        new Vector3(0.11f, 0.18f, 0.44f),
+                        new Vector3(0.14f, 0.18f, 1.16f),
+                        new Vector3(0.43f, 1.01f, 0.25f),
+                        new Vector3(-0.04f, 1.08f, 0.76f),
+                        new Vector3(0.06f, 0.07f, 0.64f),
+                        new Vector3(0.08f, 0.07f, 1.2f));
+                    break;
+                case PlayerProxyMotionProfile.Light03:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(0f, 0.83f, -0.02f),
+                        new Vector3(0f, 0.9f, 0.17f),
+                        new Vector3(0f, 1.08f, 0.14f),
+                        new Vector3(0f, 1.17f, 0.34f),
+                        new Vector3(0f, 1.57f, 0.01f),
+                        new Vector3(0f, 1.69f, 0.19f),
+                        new Vector3(0f, 0.9f, 0.46f),
+                        new Vector3(0f, 1.0f, 1.06f),
+                        new Vector3(0.12f, 0.18f, 0.42f),
+                        new Vector3(0.16f, 0.18f, 1.26f),
+                        new Vector3(0.18f, 1.18f, 0.18f),
+                        new Vector3(0.12f, 1.3f, 0.92f),
+                        new Vector3(0.06f, 0.07f, 0.72f),
+                        new Vector3(0.1f, 0.08f, 1.38f));
+                    break;
+                case PlayerProxyMotionProfile.Heavy01:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(-0.02f, 0.8f, -0.04f),
+                        new Vector3(0f, 0.93f, 0.22f),
+                        new Vector3(-0.01f, 1.04f, 0.1f),
+                        new Vector3(0f, 1.2f, 0.38f),
+                        new Vector3(0f, 1.54f, -0.02f),
+                        new Vector3(0f, 1.72f, 0.24f),
+                        new Vector3(0f, 0.88f, 0.42f),
+                        new Vector3(0f, 1.04f, 1.18f),
+                        new Vector3(0.12f, 0.18f, 0.4f),
+                        new Vector3(0.18f, 0.18f, 1.42f),
+                        new Vector3(0.16f, 1.18f, 0.12f),
+                        new Vector3(0.08f, 1.38f, 1.08f),
+                        new Vector3(0.06f, 0.07f, 0.72f),
+                        new Vector3(0.11f, 0.08f, 1.56f));
+                    break;
+                case PlayerProxyMotionProfile.DodgeFollowUp:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(-0.01f, 0.84f, 0.01f),
+                        new Vector3(0f, 0.89f, 0.18f),
+                        new Vector3(0f, 1.1f, 0.2f),
+                        new Vector3(0f, 1.14f, 0.33f),
+                        new Vector3(0f, 1.59f, 0.05f),
+                        new Vector3(0f, 1.64f, 0.16f),
+                        new Vector3(0f, 0.92f, 0.52f),
+                        new Vector3(0f, 0.96f, 1.04f),
+                        new Vector3(0.11f, 0.18f, 0.44f),
+                        new Vector3(0.15f, 0.18f, 1.24f),
+                        new Vector3(0.28f, 1.02f, 0.28f),
+                        new Vector3(0.3f, 1.1f, 0.94f),
+                        new Vector3(0.06f, 0.07f, 0.68f),
+                        new Vector3(0.08f, 0.07f, 1.32f));
+                    break;
+                case PlayerProxyMotionProfile.DodgeFollowUpEnhanced:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(-0.01f, 0.83f, 0.02f),
+                        new Vector3(0.01f, 0.9f, 0.21f),
+                        new Vector3(0f, 1.09f, 0.2f),
+                        new Vector3(0.01f, 1.16f, 0.36f),
+                        new Vector3(0f, 1.58f, 0.05f),
+                        new Vector3(0.01f, 1.67f, 0.19f),
+                        new Vector3(0f, 0.92f, 0.52f),
+                        new Vector3(0f, 0.98f, 1.14f),
+                        new Vector3(0.11f, 0.18f, 0.44f),
+                        new Vector3(0.16f, 0.18f, 1.38f),
+                        new Vector3(0.27f, 1.02f, 0.26f),
+                        new Vector3(0.3f, 1.14f, 1.06f),
+                        new Vector3(0.06f, 0.07f, 0.68f),
+                        new Vector3(0.09f, 0.07f, 1.46f));
+                    break;
+                case PlayerProxyMotionProfile.Counter:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(0.03f, 0.85f, 0.02f),
+                        new Vector3(0f, 0.91f, 0.17f),
+                        new Vector3(0.04f, 1.1f, 0.18f),
+                        new Vector3(0f, 1.16f, 0.34f),
+                        new Vector3(0.03f, 1.6f, 0.04f),
+                        new Vector3(0f, 1.68f, 0.19f),
+                        new Vector3(0.04f, 0.93f, 0.5f),
+                        new Vector3(0f, 0.98f, 1.04f),
+                        new Vector3(0.11f, 0.18f, 0.44f),
+                        new Vector3(0.15f, 0.18f, 1.24f),
+                        new Vector3(0.44f, 1.02f, 0.28f),
+                        new Vector3(0.18f, 1.12f, 0.98f),
+                        new Vector3(0.06f, 0.07f, 0.66f),
+                        new Vector3(0.08f, 0.07f, 1.36f));
+                    break;
+                case PlayerProxyMotionProfile.CounterEnhanced:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(0.03f, 0.84f, 0.02f),
+                        new Vector3(0f, 0.92f, 0.2f),
+                        new Vector3(0.04f, 1.1f, 0.17f),
+                        new Vector3(0f, 1.18f, 0.37f),
+                        new Vector3(0.03f, 1.6f, 0.03f),
+                        new Vector3(0f, 1.7f, 0.22f),
+                        new Vector3(0.04f, 0.93f, 0.5f),
+                        new Vector3(0f, 0.99f, 1.14f),
+                        new Vector3(0.11f, 0.18f, 0.44f),
+                        new Vector3(0.16f, 0.18f, 1.36f),
+                        new Vector3(0.44f, 1.02f, 0.26f),
+                        new Vector3(0.16f, 1.14f, 1.08f),
+                        new Vector3(0.06f, 0.07f, 0.66f),
+                        new Vector3(0.09f, 0.07f, 1.48f));
+                    break;
+                default:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(0f, 0.85f, 0.02f),
+                        new Vector3(0f, 0.9f, 0.12f),
+                        new Vector3(0f, 1.1f, 0.2f),
+                        new Vector3(0f, 1.14f, 0.3f),
+                        new Vector3(0f, 1.6f, 0.04f),
+                        new Vector3(0f, 1.66f, 0.16f),
+                        new Vector3(0f, 0.93f, 0.5f),
+                        new Vector3(0f, 0.96f, 0.98f),
+                        new Vector3(0.11f, 0.18f, 0.44f),
+                        new Vector3(0.14f, 0.18f, 1.1f),
+                        new Vector3(0.24f, 1.02f, 0.3f),
+                        new Vector3(0.3f, 1.08f, 0.78f),
+                        new Vector3(0.06f, 0.07f, 0.64f),
+                        new Vector3(0.08f, 0.07f, 1.22f));
+                    break;
+            }
+        }
+
+        private static void ApplyIdleProxyCurves(AnimationClip clip, float duration)
+        {
+            float midpoint = duration * 0.5f;
+            SetLocalPositionCurve(clip, PlayerProxyTorsoPath, 'y',
+                new ProxyCurveKey(0f, 0.88f),
+                new ProxyCurveKey(midpoint, 0.905f),
+                new ProxyCurveKey(duration, 0.88f));
+            SetLocalPositionCurve(clip, PlayerProxyTorsoPath, 'z',
+                new ProxyCurveKey(0f, 0.04f),
+                new ProxyCurveKey(midpoint, 0.055f),
+                new ProxyCurveKey(duration, 0.04f));
+            SetLocalPositionCurve(clip, PlayerProxyHeadPath, 'y',
+                new ProxyCurveKey(0f, 1.62f),
+                new ProxyCurveKey(midpoint, 1.645f),
+                new ProxyCurveKey(duration, 1.62f));
+            SetLocalPositionCurve(clip, PlayerProxyHeadPath, 'z',
+                new ProxyCurveKey(0f, 0.08f),
+                new ProxyCurveKey(midpoint, 0.1f),
+                new ProxyCurveKey(duration, 0.08f));
+            SetLocalScaleCurve(clip, PlayerProxyForwardMarkerPath, 'z',
+                new ProxyCurveKey(0f, 0.56f),
+                new ProxyCurveKey(midpoint, 0.62f),
+                new ProxyCurveKey(duration, 0.56f));
+        }
+
+        private static void ApplyAttackProxyCurves(
+            AnimationClip clip,
+            float duration,
+            float anticipationTime,
+            float strikeTime,
+            float settleTime,
+            Vector3 anticipationTorsoPosition,
+            Vector3 strikeTorsoPosition,
+            Vector3 anticipationChestPosition,
+            Vector3 strikeChestPosition,
+            Vector3 anticipationHeadPosition,
+            Vector3 strikeHeadPosition,
+            Vector3 anticipationForwardMarkerPosition,
+            Vector3 strikeForwardMarkerPosition,
+            Vector3 anticipationForwardMarkerScale,
+            Vector3 strikeForwardMarkerScale,
+            Vector3 anticipationBladePosition,
+            Vector3 strikeBladePosition,
+            Vector3 anticipationBladeScale,
+            Vector3 strikeBladeScale)
+        {
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyTorsoPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(anticipationTime, anticipationTorsoPosition.x), new ProxyCurveKey(strikeTime, strikeTorsoPosition.x), new ProxyCurveKey(settleTime, 0f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0.88f), new ProxyCurveKey(anticipationTime, anticipationTorsoPosition.y), new ProxyCurveKey(strikeTime, strikeTorsoPosition.y), new ProxyCurveKey(settleTime, 0.89f), new ProxyCurveKey(duration, 0.88f) },
+                new[] { new ProxyCurveKey(0f, 0.04f), new ProxyCurveKey(anticipationTime, anticipationTorsoPosition.z), new ProxyCurveKey(strikeTime, strikeTorsoPosition.z), new ProxyCurveKey(settleTime, 0.07f), new ProxyCurveKey(duration, 0.04f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyChestPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(anticipationTime, anticipationChestPosition.x), new ProxyCurveKey(strikeTime, strikeChestPosition.x), new ProxyCurveKey(settleTime, 0f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 1.12f), new ProxyCurveKey(anticipationTime, anticipationChestPosition.y), new ProxyCurveKey(strikeTime, strikeChestPosition.y), new ProxyCurveKey(settleTime, 1.13f), new ProxyCurveKey(duration, 1.12f) },
+                new[] { new ProxyCurveKey(0f, 0.24f), new ProxyCurveKey(anticipationTime, anticipationChestPosition.z), new ProxyCurveKey(strikeTime, strikeChestPosition.z), new ProxyCurveKey(settleTime, 0.27f), new ProxyCurveKey(duration, 0.24f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyHeadPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(anticipationTime, anticipationHeadPosition.x), new ProxyCurveKey(strikeTime, strikeHeadPosition.x), new ProxyCurveKey(settleTime, 0f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 1.62f), new ProxyCurveKey(anticipationTime, anticipationHeadPosition.y), new ProxyCurveKey(strikeTime, strikeHeadPosition.y), new ProxyCurveKey(settleTime, 1.64f), new ProxyCurveKey(duration, 1.62f) },
+                new[] { new ProxyCurveKey(0f, 0.08f), new ProxyCurveKey(anticipationTime, anticipationHeadPosition.z), new ProxyCurveKey(strikeTime, strikeHeadPosition.z), new ProxyCurveKey(settleTime, 0.12f), new ProxyCurveKey(duration, 0.08f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyForwardMarkerPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(anticipationTime, anticipationForwardMarkerPosition.x), new ProxyCurveKey(strikeTime, strikeForwardMarkerPosition.x), new ProxyCurveKey(settleTime, 0f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0.94f), new ProxyCurveKey(anticipationTime, anticipationForwardMarkerPosition.y), new ProxyCurveKey(strikeTime, strikeForwardMarkerPosition.y), new ProxyCurveKey(settleTime, 0.95f), new ProxyCurveKey(duration, 0.94f) },
+                new[] { new ProxyCurveKey(0f, 0.62f), new ProxyCurveKey(anticipationTime, anticipationForwardMarkerPosition.z), new ProxyCurveKey(strikeTime, strikeForwardMarkerPosition.z), new ProxyCurveKey(settleTime, 0.76f), new ProxyCurveKey(duration, 0.62f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyForwardMarkerPath,
+                "m_LocalScale",
+                new[] { new ProxyCurveKey(0f, 0.14f), new ProxyCurveKey(anticipationTime, anticipationForwardMarkerScale.x), new ProxyCurveKey(strikeTime, strikeForwardMarkerScale.x), new ProxyCurveKey(settleTime, 0.14f), new ProxyCurveKey(duration, 0.14f) },
+                new[] { new ProxyCurveKey(0f, 0.18f), new ProxyCurveKey(anticipationTime, anticipationForwardMarkerScale.y), new ProxyCurveKey(strikeTime, strikeForwardMarkerScale.y), new ProxyCurveKey(settleTime, 0.18f), new ProxyCurveKey(duration, 0.18f) },
+                new[] { new ProxyCurveKey(0f, 0.56f), new ProxyCurveKey(anticipationTime, anticipationForwardMarkerScale.z), new ProxyCurveKey(strikeTime, strikeForwardMarkerScale.z), new ProxyCurveKey(settleTime, 0.74f), new ProxyCurveKey(duration, 0.56f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyBladePath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0.34f), new ProxyCurveKey(anticipationTime, anticipationBladePosition.x), new ProxyCurveKey(strikeTime, strikeBladePosition.x), new ProxyCurveKey(settleTime, 0.34f), new ProxyCurveKey(duration, 0.34f) },
+                new[] { new ProxyCurveKey(0f, 1.04f), new ProxyCurveKey(anticipationTime, anticipationBladePosition.y), new ProxyCurveKey(strikeTime, strikeBladePosition.y), new ProxyCurveKey(settleTime, 1.05f), new ProxyCurveKey(duration, 1.04f) },
+                new[] { new ProxyCurveKey(0f, 0.54f), new ProxyCurveKey(anticipationTime, anticipationBladePosition.z), new ProxyCurveKey(strikeTime, strikeBladePosition.z), new ProxyCurveKey(settleTime, 0.66f), new ProxyCurveKey(duration, 0.54f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyBladePath,
+                "m_LocalScale",
+                new[] { new ProxyCurveKey(0f, 0.07f), new ProxyCurveKey(anticipationTime, anticipationBladeScale.x), new ProxyCurveKey(strikeTime, strikeBladeScale.x), new ProxyCurveKey(settleTime, 0.07f), new ProxyCurveKey(duration, 0.07f) },
+                new[] { new ProxyCurveKey(0f, 0.07f), new ProxyCurveKey(anticipationTime, anticipationBladeScale.y), new ProxyCurveKey(strikeTime, strikeBladeScale.y), new ProxyCurveKey(settleTime, 0.07f), new ProxyCurveKey(duration, 0.07f) },
+                new[] { new ProxyCurveKey(0f, 0.82f), new ProxyCurveKey(anticipationTime, anticipationBladeScale.z), new ProxyCurveKey(strikeTime, strikeBladeScale.z), new ProxyCurveKey(settleTime, 0.94f), new ProxyCurveKey(duration, 0.82f) });
+            SetLocalPositionCurve(clip, PlayerProxyGuardPath, 'z',
+                new ProxyCurveKey(0f, 0.34f),
+                new ProxyCurveKey(anticipationTime, 0.28f),
+                new ProxyCurveKey(strikeTime, 0.4f),
+                new ProxyCurveKey(settleTime, 0.36f),
+                new ProxyCurveKey(duration, 0.34f));
+        }
+
+        private static void SetVector3PropertyCurves(
+            AnimationClip clip,
+            string path,
+            string propertyPrefix,
+            ProxyCurveKey[] xKeys,
+            ProxyCurveKey[] yKeys,
+            ProxyCurveKey[] zKeys)
+        {
+            SetFloatCurve(clip, path, propertyPrefix + ".x", xKeys);
+            SetFloatCurve(clip, path, propertyPrefix + ".y", yKeys);
+            SetFloatCurve(clip, path, propertyPrefix + ".z", zKeys);
+        }
+
+        private static void SetLocalPositionCurve(AnimationClip clip, string path, char axis, params ProxyCurveKey[] keys)
+        {
+            SetFloatCurve(clip, path, "m_LocalPosition." + axis, keys);
+        }
+
+        private static void SetLocalScaleCurve(AnimationClip clip, string path, char axis, params ProxyCurveKey[] keys)
+        {
+            SetFloatCurve(clip, path, "m_LocalScale." + axis, keys);
+        }
+
+        private static void SetFloatCurve(AnimationClip clip, string path, string propertyName, params ProxyCurveKey[] keys)
+        {
+            EditorCurveBinding binding = EditorCurveBinding.FloatCurve(path, typeof(Transform), propertyName);
+            AnimationUtility.SetEditorCurve(clip, binding, CreateCurve(keys));
+        }
+
+        private static AnimationCurve CreateCurve(params ProxyCurveKey[] keys)
+        {
+            Keyframe[] keyframes = new Keyframe[keys.Length];
+
+            for (int i = 0; i < keys.Length; i++)
+            {
+                keyframes[i] = new Keyframe(keys[i].Time, keys[i].Value);
+            }
+
+            return new AnimationCurve(keyframes);
         }
 
         private static void ClearClipContent(AnimationClip clip)
@@ -802,6 +1853,33 @@ namespace CampusRPG.Editor
             }
 
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static float ResolveClipConfiguredDuration(AnimationClip clip)
+        {
+            if (clip == null)
+            {
+                return 0f;
+            }
+
+            SerializedObject serializedObject = new SerializedObject(clip);
+            SerializedProperty clipSettings = serializedObject.FindProperty("m_AnimationClipSettings");
+
+            if (clipSettings == null)
+            {
+                return Mathf.Max(0f, clip.length);
+            }
+
+            SerializedProperty startTimeProperty = clipSettings.FindPropertyRelative("m_StartTime");
+            SerializedProperty stopTimeProperty = clipSettings.FindPropertyRelative("m_StopTime");
+            float startTime = startTimeProperty != null ? startTimeProperty.floatValue : 0f;
+            float stopTime = stopTimeProperty != null ? stopTimeProperty.floatValue : clip.length;
+            return Mathf.Max(0f, stopTime - startTime);
+        }
+
+        private static float GetConfiguredClipDuration(string clipPath)
+        {
+            return ResolveClipConfiguredDuration(AssetDatabase.LoadAssetAtPath<AnimationClip>(clipPath));
         }
 
         private static GameObject BuildProjectilePrefab(string prefabPath, string prefabName, GameObject impactEffectPrefab)

@@ -276,8 +276,13 @@ namespace CampusRPG.Editor
             SetObjectReference(attackExecutor, "attackOrigin", attackOrigin);
             SetLayerMask(attackExecutor, "targetMask", ~0);
             SetObjectReference(hitboxController, "attackExecutor", attackExecutor);
+            SetObjectReference(animationRelay, "playerCharacter", playerCharacter);
             SetObjectReference(animationRelay, "combatController", playerCombatController);
+            SetObjectReference(animationRelay, "stateMachine", playerStateMachine);
+            SetObjectReference(animationRelay, "motor", playerMotor);
             SetObjectReference(animationRelay, "animator", animator);
+            SetFloat(animationRelay, "dodgeAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerDodgeAnimationDuration());
+            SetFloat(animationRelay, "hitAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerHitAnimationDuration());
             ConfigurePlayerAnimator(animator, playerAnimatorController);
 
             SetObjectReference(skillController, "owner", playerCharacter);
@@ -290,6 +295,8 @@ namespace CampusRPG.Editor
 
             SetObjectReference(damageableReceiver, "health", health);
             SetObjectReference(damageableReceiver, "playerCharacter", playerCharacter);
+            CombatImportedPlayerVisualUtility.TryApply(player, animator);
+            CombatProxyVisualUtility.Apply(player, CombatProxyVisualKind.Player);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             Object.DestroyImmediate(player);
@@ -334,6 +341,7 @@ namespace CampusRPG.Editor
             SetObjectReference(damageableReceiver, "enemyBrain", enemyBrain);
             SetObjectReference(lockOnTarget, "targetTransform", lockPoint);
             SetLayerMask(enemySensing, "targetMask", ~0);
+            CombatProxyVisualUtility.Apply(enemy, ResolveEnemyVisualKind(prefabPath));
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(enemy, prefabPath);
             Object.DestroyImmediate(enemy);
@@ -381,8 +389,13 @@ namespace CampusRPG.Editor
                 SetObjectReference(playerCombatController, "hitboxController", hitboxController);
                 SetObjectReference(playerCombatController, "animationRelay", animationRelay);
 
+                SetObjectReference(animationRelay, "playerCharacter", playerCharacter);
                 SetObjectReference(animationRelay, "combatController", playerCombatController);
+                SetObjectReference(animationRelay, "stateMachine", playerStateMachine);
+                SetObjectReference(animationRelay, "motor", playerMotor);
                 SetObjectReference(animationRelay, "animator", animator);
+                SetFloat(animationRelay, "dodgeAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerDodgeAnimationDuration());
+                SetFloat(animationRelay, "hitAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerHitAnimationDuration());
                 SetObjectReference(attackExecutor, "attackOrigin", attackOrigin);
                 SetObjectReference(hitboxController, "attackExecutor", attackExecutor);
                 SetObjectReference(skillController, "owner", playerCharacter);
@@ -393,6 +406,8 @@ namespace CampusRPG.Editor
                 SetObjectReference(damageableReceiver, "health", health);
                 SetObjectReference(damageableReceiver, "playerCharacter", playerCharacter);
                 ConfigurePlayerAnimator(animator, playerAnimatorController);
+                changed |= CombatImportedPlayerVisualUtility.TryApply(player, animator);
+                changed |= CombatProxyVisualUtility.Apply(player, CombatProxyVisualKind.Player);
 
                 PrefabUtility.SaveAsPrefabAsset(player, prefabPath);
                 return true;
@@ -435,6 +450,7 @@ namespace CampusRPG.Editor
                 SetObjectReference(damageableReceiver, "health", health);
                 SetObjectReference(damageableReceiver, "enemyBrain", enemyBrain);
                 SetObjectReference(lockOnTarget, "targetTransform", lockPoint);
+                changed |= CombatProxyVisualUtility.Apply(enemy, ResolveEnemyVisualKind(prefabPath));
 
                 PrefabUtility.SaveAsPrefabAsset(enemy, prefabPath);
                 return true;
@@ -626,6 +642,21 @@ namespace CampusRPG.Editor
 
             changed = true;
             return CreateChild(parent, name, localPosition);
+        }
+
+        private static CombatProxyVisualKind ResolveEnemyVisualKind(string prefabPath)
+        {
+            if (string.Equals(prefabPath, EnemyMobilePrefabPath, global::System.StringComparison.Ordinal))
+            {
+                return CombatProxyVisualKind.EnemyMobile;
+            }
+
+            if (string.Equals(prefabPath, EnemyRangedPrefabPath, global::System.StringComparison.Ordinal))
+            {
+                return CombatProxyVisualKind.EnemyRanged;
+            }
+
+            return CombatProxyVisualKind.EnemyMelee;
         }
 
         private static void EnsureFolder(string folderPath)

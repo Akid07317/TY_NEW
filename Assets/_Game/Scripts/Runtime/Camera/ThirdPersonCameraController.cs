@@ -19,6 +19,9 @@ namespace CampusRPG.Camera
         [SerializeField] private float followLookHeight = 1.5f;
         [SerializeField] private float lockOnLookHeight = 1.25f;
         [SerializeField] private float lockOnRotationSpeed = 360f;
+        [SerializeField] private LayerMask obstacleMask = ~0;
+        [SerializeField] private float obstacleProbeRadius = 0.25f;
+        [SerializeField] private float obstaclePadding = 0.1f;
 
         private bool isLockOnActive;
         private float yaw;
@@ -71,6 +74,7 @@ namespace CampusRPG.Camera
             }
 
             Vector3 focusPoint = followTarget.position;
+            Vector3 playerLookPoint = focusPoint + Vector3.up * followLookHeight;
             ThirdPersonCameraFollowStep followStep = ThirdPersonCameraOrbitUtility.ResolveFollowStep(
                 transform.position,
                 focusPoint,
@@ -79,7 +83,13 @@ namespace CampusRPG.Camera
                 pitch,
                 followSharpness,
                 Time.deltaTime);
-            transform.position = followStep.Position;
+            transform.position = CameraObstacleResolver.ResolveAdjustedPosition(
+                playerLookPoint,
+                followStep.Position,
+                followTarget,
+                obstacleProbeRadius,
+                obstaclePadding,
+                obstacleMask);
 
             Vector3 lookPoint = ThirdPersonCameraOrbitUtility.ResolveLookPoint(
                 followTarget.position,

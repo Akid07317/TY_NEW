@@ -1,4 +1,5 @@
 using CampusRPG.Combat;
+using UnityEngine;
 
 namespace CampusRPG.Character
 {
@@ -13,6 +14,7 @@ namespace CampusRPG.Character
         private float recoveryRemaining;
         private bool queuedNextLightAttack;
         private bool isActiveWindowStarted;
+        private bool hasAppliedForwardMovement;
 
         public PlayerAttackState(PlayerCharacter owner, PlayerStateMachine stateMachine, PlayerAttackRequest request) : base(owner)
         {
@@ -36,7 +38,8 @@ namespace CampusRPG.Character
 
             startupRemaining = definition.StartupSeconds;
             activeRemaining = definition.ActiveSeconds;
-            recoveryRemaining = definition.RecoverySeconds;
+            recoveryRemaining = ResolveRecoverySeconds(definition);
+            hasAppliedForwardMovement = false;
 
             if (Owner.CombatController?.HitboxController != null && Owner.BaseStats != null)
             {
@@ -126,6 +129,7 @@ namespace CampusRPG.Character
         private void BeginActiveWindow()
         {
             isActiveWindowStarted = true;
+            ApplyForwardMovement();
             Owner.CombatController?.HitboxController?.OpenActivationWindow();
 
             if (definition == null || definition.HitboxActivationMode == AttackHitboxActivationMode.AnimationEvent)
@@ -149,6 +153,37 @@ namespace CampusRPG.Character
         private void EndActiveWindow()
         {
             Owner.CombatController?.HitboxController?.CloseActivationWindow();
+        }
+
+        private void ApplyForwardMovement()
+        {
+            if (hasAppliedForwardMovement || definition == null)
+            {
+                return;
+            }
+
+            hasAppliedForwardMovement = true;
+            Owner.Motor?.AdvanceFacingDirection(definition.ForwardMovement);
+        }
+
+        private static float ResolveRecoverySeconds(AttackDefinitionSO attackDefinition)
+        {
+            if (attackDefinition == null)
+            {
+                return 0f;
+            }
+
+            float configuredDuration = attackDefinition.AnimationDurationSeconds;
+
+            if (configuredDuration <= 0f)
+            {
+                return attackDefinition.RecoverySeconds;
+            }
+
+            float animationRecoverySeconds = Mathf.Max(
+                0f,
+                configuredDuration - attackDefinition.StartupSeconds - attackDefinition.ActiveSeconds);
+            return Mathf.Max(attackDefinition.RecoverySeconds, animationRecoverySeconds);
         }
     }
 }

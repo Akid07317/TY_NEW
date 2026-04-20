@@ -5,6 +5,7 @@
     "CampusRPG.Runtime",
     "CampusRPG.Runtime.Core",
     "CampusRPG.Runtime.Input",
+    "CampusRPG.Editor",
     "Unity.InputSystem"
   ],
   "includePlatforms": [
