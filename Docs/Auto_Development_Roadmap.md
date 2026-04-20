@@ -28,7 +28,7 @@
 
 ## 2. 当前阶段判断
 
-更新时间：`2026-04-18`
+更新时间：`2026-04-20`
 
 当前项目的默认判断如下：
 
@@ -45,6 +45,8 @@
 当前默认小阶段：`第一章主流程继续围绕“玩家不看文档也能顺着打下去”的可玩闭环收口。已完成主路线门禁、内场封锁、Boss 前读档、区域到达提示、检查点提示、关键物品提示、章节目标提示、入口教学提示、路线阻塞提示、普通遭遇战开战封锁提示、普通遭遇战清场提示、守门者战开场战术提示、章节完成后的收尾总结卡，以及 Boss 倒地后通往 `RitualCore` 的世界空间引导标记；最新又把这段的第一眼反馈补成了“引导标记 + 一次性地面扩散闪光”，进一步收掉了 `RitualCore` 拾取瞬间与章节完成卡的双层提示重叠、Boss 清场那一拍的目标面板高亮，压短了 `BossArenaStatusPresenter` 的清场提示停留时间，补了“章节完成时立刻收掉 Boss 清场提示”的收尾清理，并继续给 `BossArenaStatusPresenter` 补了短淡入淡出，同时把 `ChapterCompleteView` 从“短延迟出场”推进到“短延迟后再短淡入 + 轻背景压暗”，让玩家拾取 `RitualCore` 后会先有一个极短的完成落点，再看到更聚焦、柔和一点的章节总结卡入场。最近几轮则继续把“入口 -> 继续 -> 进关卡”这一段真正补成可用前端：先恢复 `MainMenu` 的正式构建落点，再补上“自动读取存档 + 告诉玩家下一目标 + 列出关键操作 + 支持 Enter/R/Esc 快捷键”，随后把“从主菜单点继续后直接进 `Chapter01`”这一下接进关卡本身，新增了一个短时 `Resume` 提示，让玩家进场第一眼就知道自己当前是从哪一段接着打、接下来目标是什么；这轮又继续把它和原有 `AreaEntry` 区域到达横幅做了避让，避免“继续进关”第一拍同时弹两层提示、互相抢信息。现在整条“看懂入口 -> 点继续 -> 进关后知道要做什么”的链路已经基本接上，而且继续进入时的第一眼信息也更干净。当前最新完整真实 Unity 回归稳定仍是上一轮的 `EditMode 143/143`、`PlayMode 11/11` 全通过；但最近几轮针对 `MainMenuViewTests`、`BuildSettingsSceneOrderTests`、`ChapterResumeContextViewTests`、`AreaEntryViewTests` 与场景接线的 batchmode 验证都被当前受限 shell 的 `attempt to write a readonly database` 环境问题拦住，尚未拿到新的真实 Unity 结果。下一步应先在可用 shell 补跑 `MainMenuViewTests`、`BuildSettingsSceneOrderTests`、`ChapterResumeContextViewTests`、`AreaEntryViewTests` 与一次真实构建启动检查，再回到整章人工通关检查和 Boss 前后节奏收口。`
 
 补充状态：`本轮顺手把 `MainMenu`、`BossTest`、`Bootstrap` 与参考模板场景里残留的旧 HDRP 缺失脚本一起清掉，并移除了已经失效的 `SkyandFogSettingsProfile.asset`。现在真实命令行构建已经不再刷这批 “missing script / no valid script” 告警，`Build And Run` 的构建日志至少已经从“能过但一串黄警告”收回到干净可交接的状态。`
+
+本轮补充：`CombatTest` 的玩家动作系统已完成一轮局部升级：锁定八向步态、定向闪避方向/后撤距离、地面加速度/减速度、低矮障碍 mantle 探针，以及新版方向动作资源接线都已落地；并已在 `2026-04-20` 通过定向 `EditMode 12/12` 回归。`
 
 ## 3. 当前开发路线
 
@@ -82,6 +84,7 @@
 
 | 日期 | 本次推进 | 结果 | 验证 | 下一步 |
 |---|---|---|---|---|
+| `2026-04-20` | 局部升级 `CombatTest` 玩家动作系统的前两刀 | 补上了锁定八向步态、定向闪避方向与后撤距离倍率、地面加速度/减速度、低矮障碍 mantle 探针，以及方向动作资源与 `FreeformCartesian2D` locomotion 混合树接线；同时新增 `PlayerMovementRuntimeUtilityTests`，把锁定移动倍率、动画轴、后撤步与 mantle 探针一起纳入回归 | 先在临时克隆执行 `CampusRPG.Editor.CombatTestAssetGenerator.CreateCombatTestAssets` 刷新新版动作资源与参数资产；随后执行 `unity-run-tests EditMode --use-temp-clone --group-filter '^(CampusRPG\\.Tests\\.EditMode\\.(CombatTestAnimationAssetWiringTests|PlayerMovementRuntimeUtilityTests))$' --results /tmp/TY_NEW_editmode_movement_upgrade_final.xml --log /tmp/TY_NEW_editmode_movement_upgrade_final.log --startup-timeout 45`，结果为 `12/12 Passed` | 下一轮优先把这套移动升级接进 `CombatTest` / `Chapter01` 的真实手感验证，重点看锁定横移读招、后撤闪避距离和 mantle 落点是否还需要继续收口；若节奏成立，再考虑第三刀里更深的动作层改造 |
 | `2026-04-17` | 初始化自动开发路线图 | 建立自动化专用路线图文档，明确当前大阶段、小阶段、标记规则与执行记录格式 | 文档创建完成 | 由自动化在后续运行中持续回写真实开发进度 |
 | `2026-04-17` | 补 `Chapter01` Boss 收尾链场景回归保护 | 新增 `Chapter01ProgressionSceneWiringTests`，把 `Door_A03_To_A04`、`Door_A04_To_RitualCore`、`Pickup_GateSigil`、`Pickup_RitualCore`、`BossPresentationRig`、`BossArenaStatusPresenter`、`ChapterCompleteView` 的关键接线锁进 EditMode 场景测试，避免后续重建章节时把通关链悄悄接坏 | `unity-csc` 单独编译新测试文件通过；`unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.EditMode\\.Chapter01.*SceneWiringTests$'` 未进入正式测试阶段，日志停在 Unity 授权客户端并出现 `Access token is unavailable` / `Found 0 entitlement groups`，因此本轮未拿到真实 Unity 用例结果 | 先恢复可用的 Unity 批处理回归，再继续做 `Chapter01` 的真实整章通关验证与 Boss 收尾收口 |
 | `2026-04-17` | 补 `Chapter01` Boss 收尾链场景流回归 | 新增 `Chapter01ProgressionSceneFlowTests`，直接在 `Chapter01_Combined` 场景里串起 `ChapterProgressService -> Door_A03_To_A04 -> Door_A04_To_RitualCore -> ChapterCompleteView`，把“拿到门禁印记 -> 击败守门者 -> 拾取术式核心后章节完成”的尾段逻辑补成可回归的场景流测试 | `unity-csc` 单独编译新测试文件通过；再次确认批处理日志仍卡在 Unity 授权客户端 `Access token is unavailable` / `Found 0 entitlement groups`，且当前进程只见 Unity Editor 与其拉起的 `Unity.Licensing.Client`，未观察到 `Unity Hub` 常驻痕迹，因此本轮仍未拿到真实 Unity 场景测试结果 | 下一轮优先把 Unity 授权阻塞恢复到可跑 `unity-run-tests`，随后立刻验证新补的 `Chapter01` 场景流测试，并继续推进整章通关回归 |

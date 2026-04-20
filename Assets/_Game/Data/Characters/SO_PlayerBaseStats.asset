@@ -19,3 +19,11 @@ MonoBehaviour:
   moveSpeed: 6
   rotationSpeed: 720
   jumpHeight: 1.6
+  groundAcceleration: 24
+  groundDeceleration: 20
+  lockOnStrafeSpeedScale: 0.92
+  lockOnBackwardSpeedScale: 0.82
+  mantleDurationSeconds: 0.22
+  mantleMinHeight: 0.5
+  mantleMaxHeight: 1.25
+  mantleForwardDistance: 0.8

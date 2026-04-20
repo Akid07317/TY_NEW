@@ -25,6 +25,10 @@ TMP_WRITE_ROOT="${TMPDIR:-/tmp}"
 ACTIVE_TMPDIR="${TMPDIR:-/tmp}"
 ACTIVE_XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 ACTIVE_XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+ORIGINAL_METRICS_DIR="$ORIGINAL_HOME/Library/Application Support/Unity"
+ORIGINAL_METRICS_DB="$ORIGINAL_METRICS_DIR/CoreBusinessMetrics.db"
+ORIGINAL_METRICS_WAL="$ORIGINAL_METRICS_DIR/CoreBusinessMetrics.db-wal"
+ORIGINAL_METRICS_SHM="$ORIGINAL_METRICS_DIR/CoreBusinessMetrics.db-shm"
 
 if [ ! -f "$PROJECT_VERSION_FILE" ]; then
   echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
@@ -125,9 +129,36 @@ print_startup_failure() {
 
   if log_contains "attempt to write a readonly database"; then
     echo "Detected a readonly database write during Unity startup. Check Unity user-data/cache permissions." >&2
+    print_metrics_db_hint >&2
   fi
 
   echo "Suggested recovery: run Tools/unity-cli/unity-license-warmup first, then retry this command." >&2
+}
+
+print_metrics_db_hint() {
+  HINT_PRINTED=0
+
+  for TARGET in "$ORIGINAL_METRICS_DIR" "$ORIGINAL_METRICS_DB" "$ORIGINAL_METRICS_WAL" "$ORIGINAL_METRICS_SHM"; do
+    if [ -e "$TARGET" ] && [ ! -w "$TARGET" ]; then
+      if [ "$HINT_PRINTED" -eq 0 ]; then
+        echo "Likely blocker: Unity's metrics database path is not writable from this shell." 
+        HINT_PRINTED=1
+      fi
+
+      echo "  $TARGET"
+    fi
+  done
+}
+
+print_preflight_metrics_warning() {
+  if [ -e "$ORIGINAL_METRICS_DIR" ] && [ ! -w "$ORIGINAL_METRICS_DIR" ]; then
+    echo "Preflight warning: $ORIGINAL_METRICS_DIR is not writable from this shell." >&2
+    return
+  fi
+
+  if [ -e "$ORIGINAL_METRICS_DB" ] && [ ! -w "$ORIGINAL_METRICS_DB" ]; then
+    echo "Preflight warning: $ORIGINAL_METRICS_DB is not writable from this shell." >&2
+  fi
 }
 
 while [ $# -gt 0 ]; do
@@ -238,6 +269,10 @@ echo "Log: $LOG_FILE"
 echo "Startup timeout: ${STARTUP_TIMEOUT}s"
 echo "Note: unity-run-tests intentionally omits -quit because com.unity.test-framework exits the editor after the run, and -quit prevents the test run from starting."
 echo "Note: --group-filter forwards Unity's -testFilter regex, which matches groups/fixtures rather than individual test methods."
+print_preflight_metrics_warning
+
+# Clear previous batch artifacts so startup monitors do not trip on stale failures.
+rm -f "$LOG_FILE" "$RESULTS_FILE"
 
 trap cleanup_child INT TERM EXIT
 env HOME="$ACTIVE_HOME" TMPDIR="$ACTIVE_TMPDIR" XDG_CACHE_HOME="$ACTIVE_XDG_CACHE_HOME" XDG_CONFIG_HOME="$ACTIVE_XDG_CONFIG_HOME" "$@" &

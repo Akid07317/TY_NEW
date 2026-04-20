@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Linq;
+using CampusRPG.Editor;
 using CampusRPG.Character;
 using CampusRPG.Combat;
 using NUnit.Framework;
@@ -18,7 +19,17 @@ namespace CampusRPG.Tests.EditMode
         {
             "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Idle_CombatTest.anim",
             "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Walk_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Walk_Backward_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Walk_Left_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Walk_Right_CombatTest.anim",
             "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Run_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Run_Backward_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Run_Left_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Run_Right_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Run_ForwardLeft_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Run_ForwardRight_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Run_BackwardLeft_CombatTest.anim",
+            "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Run_BackwardRight_CombatTest.anim",
             "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Airborne_CombatTest.anim",
             "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Block_CombatTest.anim",
             "Assets/_Game/Animations/Characters/CombatTest/AN_Player_Dodge_CombatTest.anim",
@@ -31,6 +42,8 @@ namespace CampusRPG.Tests.EditMode
         private static readonly string[] PlayerAnimatorParameterNames =
         {
             "GroundSpeed",
+            "MoveX",
+            "MoveY",
             "IsGrounded",
             "IsBlocking",
             "VerticalSpeed"
@@ -61,6 +74,7 @@ namespace CampusRPG.Tests.EditMode
         public void PlayerCombatTestPrefab_HasAnimatorControllerAndRelayWired()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+            bool shouldUseImportedPlayerSources = CombatImportedPlayerVisualUtility.ShouldUseImportedPlayerSources;
 
             Assert.IsNotNull(prefab);
 
@@ -73,12 +87,24 @@ namespace CampusRPG.Tests.EditMode
             Assert.IsNotNull(combatController);
             Assert.IsNotNull(animator.runtimeAnimatorController);
             Assert.AreEqual(PlayerControllerPath, AssetDatabase.GetAssetPath(animator.runtimeAnimatorController));
-            Assert.IsNull(animator.avatar);
-            Assert.IsNull(prefab.transform.Find("ImportedVisualRoot"));
-            Assert.IsNotNull(prefab.transform.Find("CombatProxyVisualRoot"));
-            CollectionAssert.IsEmpty(
-                AssetDatabase.GetDependencies(PlayerPrefabPath, true)
-                    .Where(path => path.StartsWith("Assets/Kevin Iglesias/") || path.StartsWith("Assets/JC_LP_MedievalCharacters_LITE/")));
+            if (shouldUseImportedPlayerSources)
+            {
+                Assert.IsNotNull(animator.avatar);
+                Assert.IsNotNull(prefab.transform.Find("ImportedVisualRoot"));
+                Assert.IsNull(prefab.transform.Find("CombatProxyVisualRoot"));
+                Assert.That(
+                    AssetDatabase.GetDependencies(PlayerPrefabPath, true),
+                    Has.Some.Matches<string>(path => path.StartsWith("Assets/Kevin Iglesias/") || path.StartsWith("Assets/JC_LP_MedievalCharacters_LITE/")));
+            }
+            else
+            {
+                Assert.IsNull(animator.avatar);
+                Assert.IsNull(prefab.transform.Find("ImportedVisualRoot"));
+                Assert.IsNotNull(prefab.transform.Find("CombatProxyVisualRoot"));
+                CollectionAssert.IsEmpty(
+                    AssetDatabase.GetDependencies(PlayerPrefabPath, true)
+                        .Where(path => path.StartsWith("Assets/Kevin Iglesias/") || path.StartsWith("Assets/JC_LP_MedievalCharacters_LITE/")));
+            }
             Assert.AreSame(animator, GetPrivateField<Animator>(relay, "animator"));
             Assert.AreSame(prefab.GetComponent<PlayerCharacter>(), GetPrivateField<PlayerCharacter>(relay, "playerCharacter"));
             Assert.AreSame(combatController, GetPrivateField<PlayerCombatController>(relay, "combatController"));
@@ -121,6 +147,11 @@ namespace CampusRPG.Tests.EditMode
 
             Assert.IsNotNull(locomotionState);
             Assert.IsInstanceOf<BlendTree>(locomotionState.motion);
+            BlendTree locomotionBlendTree = (BlendTree)locomotionState.motion;
+            Assert.AreEqual(BlendTreeType.FreeformCartesian2D, locomotionBlendTree.blendType);
+            Assert.AreEqual("MoveX", locomotionBlendTree.blendParameter);
+            Assert.AreEqual("MoveY", locomotionBlendTree.blendParameterY);
+            Assert.That(locomotionBlendTree.children, Has.Length.EqualTo(13));
         }
 
         [Test]
@@ -165,17 +196,31 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
-        public void PlayerClips_UseRepositorySafeProxyCurves()
+        public void PlayerClips_UseExpectedCurveSource()
         {
+            bool shouldUseImportedPlayerSources = CombatImportedPlayerVisualUtility.ShouldUseImportedPlayerSources;
+
             foreach (string clipPath in PlayerBaselineClipPaths.Concat(AttackClipPaths))
             {
                 AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(clipPath);
+                EditorCurveBinding[] curveBindings = AnimationUtility.GetCurveBindings(clip);
 
                 Assert.IsNotNull(clip, clipPath);
-                Assert.That(
-                    AnimationUtility.GetCurveBindings(clip),
-                    Has.Some.Matches<EditorCurveBinding>(binding => binding.path.StartsWith("CombatProxyVisualRoot/")),
-                    clipPath);
+
+                if (shouldUseImportedPlayerSources)
+                {
+                    Assert.That(
+                        curveBindings,
+                        Has.Some.Matches<EditorCurveBinding>(binding => !binding.path.StartsWith("CombatProxyVisualRoot/")),
+                        clipPath);
+                }
+                else
+                {
+                    Assert.That(
+                        curveBindings,
+                        Has.Some.Matches<EditorCurveBinding>(binding => binding.path.StartsWith("CombatProxyVisualRoot/")),
+                        clipPath);
+                }
             }
         }
 

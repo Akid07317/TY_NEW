@@ -35,8 +35,18 @@ namespace CampusRPG.Editor
         private const string PlayerAnimationRootFolder = "Assets/_Game/Animations/Characters/CombatTest";
         private const string PlayerAnimatorControllerPath = PlayerAnimationRootFolder + "/AC_Player_CombatTest.controller";
         private const string PlayerIdleClipPath = PlayerAnimationRootFolder + "/AN_Player_Idle_CombatTest.anim";
-        private const string PlayerLocomotionWalkClipPath = PlayerAnimationRootFolder + "/AN_Player_Walk_CombatTest.anim";
-        private const string PlayerLocomotionRunClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_CombatTest.anim";
+        private const string PlayerLocomotionWalkForwardClipPath = PlayerAnimationRootFolder + "/AN_Player_Walk_CombatTest.anim";
+        private const string PlayerLocomotionWalkBackwardClipPath = PlayerAnimationRootFolder + "/AN_Player_Walk_Backward_CombatTest.anim";
+        private const string PlayerLocomotionWalkLeftClipPath = PlayerAnimationRootFolder + "/AN_Player_Walk_Left_CombatTest.anim";
+        private const string PlayerLocomotionWalkRightClipPath = PlayerAnimationRootFolder + "/AN_Player_Walk_Right_CombatTest.anim";
+        private const string PlayerLocomotionRunForwardClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_CombatTest.anim";
+        private const string PlayerLocomotionRunBackwardClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_Backward_CombatTest.anim";
+        private const string PlayerLocomotionRunLeftClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_Left_CombatTest.anim";
+        private const string PlayerLocomotionRunRightClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_Right_CombatTest.anim";
+        private const string PlayerLocomotionRunForwardLeftClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_ForwardLeft_CombatTest.anim";
+        private const string PlayerLocomotionRunForwardRightClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_ForwardRight_CombatTest.anim";
+        private const string PlayerLocomotionRunBackwardLeftClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_BackwardLeft_CombatTest.anim";
+        private const string PlayerLocomotionRunBackwardRightClipPath = PlayerAnimationRootFolder + "/AN_Player_Run_BackwardRight_CombatTest.anim";
         private const string PlayerAirborneClipPath = PlayerAnimationRootFolder + "/AN_Player_Airborne_CombatTest.anim";
         private const string PlayerBlockClipPath = PlayerAnimationRootFolder + "/AN_Player_Block_CombatTest.anim";
         private const string PlayerDodgeClipPath = PlayerAnimationRootFolder + "/AN_Player_Dodge_CombatTest.anim";
@@ -50,6 +60,8 @@ namespace CampusRPG.Editor
         private const string PlayerHitStateName = "Hit";
         private const string PlayerDeathStateName = "Death";
         private const string GroundSpeedParameterName = "GroundSpeed";
+        private const string MoveXParameterName = "MoveX";
+        private const string MoveYParameterName = "MoveY";
         private const string IsGroundedParameterName = "IsGrounded";
         private const string IsBlockingParameterName = "IsBlocking";
         private const string VerticalSpeedParameterName = "VerticalSpeed";
@@ -412,6 +424,14 @@ namespace CampusRPG.Editor
             serializedObject.FindProperty("moveSpeed").floatValue = 6f;
             serializedObject.FindProperty("rotationSpeed").floatValue = 720f;
             serializedObject.FindProperty("jumpHeight").floatValue = 1.6f;
+            serializedObject.FindProperty("groundAcceleration").floatValue = 24f;
+            serializedObject.FindProperty("groundDeceleration").floatValue = 20f;
+            serializedObject.FindProperty("lockOnStrafeSpeedScale").floatValue = 0.92f;
+            serializedObject.FindProperty("lockOnBackwardSpeedScale").floatValue = 0.82f;
+            serializedObject.FindProperty("mantleDurationSeconds").floatValue = 0.22f;
+            serializedObject.FindProperty("mantleMinHeight").floatValue = 0.5f;
+            serializedObject.FindProperty("mantleMaxHeight").floatValue = 1.25f;
+            serializedObject.FindProperty("mantleForwardDistance").floatValue = 0.8f;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
         }
@@ -424,6 +444,8 @@ namespace CampusRPG.Editor
             serializedObject.FindProperty("dodgeFollowUpWindowSeconds").floatValue = 0.8f;
             serializedObject.FindProperty("dodgeDurationSeconds").floatValue = 0.25f;
             serializedObject.FindProperty("dodgeInvulnerableSeconds").floatValue = 0.2f;
+            serializedObject.FindProperty("dodgeDistance").floatValue = 2.8f;
+            serializedObject.FindProperty("dodgeBackwardDistanceScale").floatValue = 0.88f;
             serializedObject.FindProperty("guardCounterGaugeGain").floatValue = 20f;
             serializedObject.FindProperty("dodgeAgilityGaugeGain").floatValue = 25f;
             serializedObject.FindProperty("defaultHitStopSeconds").floatValue = 0.05f;
@@ -636,8 +658,18 @@ namespace CampusRPG.Editor
         private static RuntimeAnimatorController EnsurePlayerCombatAnimationAssets(params AttackDefinitionSO[] attackDefinitions)
         {
             AnimationClip idleClip = CreateOrUpdatePlayerIdleClip();
-            AnimationClip walkClip = CreateOrUpdatePlayerWalkClip();
-            AnimationClip runClip = CreateOrUpdatePlayerRunClip();
+            AnimationClip walkForwardClip = CreateOrUpdatePlayerWalkForwardClip();
+            AnimationClip walkBackwardClip = CreateOrUpdatePlayerWalkBackwardClip();
+            AnimationClip walkLeftClip = CreateOrUpdatePlayerWalkLeftClip();
+            AnimationClip walkRightClip = CreateOrUpdatePlayerWalkRightClip();
+            AnimationClip runForwardClip = CreateOrUpdatePlayerRunForwardClip();
+            AnimationClip runBackwardClip = CreateOrUpdatePlayerRunBackwardClip();
+            AnimationClip runLeftClip = CreateOrUpdatePlayerRunLeftClip();
+            AnimationClip runRightClip = CreateOrUpdatePlayerRunRightClip();
+            AnimationClip runForwardLeftClip = CreateOrUpdatePlayerRunForwardLeftClip();
+            AnimationClip runForwardRightClip = CreateOrUpdatePlayerRunForwardRightClip();
+            AnimationClip runBackwardLeftClip = CreateOrUpdatePlayerRunBackwardLeftClip();
+            AnimationClip runBackwardRightClip = CreateOrUpdatePlayerRunBackwardRightClip();
             AnimationClip airborneClip = CreateOrUpdatePlayerAirborneClip();
             AnimationClip blockClip = CreateOrUpdatePlayerBlockClip();
             AnimationClip dodgeClip = CreateOrUpdatePlayerDodgeClip();
@@ -655,7 +687,21 @@ namespace CampusRPG.Editor
             ClearStateMachine(stateMachine);
             EnsurePlayerAnimatorParameters(controller);
 
-            BlendTree locomotionBlendTree = CreateOrUpdateLocomotionBlendTree(controller, idleClip, walkClip, runClip);
+            BlendTree locomotionBlendTree = CreateOrUpdateLocomotionBlendTree(
+                controller,
+                idleClip,
+                walkForwardClip,
+                walkBackwardClip,
+                walkLeftClip,
+                walkRightClip,
+                runForwardClip,
+                runBackwardClip,
+                runLeftClip,
+                runRightClip,
+                runForwardLeftClip,
+                runForwardRightClip,
+                runBackwardLeftClip,
+                runBackwardRightClip);
 
             AnimatorState locomotionState = stateMachine.AddState(PlayerLocomotionStateName);
             locomotionState.motion = locomotionBlendTree;
@@ -722,6 +768,8 @@ namespace CampusRPG.Editor
             }
 
             controller.AddParameter(GroundSpeedParameterName, AnimatorControllerParameterType.Float);
+            controller.AddParameter(MoveXParameterName, AnimatorControllerParameterType.Float);
+            controller.AddParameter(MoveYParameterName, AnimatorControllerParameterType.Float);
             controller.AddParameter(IsGroundedParameterName, AnimatorControllerParameterType.Bool);
             controller.AddParameter(IsBlockingParameterName, AnimatorControllerParameterType.Bool);
             controller.AddParameter(VerticalSpeedParameterName, AnimatorControllerParameterType.Float);
@@ -730,8 +778,18 @@ namespace CampusRPG.Editor
         private static BlendTree CreateOrUpdateLocomotionBlendTree(
             AnimatorController controller,
             Motion idleMotion,
-            Motion walkMotion,
-            Motion runMotion)
+            Motion walkForwardMotion,
+            Motion walkBackwardMotion,
+            Motion walkLeftMotion,
+            Motion walkRightMotion,
+            Motion runForwardMotion,
+            Motion runBackwardMotion,
+            Motion runLeftMotion,
+            Motion runRightMotion,
+            Motion runForwardLeftMotion,
+            Motion runForwardRightMotion,
+            Motion runBackwardLeftMotion,
+            Motion runBackwardRightMotion)
         {
             BlendTree blendTree = LoadBlendTreeAsset(PlayerLocomotionBlendTreeName);
 
@@ -744,14 +802,24 @@ namespace CampusRPG.Editor
                 AssetDatabase.AddObjectToAsset(blendTree, controller);
             }
 
-            blendTree.blendType = BlendTreeType.Simple1D;
-            blendTree.blendParameter = GroundSpeedParameterName;
-            blendTree.useAutomaticThresholds = false;
+            blendTree.blendType = BlendTreeType.FreeformCartesian2D;
+            blendTree.blendParameter = MoveXParameterName;
+            blendTree.blendParameterY = MoveYParameterName;
             blendTree.children = new[]
             {
-                CreateBlendChild(idleMotion, 0f),
-                CreateBlendChild(walkMotion, 0.45f),
-                CreateBlendChild(runMotion, 1f)
+                CreateCartesianBlendChild(idleMotion, 0f, 0f),
+                CreateCartesianBlendChild(walkForwardMotion, 0f, 0.5f),
+                CreateCartesianBlendChild(walkBackwardMotion, 0f, -0.5f),
+                CreateCartesianBlendChild(walkLeftMotion, -0.5f, 0f),
+                CreateCartesianBlendChild(walkRightMotion, 0.5f, 0f),
+                CreateCartesianBlendChild(runForwardMotion, 0f, 1f),
+                CreateCartesianBlendChild(runBackwardMotion, 0f, -1f),
+                CreateCartesianBlendChild(runLeftMotion, -1f, 0f),
+                CreateCartesianBlendChild(runRightMotion, 1f, 0f),
+                CreateCartesianBlendChild(runForwardLeftMotion, -0.85f, 0.85f),
+                CreateCartesianBlendChild(runForwardRightMotion, 0.85f, 0.85f),
+                CreateCartesianBlendChild(runBackwardLeftMotion, -0.85f, -0.85f),
+                CreateCartesianBlendChild(runBackwardRightMotion, 0.85f, -0.85f)
             };
             EditorUtility.SetDirty(blendTree);
             return blendTree;
@@ -774,12 +842,12 @@ namespace CampusRPG.Editor
             return null;
         }
 
-        private static ChildMotion CreateBlendChild(Motion motion, float threshold)
+        private static ChildMotion CreateCartesianBlendChild(Motion motion, float positionX, float positionY)
         {
             return new ChildMotion
             {
                 motion = motion,
-                threshold = threshold,
+                position = new Vector2(positionX, positionY),
                 timeScale = 1f
             };
         }
@@ -974,24 +1042,124 @@ namespace CampusRPG.Editor
             return CreateOrUpdatePlaceholderClip(PlayerIdleClipPath, 1f, true, System.Array.Empty<AnimationEvent>());
         }
 
-        private static AnimationClip CreateOrUpdatePlayerWalkClip()
+        private static AnimationClip CreateOrUpdatePlayerWalkForwardClip()
         {
             return CreateOrUpdateMotionClip(
-                PlayerLocomotionWalkClipPath,
-                ResolveImportedWalkClipCandidatePaths(),
+                PlayerLocomotionWalkForwardClipPath,
+                ResolveImportedWalkForwardClipCandidatePaths(),
                 0.9f,
                 true,
-                "Player Walk");
+                "Player Walk Forward");
         }
 
-        private static AnimationClip CreateOrUpdatePlayerRunClip()
+        private static AnimationClip CreateOrUpdatePlayerWalkBackwardClip()
         {
             return CreateOrUpdateMotionClip(
-                PlayerLocomotionRunClipPath,
-                ResolveImportedRunClipCandidatePaths(),
+                PlayerLocomotionWalkBackwardClipPath,
+                ResolveImportedWalkBackwardClipCandidatePaths(),
+                0.9f,
+                true,
+                "Player Walk Backward");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerWalkLeftClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionWalkLeftClipPath,
+                ResolveImportedWalkLeftClipCandidatePaths(),
+                0.9f,
+                true,
+                "Player Walk Left");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerWalkRightClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionWalkRightClipPath,
+                ResolveImportedWalkRightClipCandidatePaths(),
+                0.9f,
+                true,
+                "Player Walk Right");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerRunForwardClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionRunForwardClipPath,
+                ResolveImportedRunForwardClipCandidatePaths(),
                 0.8f,
                 true,
-                "Player Run");
+                "Player Run Forward");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerRunBackwardClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionRunBackwardClipPath,
+                ResolveImportedRunBackwardClipCandidatePaths(),
+                0.8f,
+                true,
+                "Player Run Backward");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerRunLeftClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionRunLeftClipPath,
+                ResolveImportedRunLeftClipCandidatePaths(),
+                0.8f,
+                true,
+                "Player Run Left");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerRunRightClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionRunRightClipPath,
+                ResolveImportedRunRightClipCandidatePaths(),
+                0.8f,
+                true,
+                "Player Run Right");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerRunForwardLeftClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionRunForwardLeftClipPath,
+                ResolveImportedRunForwardLeftClipCandidatePaths(),
+                0.8f,
+                true,
+                "Player Run Forward Left");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerRunForwardRightClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionRunForwardRightClipPath,
+                ResolveImportedRunForwardRightClipCandidatePaths(),
+                0.8f,
+                true,
+                "Player Run Forward Right");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerRunBackwardLeftClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionRunBackwardLeftClipPath,
+                ResolveImportedRunBackwardLeftClipCandidatePaths(),
+                0.8f,
+                true,
+                "Player Run Backward Left");
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerRunBackwardRightClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerLocomotionRunBackwardRightClipPath,
+                ResolveImportedRunBackwardRightClipCandidatePaths(),
+                0.8f,
+                true,
+                "Player Run Backward Right");
         }
 
         private static AnimationClip CreateOrUpdatePlayerAirborneClip()
@@ -1157,7 +1325,7 @@ namespace CampusRPG.Editor
 
         private static AnimationClip TryLoadImportedPlayerClip(string[] candidatePaths)
         {
-            if (!CombatImportedPlayerVisualUtility.UseImportedPlayerSourcesForLocalPreview
+            if (!CombatImportedPlayerVisualUtility.ShouldUseImportedPlayerSources
                 || !CombatImportedPlayerVisualUtility.HasPlayerVisualSource()
                 || candidatePaths == null)
             {
@@ -1231,7 +1399,7 @@ namespace CampusRPG.Editor
             };
         }
 
-        private static string[] ResolveImportedWalkClipCandidatePaths()
+        private static string[] ResolveImportedWalkForwardClipCandidatePaths()
         {
             return new[]
             {
@@ -1242,7 +1410,37 @@ namespace CampusRPG.Editor
             };
         }
 
-        private static string[] ResolveImportedRunClipCandidatePaths()
+        private static string[] ResolveImportedWalkBackwardClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_B_InPlace.anim",
+                "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_B_InPlace.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Backward.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedWalkLeftClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_L_InPlace.anim",
+                "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_L90_A_InPlace.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Left.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedWalkRightClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_R_InPlace.anim",
+                "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_R90_A_InPlace.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Right.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedRunForwardClipCandidatePaths()
         {
             return new[]
             {
@@ -1250,6 +1448,72 @@ namespace CampusRPG.Editor
                 "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_InPlace.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Forward.fbx",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Other_Animations/Run_Forward.anim"
+            };
+        }
+
+        private static string[] ResolveImportedRunBackwardClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Run_B_InPlace.anim",
+                "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_B_InPlace.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Backward.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedRunLeftClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Run_L_InPlace.anim",
+                "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_L90_A_InPlace.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Left.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedRunRightClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Run_R_InPlace.anim",
+                "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_R90_A_InPlace.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Right.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedRunForwardLeftClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_ForwardLeft.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_ForwardLeft.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedRunForwardRightClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_ForwardRight.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_ForwardRight.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedRunBackwardLeftClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_BackwardLeft.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_BackwardLeft.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedRunBackwardRightClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_BackwardRight.fbx",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_BackwardRight.fbx"
             };
         }
 

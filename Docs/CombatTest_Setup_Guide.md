@@ -118,13 +118,13 @@
 - `ManaComponent`
 - `GaugeComponent`
 
-当前自动生成的 `PF_Player_CombatTest` 还会额外挂一套 `CombatProxyVisualRoot` 代理外形：
+当前自动生成的 `PF_Player_CombatTest` 现在会优先使用导入角色与 Humanoid 动作；只有在找不到可用素材源时，才会回退到 `CombatProxyVisualRoot` 代理外形：
 
-- 它不是正式角色模型，而是为了在缺少 `fbx/glb` 等角色资源时，先看清角色前向、胸口朝向和攻击距离
-- 仓库默认基线会固定使用这套代理外形和本地代理动作，避免把 Unity Asset Store 第三方资源误写进公开仓库
-- 如果你本地想临时用导入模型评估手感，可以手动执行 `CampusRPG/Setup/Apply Imported Player Visuals To CombatTest Player Prefab (Local Preview)`，并在需要导出仓库基线前重新执行 `Repair CombatTest Prefab Wiring`
-- 如果你本地想临时用第三方动作源重建 `AN_Player_*`，先勾上 `CampusRPG/Setup/CombatTest/Use Imported Player Sources For Local Preview`；这个开关只用于本地预览，重跑生成后不要把结果提交到公开仓库
-- 如果后续给 prefab 接入你自己的正式角色模型，只要保留子物体 `Renderer`，重跑修复脚本时也会自动跳过这套代理外形，不会强行覆盖正式模型
+- 若工程里存在支持的玩家 prefab / Avatar / 动作源，`Repair CombatTest Prefab Wiring` 与 `Build CombatTest Scene` 会默认把它们接成正式显示层
+- 若当前机器没有这些素材，系统会自动回退到代理角色，保证工程依旧可打开、可构建、可通过核心回归
+- 如果你想强制退回代理链，可以关闭菜单 `CampusRPG/Setup/CombatTest/Prefer Imported Player Sources When Available`
+- 如果你只想把当前玩家 prefab 立刻重绑到导入角色，也可以手动执行 `CampusRPG/Setup/Apply Imported Player Visuals To CombatTest Player Prefab`
+- 如果后续给 prefab 接入你自己的正式角色模型，只要保留子物体 `Renderer`，重跑修复脚本时也会继续优先保留正式模型，不会额外再叠一层代理外形
 
 `PlayerCharacter` 需要连接：
 

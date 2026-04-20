@@ -23,7 +23,7 @@ namespace CampusRPG.Editor
         private const string RootMenu = "CampusRPG/Setup/Build CombatTest Scene";
         private const string ForceRebuildMenu = "CampusRPG/Setup/Build CombatTest Scene (Force Rebuild)";
         private const string RepairPrefabMenu = "CampusRPG/Setup/Repair CombatTest Prefab Wiring";
-        private const string ApplyImportedVisualMenu = "CampusRPG/Setup/Apply Imported Player Visuals To CombatTest Player Prefab (Local Preview)";
+        private const string ApplyImportedVisualMenu = "CampusRPG/Setup/Apply Imported Player Visuals To CombatTest Player Prefab";
         private const string ScenePath = "Assets/_Game/Scenes/CombatTest.unity";
         private const string PlayerPrefabPath = "Assets/_Game/Prefabs/Characters/PF_Player_CombatTest.prefab";
         private const string EnemyMeleePrefabPath = "Assets/_Game/Prefabs/Characters/PF_Enemy_Melee_CombatTest.prefab";
@@ -102,9 +102,9 @@ namespace CampusRPG.Editor
 
                 if (!CombatImportedPlayerVisualUtility.TryApply(player, animator))
                 {
-                    Debug.LogWarning("No imported player visual source was found. Install a supported local package first.");
-                    return;
-                }
+                Debug.LogWarning("No imported player visual source was found. Install a supported player package first.");
+                return;
+            }
 
                 PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             }
@@ -115,7 +115,7 @@ namespace CampusRPG.Editor
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log("Applied imported player visuals to PF_Player_CombatTest for local preview. Do not commit this prefab state to the public repository.");
+            Debug.Log("Applied imported player visuals to PF_Player_CombatTest.");
         }
 
         public static void EnsureCombatTestContent()
@@ -329,8 +329,7 @@ namespace CampusRPG.Editor
 
             SetObjectReference(damageableReceiver, "health", health);
             SetObjectReference(damageableReceiver, "playerCharacter", playerCharacter);
-            CombatImportedPlayerVisualUtility.RemoveImportedVisual(player, animator);
-            CombatProxyVisualUtility.Apply(player, CombatProxyVisualKind.Player);
+            SyncPlayerVisualPresentation(player, animator);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             Object.DestroyImmediate(player);
@@ -440,8 +439,7 @@ namespace CampusRPG.Editor
                 SetObjectReference(damageableReceiver, "health", health);
                 SetObjectReference(damageableReceiver, "playerCharacter", playerCharacter);
                 ConfigurePlayerAnimator(animator, playerAnimatorController);
-                changed |= CombatImportedPlayerVisualUtility.RemoveImportedVisual(player, animator);
-                changed |= CombatProxyVisualUtility.Apply(player, CombatProxyVisualKind.Player);
+                changed |= SyncPlayerVisualPresentation(player, animator);
 
                 PrefabUtility.SaveAsPrefabAsset(player, prefabPath);
                 return true;
@@ -636,6 +634,23 @@ namespace CampusRPG.Editor
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             animator.updateMode = AnimatorUpdateMode.Normal;
             EditorUtility.SetDirty(animator);
+        }
+
+        private static bool SyncPlayerVisualPresentation(GameObject player, Animator animator)
+        {
+            bool changed = false;
+
+            if (CombatImportedPlayerVisualUtility.ShouldUseImportedPlayerSources)
+            {
+                changed |= CombatImportedPlayerVisualUtility.TryApply(player, animator);
+            }
+            else
+            {
+                changed |= CombatImportedPlayerVisualUtility.RemoveImportedVisual(player, animator);
+            }
+
+            changed |= CombatProxyVisualUtility.Apply(player, CombatProxyVisualKind.Player);
+            return changed;
         }
 
         private static T GetOrAddComponent<T>(GameObject gameObject) where T : Component

@@ -64,15 +64,18 @@ CampusRPG.UI
 | 类名 | 职责 |
 |---|---|
 | `PlayerCharacter` | 玩家主入口，聚合主要组件引用 |
-| `PlayerMotor` | 地面移动、朝向、跳跃、重力 |
+| `PlayerMotor` | 地面移动、加减速、锁定朝向、定向闪避、跳跃与 mantle 位移 |
+| `PlayerMovementRuntimeUtility` | 统一相机相对移动、锁定步态轴、闪避方向与距离倍率解析 |
+| `PlayerMovementProbe` | 探测低矮障碍是否可 mantle，并给出目标落点 |
 | `PlayerCombatController` | 轻重攻击、追击、反击与量表窗口管理 |
 | `PlayerCombatAnimationRelay` | 把玩家状态机与战斗事件同步到 Animator，统一驱动基础动作层与攻击播放 |
 | `PlayerCombatRuntimeUtility` | 统一连段推进、反击/追击派生决策与窗口计时辅助 |
 | `PlayerStateMachine` | 玩家 FSM 宿主 |
-| `PlayerLocomotionState` | 待机、移动、转向 |
+| `PlayerLocomotionState` | 待机、移动、转向、锁定步态 |
 | `PlayerAttackState` | 轻重攻击、派生、输入缓存 |
 | `PlayerBlockState` | 格挡与反击窗口 |
 | `PlayerDodgeState` | 闪避与追击窗口 |
+| `PlayerMantleState` | 受控翻越状态，结束回 Locomotion |
 | `PlayerJumpState` | 起跳与落地 |
 | `PlayerSkillState` | 技能施法 |
 | `PlayerHitState` | 受击硬直 |

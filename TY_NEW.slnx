@@ -3,8 +3,8 @@
   <Project Path="CampusRPG.Runtime.csproj" />
   <Project Path="CampusRPG.Tests.EditMode.csproj" />
   <Project Path="CampusRPG.Editor.csproj" />
-  <Project Path="CampusRPG.Runtime.Core.csproj" />
-  <Project Path="Assembly-CSharp.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="CampusRPG.Runtime.Core.csproj" />
   <Project Path="CampusRPG.Runtime.Input.csproj" />
 </Solution>

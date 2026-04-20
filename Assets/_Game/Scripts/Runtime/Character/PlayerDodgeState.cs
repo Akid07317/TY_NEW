@@ -31,6 +31,23 @@ namespace CampusRPG.Character
             remainingTime = Mathf.Max(gameplayDuration, animationDuration);
             invulnerableRemaining = balance != null ? balance.DodgeInvulnerableSeconds : 0.2f;
             hasRegisteredSuccessfulDodge = false;
+            float dodgeDistance = balance != null ? balance.DodgeDistance : 2.8f;
+
+            if (PlayerMovementRuntimeUtility.TryResolveDodgeDirection(
+                    Owner.transform,
+                    Owner.InputReader != null ? Owner.InputReader.MoveValue : Vector2.zero,
+                    Owner.CameraTransform,
+                    Owner.LockOnTargetSelector != null ? Owner.LockOnTargetSelector.CurrentTarget : null,
+                    out Vector3 dodgeDirection,
+                    out bool faceLockTarget))
+            {
+                dodgeDistance *= PlayerMovementRuntimeUtility.ResolveDodgeDistanceMultiplier(
+                    Owner.transform,
+                    dodgeDirection,
+                    balance != null ? balance.DodgeBackwardDistanceScale : 0.88f);
+                Owner.Motor?.BeginDirectionalDodge(dodgeDirection, dodgeDistance, gameplayDuration, faceLockTarget);
+            }
+
             Owner.CombatController?.HandleDodgeStarted();
         }
 

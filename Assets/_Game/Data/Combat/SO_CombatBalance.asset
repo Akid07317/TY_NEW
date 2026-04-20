@@ -17,6 +17,8 @@ MonoBehaviour:
   dodgeFollowUpWindowSeconds: 0.8
   dodgeDurationSeconds: 0.25
   dodgeInvulnerableSeconds: 0.2
+  dodgeDistance: 2.8
+  dodgeBackwardDistanceScale: 0.88
   guardCounterGaugeGain: 20
   dodgeAgilityGaugeGain: 25
   defaultHitStopSeconds: 0.05

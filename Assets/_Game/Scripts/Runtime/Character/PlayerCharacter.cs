@@ -3,6 +3,7 @@ using CampusRPG.Composition;
 using CampusRPG.Input;
 using CampusRPG.Skills;
 using UnityEngine;
+using CampusRPG.Camera;
 
 namespace CampusRPG.Character
 {
@@ -16,10 +17,12 @@ namespace CampusRPG.Character
         [SerializeField] private PlayerStateMachine stateMachine;
         [SerializeField] private PlayerCombatController combatController;
         [SerializeField] private SkillController skillController;
+        [SerializeField] private PlayerMovementProbe movementProbe;
         [SerializeField] private HealthComponent health;
         [SerializeField] private ManaComponent mana;
         [SerializeField] private GaugeComponent gauges;
         [SerializeField] private Transform cameraTransform;
+        [SerializeField] private LockOnTargetSelector lockOnTargetSelector;
 
         private bool jumpQueued;
 
@@ -35,6 +38,8 @@ namespace CampusRPG.Character
 
         public SkillController SkillController => skillController;
 
+        public PlayerMovementProbe MovementProbe => movementProbe;
+
         public HealthComponent Health => health;
 
         public ManaComponent Mana => mana;
@@ -42,6 +47,8 @@ namespace CampusRPG.Character
         public GaugeComponent Gauges => gauges;
 
         public Transform CameraTransform => cameraTransform;
+
+        public LockOnTargetSelector LockOnTargetSelector => lockOnTargetSelector;
 
         private void Awake()
         {
@@ -67,6 +74,16 @@ namespace CampusRPG.Character
                 skillController = GetComponent<SkillController>();
             }
 
+            if (movementProbe == null)
+            {
+                movementProbe = GetComponent<PlayerMovementProbe>();
+            }
+
+            if (movementProbe == null)
+            {
+                movementProbe = gameObject.AddComponent<PlayerMovementProbe>();
+            }
+
             if (health == null)
             {
                 health = GetComponent<HealthComponent>();
@@ -88,6 +105,7 @@ namespace CampusRPG.Character
             }
 
             cameraTransform = SceneRuntimeReferenceUtility.ResolveCameraTransform(cameraTransform, this);
+            lockOnTargetSelector = SceneRuntimeReferenceUtility.ResolveLockOnTargetSelector(lockOnTargetSelector, this);
 
             ApplyBaseStats();
         }
@@ -114,11 +132,19 @@ namespace CampusRPG.Character
         {
             if (motor != null && inputReader != null)
             {
-                Vector2 moveInput = stateMachine == null || stateMachine.AllowsMovement
+                bool allowsMovement = stateMachine == null || stateMachine.AllowsMovement;
+                bool allowsJump = stateMachine == null || stateMachine.AllowsJump;
+                Vector2 moveInput = allowsMovement
                     ? inputReader.MoveValue
                     : Vector2.zero;
-                bool jumpPressed = (stateMachine == null || stateMachine.AllowsJump) && ConsumeJumpQueued();
-                motor.Tick(moveInput, jumpPressed, cameraTransform);
+                bool jumpPressed = allowsJump && ConsumeJumpQueued();
+
+                if (jumpPressed && TryBeginMantle())
+                {
+                    jumpPressed = false;
+                }
+
+                motor.Tick(moveInput, jumpPressed, cameraTransform, allowsMovement);
             }
 
             if (stateMachine != null)
@@ -137,6 +163,11 @@ namespace CampusRPG.Character
             health?.SetMax(baseStats.MaxHealth, true);
             mana?.SetMax(baseStats.MaxMana, true);
             motor?.ApplyMovementStats(baseStats.MoveSpeed, baseStats.RotationSpeed, baseStats.JumpHeight);
+            motor?.ApplyMovementTuning(
+                baseStats.GroundAcceleration,
+                baseStats.GroundDeceleration,
+                baseStats.LockOnStrafeSpeedScale,
+                baseStats.LockOnBackwardSpeedScale);
         }
 
         public void RestoreFromCheckpoint(Vector3 worldPosition, Quaternion worldRotation, float healthValue, float manaValue)
@@ -166,6 +197,25 @@ namespace CampusRPG.Character
         private void ResolveInputReader()
         {
             inputReader = SceneRuntimeReferenceUtility.ResolveInputReader(inputReader);
+        }
+
+        private bool TryBeginMantle()
+        {
+            if (baseStats == null
+                || movementProbe == null
+                || stateMachine == null
+                || !stateMachine.CanStartMantle)
+            {
+                return false;
+            }
+
+            if (!movementProbe.TryFindMantleTarget(baseStats, transform, out Vector3 mantleTarget))
+            {
+                return false;
+            }
+
+            stateMachine.SwitchToMantle(mantleTarget, baseStats.MantleDurationSeconds);
+            return true;
         }
     }
 }

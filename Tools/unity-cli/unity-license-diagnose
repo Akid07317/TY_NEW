@@ -1387,6 +1387,16 @@ print_runtime_log_summary() {
   fi
 }
 
+metrics_path_not_writable() {
+  for TARGET in "$METRICS_DIR" "$METRICS_DB" "$METRICS_WAL" "$METRICS_SHM"; do
+    if [ -e "$TARGET" ] && [ ! -w "$TARGET" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 print_correlation_summary() {
   echo "CORRELATION_SUMMARY:"
 
@@ -1660,6 +1670,12 @@ EOS
   else
     echo "CORRELATION_LOOPBACK_VPN_SERVICE_MATCHES_EFFECTIVE_DNS: no"
   fi
+
+  if metrics_path_not_writable && log_contains "attempt to write a readonly database"; then
+    echo "CORRELATION_METRICS_PATH_NOT_WRITABLE_AND_READONLY: yes"
+  else
+    echo "CORRELATION_METRICS_PATH_NOT_WRITABLE_AND_READONLY: no"
+  fi
 }
 
 collect_remote_connectivity_conclusion() {
@@ -1854,6 +1870,10 @@ if log_contains "attempt to write a readonly database"; then
     DETAIL="Unity hit a readonly database write during startup."
   else
     DETAIL="$DETAIL Also hit a readonly database write during startup."
+  fi
+
+  if metrics_path_not_writable; then
+    DETAIL="$DETAIL Metrics path is not writable: $METRICS_DIR"
   fi
 fi
 

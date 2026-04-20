@@ -14,6 +14,8 @@ namespace CampusRPG.Character
         private const string DeathStateName = "Death";
 
         private static readonly int GroundSpeedHash = Animator.StringToHash("GroundSpeed");
+        private static readonly int MoveXHash = Animator.StringToHash("MoveX");
+        private static readonly int MoveYHash = Animator.StringToHash("MoveY");
         private static readonly int IsGroundedHash = Animator.StringToHash("IsGrounded");
         private static readonly int IsBlockingHash = Animator.StringToHash("IsBlocking");
         private static readonly int VerticalSpeedHash = Animator.StringToHash("VerticalSpeed");
@@ -68,14 +70,22 @@ namespace CampusRPG.Character
                 return;
             }
 
-            float targetGroundSpeed = 0f;
+            float targetGroundSpeed = motor != null
+                ? motor.NormalizedGroundSpeed
+                : playerCharacter != null && playerCharacter.InputReader != null && (stateMachine == null || stateMachine.AllowsMovement)
+                    ? Mathf.Clamp01(playerCharacter.InputReader.MoveValue.magnitude)
+                    : 0f;
+            Vector2 moveAxes = motor != null ? motor.AnimationMoveAxes : Vector2.zero;
 
-            if (playerCharacter != null && playerCharacter.InputReader != null && (stateMachine == null || stateMachine.AllowsMovement))
+            if (stateMachine != null && !stateMachine.AllowsMovement)
             {
-                targetGroundSpeed = Mathf.Clamp01(playerCharacter.InputReader.MoveValue.magnitude);
+                moveAxes = Vector2.zero;
+                targetGroundSpeed = 0f;
             }
 
             animator.SetFloat(GroundSpeedHash, targetGroundSpeed, locomotionDampSeconds, Time.deltaTime);
+            animator.SetFloat(MoveXHash, moveAxes.x, locomotionDampSeconds, Time.deltaTime);
+            animator.SetFloat(MoveYHash, moveAxes.y, locomotionDampSeconds, Time.deltaTime);
             animator.SetBool(IsGroundedHash, motor == null || motor.IsGrounded);
             animator.SetBool(IsBlockingHash, stateMachine != null && stateMachine.IsBlocking);
             animator.SetFloat(VerticalSpeedHash, motor != null ? motor.VerticalVelocity : 0f);
@@ -120,6 +130,12 @@ namespace CampusRPG.Character
                 return;
             }
 
+            if (currentState is PlayerMantleState)
+            {
+                CrossFadeState(AirborneStateName);
+                return;
+            }
+
             if (currentState is PlayerDeathState)
             {
                 CrossFadeState(DeathStateName);
@@ -127,6 +143,7 @@ namespace CampusRPG.Character
             }
 
             bool isRecoveringFromAction = previousState is PlayerDodgeState
+                || previousState is PlayerMantleState
                 || previousState is PlayerHitState
                 || previousState is PlayerSkillState;
 

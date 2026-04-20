@@ -8,6 +8,7 @@ namespace CampusRPG.Character
         private PlayerLocomotionState locomotionState;
         private PlayerBlockState blockState;
         private PlayerDodgeState dodgeState;
+        private PlayerMantleState mantleState;
         private PlayerHitState hitState;
         private PlayerDeathState deathState;
         private PlayerCombatAnimationRelay animationRelay;
@@ -24,6 +25,8 @@ namespace CampusRPG.Character
 
         public bool IsInvulnerable => CurrentState is PlayerDodgeState dodgeState && dodgeState.IsInvulnerable;
 
+        public bool CanStartMantle => CurrentState is PlayerLocomotionState;
+
         public PlayerCombatAnimationRelay AnimationRelay => animationRelay;
 
         public void Initialize(PlayerCharacter player)
@@ -38,6 +41,7 @@ namespace CampusRPG.Character
             locomotionState = new PlayerLocomotionState(owner, this);
             blockState = new PlayerBlockState(owner, this);
             dodgeState = new PlayerDodgeState(owner, this);
+            mantleState = new PlayerMantleState(owner, this);
             hitState = new PlayerHitState(owner, this);
             deathState = new PlayerDeathState(owner, this);
             Subscribe(owner);
@@ -88,6 +92,12 @@ namespace CampusRPG.Character
         public void SwitchToDodge()
         {
             SwitchState(dodgeState);
+        }
+
+        public void SwitchToMantle(Vector3 targetPosition, float durationSeconds)
+        {
+            mantleState.Configure(targetPosition, durationSeconds);
+            SwitchState(mantleState);
         }
 
         public void SwitchToHit(float duration)

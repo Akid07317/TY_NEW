@@ -10,6 +10,8 @@ namespace CampusRPG.Combat
         [SerializeField] private float dodgeFollowUpWindowSeconds = 0.8f;
         [SerializeField] private float dodgeDurationSeconds = 0.25f;
         [SerializeField] private float dodgeInvulnerableSeconds = 0.2f;
+        [SerializeField] private float dodgeDistance = 2.8f;
+        [SerializeField] private float dodgeBackwardDistanceScale = 0.88f;
         [SerializeField] private float guardCounterGaugeGain = 20f;
         [SerializeField] private float dodgeAgilityGaugeGain = 25f;
         [SerializeField] private float defaultHitStopSeconds = 0.05f;
@@ -23,6 +25,10 @@ namespace CampusRPG.Combat
         public float DodgeDurationSeconds => dodgeDurationSeconds;
 
         public float DodgeInvulnerableSeconds => dodgeInvulnerableSeconds;
+
+        public float DodgeDistance => dodgeDistance;
+
+        public float DodgeBackwardDistanceScale => dodgeBackwardDistanceScale;
 
         public float GuardCounterGaugeGain => guardCounterGaugeGain;
 

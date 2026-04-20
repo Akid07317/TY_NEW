@@ -7,7 +7,7 @@ namespace CampusRPG.Editor
     {
         private const string ImportedVisualRootName = "ImportedVisualRoot";
         private const string LocalImportedSourcePreferenceKey = "CampusRPG.CombatTest.UseImportedPlayerSources";
-        private const string ToggleImportedSourceMenu = "CampusRPG/Setup/CombatTest/Use Imported Player Sources For Local Preview";
+        private const string ToggleImportedSourceMenu = "CampusRPG/Setup/CombatTest/Prefer Imported Player Sources When Available";
 
         private static readonly string[] PlayerVisualPrefabCandidatePaths =
         {
@@ -24,9 +24,12 @@ namespace CampusRPG.Editor
 
         public static bool UseImportedPlayerSourcesForLocalPreview
         {
-            get => EditorPrefs.GetBool(LocalImportedSourcePreferenceKey, false);
+            get => EditorPrefs.GetBool(LocalImportedSourcePreferenceKey, true);
             set => EditorPrefs.SetBool(LocalImportedSourcePreferenceKey, value);
         }
+
+        public static bool ShouldUseImportedPlayerSources =>
+            UseImportedPlayerSourcesForLocalPreview && HasPlayerVisualSource();
 
         [MenuItem(ToggleImportedSourceMenu)]
         private static void ToggleImportedPlayerSourcesForLocalPreview()
@@ -34,8 +37,8 @@ namespace CampusRPG.Editor
             UseImportedPlayerSourcesForLocalPreview = !UseImportedPlayerSourcesForLocalPreview;
             Debug.Log(
                 UseImportedPlayerSourcesForLocalPreview
-                    ? "CombatTest local preview now prefers imported player sources. Do not commit regenerated player clips or imported prefab references."
-                    : "CombatTest local preview reverted to repository-safe proxy player sources.");
+                    ? "CombatTest now prefers imported player sources when they are available."
+                    : "CombatTest reverted to proxy player sources even if imported assets are present.");
         }
 
         [MenuItem(ToggleImportedSourceMenu, true)]
