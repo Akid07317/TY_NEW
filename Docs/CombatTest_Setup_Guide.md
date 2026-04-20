@@ -20,10 +20,10 @@
 - 生成 `PF_VFX_ProjectileImpact_SpellBolt`
 - 生成 `AC_Player_CombatTest`、玩家攻击片段，以及基础动作层片段
   当前玩家控制器除了攻击状态，还会生成 `Locomotion / Block / Airborne / Dodge / Hit / Death` 基础状态
-  当项目里存在兼容的 Humanoid 动作资源时，这些本地片段会优先复制导入动作；缺失时才回退到占位动作
+  仓库默认会生成可提交的代理动作片段；只有在你本地手动打开预览开关后，这些本地片段才会复制导入动作
   玩家攻击片段现在会保留一小段导入动作的收招尾巴，而不是只按命中窗口长度硬裁；运行时也会把 `forwardMovement` 用到玩家攻击前送上
   因此现在已经可以直接评估移动、格挡、闪避、受击和死亡的整体手感，而不只是静态壳子加命中事件
-- 当项目里已经导入兼容的 Humanoid 角色与动作资源时，会优先把玩家本地 `CombatTest` 动画片段重建成真实动作副本，并尝试把玩家 prefab 切到导入的人物外观
+- 当项目里已经导入兼容的 Humanoid 角色与动作资源时，你可以手动切到本地预览模式，让玩家本地 `CombatTest` 动画片段重建成真实动作副本，并把玩家 prefab 切到导入的人物外观；详细规则见 [素材来源清单](Docs/Asset_Source_List.md)
 - 重建 `Assets/_Game/Scenes/CombatTest.unity`
 - 在场景内放入 `CombatDebugHUD`
 

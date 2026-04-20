@@ -36,6 +36,7 @@
 - [Unity 工程初始化清单](Docs/Unity_Project_Setup_Checklist.md)
 - [核心脚本架构与骨架](Docs/Core_Script_Architecture.md)
 - [CombatTest 接线清单](Docs/CombatTest_Setup_Guide.md)
+- [素材来源清单](Docs/Asset_Source_List.md)
 - [协作约束与代理说明](AGENT.md)
 - [Assets 目录说明](Assets/_Game/README.md)
 
