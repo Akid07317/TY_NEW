@@ -19,7 +19,7 @@ MonoBehaviour:
   startupSeconds: 0.1
   activeSeconds: 0.1
   recoverySeconds: 0.28
-  animationDurationSeconds: 0.67200005
+  animationDurationSeconds: 0.56640005
   hitStopSeconds: 0.05
   forwardMovement: 0.5
   range: 1.9
@@ -28,7 +28,7 @@ MonoBehaviour:
   hitboxLocalCenter: {x: 0, y: 0, z: 0.95}
   hitboxHalfExtents: {x: 0.69, y: 0.75, z: 0.76}
   hitboxRadius: 0.6
-  hitboxActivationMode: 1
+  hitboxActivationMode: 0
   projectilePrefab: {fileID: 0}
   projectileSpeed: 0
   projectileLifetimeSeconds: 0

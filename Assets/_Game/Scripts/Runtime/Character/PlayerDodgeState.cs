@@ -27,8 +27,9 @@ namespace CampusRPG.Character
             float animationDuration = stateMachine.AnimationRelay != null
                 ? stateMachine.AnimationRelay.DodgeAnimationDurationSeconds
                 : 0f;
+            float actionDuration = Mathf.Max(gameplayDuration, animationDuration);
 
-            remainingTime = Mathf.Max(gameplayDuration, animationDuration);
+            remainingTime = actionDuration;
             invulnerableRemaining = balance != null ? balance.DodgeInvulnerableSeconds : 0.2f;
             hasRegisteredSuccessfulDodge = false;
             float dodgeDistance = balance != null ? balance.DodgeDistance : 2.8f;
@@ -45,7 +46,7 @@ namespace CampusRPG.Character
                     Owner.transform,
                     dodgeDirection,
                     balance != null ? balance.DodgeBackwardDistanceScale : 0.88f);
-                Owner.Motor?.BeginDirectionalDodge(dodgeDirection, dodgeDistance, gameplayDuration, faceLockTarget);
+                Owner.Motor?.BeginDirectionalDodge(dodgeDirection, dodgeDistance, actionDuration, faceLockTarget);
             }
 
             Owner.CombatController?.HandleDodgeStarted();

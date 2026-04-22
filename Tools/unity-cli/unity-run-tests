@@ -29,6 +29,10 @@ ORIGINAL_METRICS_DIR="$ORIGINAL_HOME/Library/Application Support/Unity"
 ORIGINAL_METRICS_DB="$ORIGINAL_METRICS_DIR/CoreBusinessMetrics.db"
 ORIGINAL_METRICS_WAL="$ORIGINAL_METRICS_DIR/CoreBusinessMetrics.db-wal"
 ORIGINAL_METRICS_SHM="$ORIGINAL_METRICS_DIR/CoreBusinessMetrics.db-shm"
+ACTIVE_METRICS_DIR="$ORIGINAL_METRICS_DIR"
+ACTIVE_METRICS_DB="$ORIGINAL_METRICS_DB"
+ACTIVE_METRICS_WAL="$ORIGINAL_METRICS_WAL"
+ACTIVE_METRICS_SHM="$ORIGINAL_METRICS_SHM"
 
 if [ ! -f "$PROJECT_VERSION_FILE" ]; then
   echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
@@ -101,6 +105,10 @@ create_sandbox_home() {
   ACTIVE_TMPDIR="$SANDBOX_HOME/tmp"
   ACTIVE_XDG_CACHE_HOME="$SANDBOX_HOME/.cache"
   ACTIVE_XDG_CONFIG_HOME="$SANDBOX_HOME/.config"
+  ACTIVE_METRICS_DIR="$ACTIVE_HOME/Library/Application Support/Unity"
+  ACTIVE_METRICS_DB="$ACTIVE_METRICS_DIR/CoreBusinessMetrics.db"
+  ACTIVE_METRICS_WAL="$ACTIVE_METRICS_DIR/CoreBusinessMetrics.db-wal"
+  ACTIVE_METRICS_SHM="$ACTIVE_METRICS_DIR/CoreBusinessMetrics.db-shm"
 }
 
 cleanup_child() {
@@ -113,6 +121,12 @@ cleanup_child() {
 log_contains() {
   PATTERN=$1
   [ -f "$LOG_FILE" ] && grep -F "$PATTERN" "$LOG_FILE" >/dev/null 2>&1
+}
+
+startup_initialized() {
+  log_contains "COMMAND LINE ARGUMENTS:" \
+    || log_contains "[Package Manager] Connected to IPC stream" \
+    || log_contains "Successfully changed project path to:"
 }
 
 print_startup_failure() {
@@ -138,7 +152,7 @@ print_startup_failure() {
 print_metrics_db_hint() {
   HINT_PRINTED=0
 
-  for TARGET in "$ORIGINAL_METRICS_DIR" "$ORIGINAL_METRICS_DB" "$ORIGINAL_METRICS_WAL" "$ORIGINAL_METRICS_SHM"; do
+  for TARGET in "$ACTIVE_METRICS_DIR" "$ACTIVE_METRICS_DB" "$ACTIVE_METRICS_WAL" "$ACTIVE_METRICS_SHM"; do
     if [ -e "$TARGET" ] && [ ! -w "$TARGET" ]; then
       if [ "$HINT_PRINTED" -eq 0 ]; then
         echo "Likely blocker: Unity's metrics database path is not writable from this shell." 
@@ -151,13 +165,13 @@ print_metrics_db_hint() {
 }
 
 print_preflight_metrics_warning() {
-  if [ -e "$ORIGINAL_METRICS_DIR" ] && [ ! -w "$ORIGINAL_METRICS_DIR" ]; then
-    echo "Preflight warning: $ORIGINAL_METRICS_DIR is not writable from this shell." >&2
+  if [ -e "$ACTIVE_METRICS_DIR" ] && [ ! -w "$ACTIVE_METRICS_DIR" ]; then
+    echo "Preflight warning: $ACTIVE_METRICS_DIR is not writable from this shell." >&2
     return
   fi
 
-  if [ -e "$ORIGINAL_METRICS_DB" ] && [ ! -w "$ORIGINAL_METRICS_DB" ]; then
-    echo "Preflight warning: $ORIGINAL_METRICS_DB is not writable from this shell." >&2
+  if [ -e "$ACTIVE_METRICS_DB" ] && [ ! -w "$ACTIVE_METRICS_DB" ]; then
+    echo "Preflight warning: $ACTIVE_METRICS_DB is not writable from this shell." >&2
   fi
 }
 
@@ -280,19 +294,23 @@ UNITY_PID=$!
 START_TIME=$(date +%s)
 
 while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
-  if log_contains "COMMAND LINE ARGUMENTS:" || log_contains "[Package Manager] Connected to IPC stream" || log_contains "Successfully changed project path to:"; then
+  if startup_initialized; then
     break
   fi
 
-  if log_contains "Found 0 entitlement groups and 0 free entitlements" || log_contains "'com.unity.editor.headless' was not found." || log_contains "attempt to write a readonly database"; then
+  if log_contains "Found 0 entitlement groups and 0 free entitlements" || log_contains "'com.unity.editor.headless' was not found."; then
     print_startup_failure
     exit 1
   fi
 
   NOW=$(date +%s)
   if [ $((NOW - START_TIME)) -ge "$STARTUP_TIMEOUT" ]; then
-    echo "Unity batchmode startup timed out after ${STARTUP_TIMEOUT}s before TestRunner initialized." >&2
-    echo "Log: $LOG_FILE" >&2
+    if log_contains "attempt to write a readonly database"; then
+      print_startup_failure
+    else
+      echo "Unity batchmode startup timed out after ${STARTUP_TIMEOUT}s before TestRunner initialized." >&2
+      echo "Log: $LOG_FILE" >&2
+    fi
     exit 1
   fi
 
@@ -301,3 +319,10 @@ done
 
 trap - INT TERM EXIT
 wait "$UNITY_PID"
+EXIT_CODE=$?
+
+if [ "$EXIT_CODE" -ne 0 ] && ! startup_initialized; then
+  print_startup_failure
+fi
+
+exit "$EXIT_CODE"

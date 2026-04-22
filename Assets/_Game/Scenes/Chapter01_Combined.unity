@@ -177,6 +177,11 @@ MonoBehaviour:
   followLookHeight: 1.5
   lockOnLookHeight: 1.25
   lockOnRotationSpeed: 360
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  obstacleProbeRadius: 0.25
+  obstaclePadding: 0.1
 --- !u!81 &80313847
 AudioListener:
   m_ObjectHideFlags: 0
@@ -1685,11 +1690,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.BossArenaStatusPresenter
   bossEncounter: {fileID: 461276215}
+  chapterProgressService: {fileID: 0}
   sealedTitle: Arena Sealed
   sealedBody: Gatekeeper has locked the arena behind you.
   clearedTitle: Path Open
   clearedBody: The Ritual Core is now within reach.
-  visibleDurationSeconds: 1.9
+  sealedVisibleDurationSeconds: 1.9
+  clearedVisibleDurationSeconds: 1.05
 --- !u!114 &694952585
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1703,6 +1710,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.BossSpawnFlarePresenter
   bossEnemy: {fileID: 1823854767}
+  telegraphStyle: {fileID: 0}
   groundOffset: 0.08
   flareDurationSeconds: 0.95
   maxHeight: 3.8
@@ -1721,6 +1729,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.BossImpactMarkerPresenter
   bossEnemy: {fileID: 1823854767}
+  telegraphStyle: {fileID: 0}
   groundOffset: 0.09
   minimumLifetimeSeconds: 0.24
   pulseAmplitude: 0.08
@@ -1739,6 +1748,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.BossGroundTelegraphPresenter
   bossEnemy: {fileID: 1823854767}
+  telegraphStyle: {fileID: 0}
   groundOffset: 0.08
   engagePulseSpeed: 3.2
   attackPulseSpeed: 6.4
@@ -1758,6 +1768,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.BossThreatPulsePresenter
   bossEnemy: {fileID: 1823854767}
+  telegraphStyle: {fileID: 0}
   encounterPulseSeconds: 0.44
   attackPulseSeconds: 0.24
   encounterPulseColor: {r: 0.95, g: 0.54, b: 0.14, a: 0.22}
@@ -1775,6 +1786,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.BossAttackCuePresenter
   bossEnemy: {fileID: 1823854767}
+  telegraphStyle: {fileID: 0}
   cueLabel: Incoming Attack
   minimumVisibleSeconds: 0.5
 --- !u!114 &694952590
@@ -1793,20 +1805,6 @@ MonoBehaviour:
   encounterLabel: Boss Encounter
   bossDisplayName: Campus Gatekeeper
   visibleDurationSeconds: 2.1
---- !u!114 &694952594
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 694952583}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 615c98d3aa5944078dc4c27652d7b6ca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.BossCombatHintView
-  bossEncounter: {fileID: 461276215}
-  visibleDurationSeconds: 2.6
 --- !u!114 &694952591
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1853,6 +1851,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &694952594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 694952583}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 615c98d3aa5944078dc4c27652d7b6ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.BossCombatHintView
+  bossEncounter: {fileID: 461276215}
+  visibleDurationSeconds: 2.6
 --- !u!1 &701803117
 GameObject:
   m_ObjectHideFlags: 0
@@ -2179,8 +2191,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.ChapterCompleteView
   chapterProgressService: {fileID: 2071717801}
-  titleText: Chapter Complete
-  bodyText: Recovered the Ritual Core. Progress has been saved.
+  completionRevealDelaySeconds: 0.35
+  completionFadeInDurationSeconds: 0.18
+  backdropMaxAlpha: 0.28
 --- !u!4 &738879734
 Transform:
   m_ObjectHideFlags: 0
@@ -4897,28 +4910,6 @@ MonoBehaviour:
   keyItemId: KeyItem_RitualCore
   completeChapterOnPickup: 1
   chapterProgressService: {fileID: 0}
---- !u!114 &1872674856
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1872674850}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c8b4feaf166945b592c3d0d7d0d6ec82, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.KeyItemBeaconView
-  keyItemPickup: {fileID: 0}
-  chapterProgressService: {fileID: 0}
-  requiredEncounterId: EN_A04_GATEKEEPER
-  verticalOffset: 1.9
-  hoverAmplitude: 0.14
-  hoverSpeed: 2.6
-  pulseAmplitude: 0.1
-  pulseSpeed: 6
-  baseScale: {x: 0.22, y: 0.72, z: 0.22}
-  beaconColor: {r: 1, g: 0.84, b: 0.35, a: 1}
 --- !u!23 &1872674853
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -4997,6 +4988,33 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1872674850}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1872674856
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1872674850}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8b4feaf166945b592c3d0d7d0d6ec82, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.KeyItemBeaconView
+  keyItemPickup: {fileID: 0}
+  chapterProgressService: {fileID: 0}
+  requiredEncounterId: EN_A04_GATEKEEPER
+  verticalOffset: 1.9
+  hoverAmplitude: 0.14
+  hoverSpeed: 2.6
+  pulseAmplitude: 0.1
+  pulseSpeed: 6
+  baseScale: {x: 0.22, y: 0.72, z: 0.22}
+  beaconColor: {r: 1, g: 0.84, b: 0.35, a: 1}
+  revealPulseGroundOffset: 0.08
+  revealPulseDurationSeconds: 0.85
+  revealPulseMaxHeight: 0.42
+  revealPulseMaxRadius: 1.3
+  revealPulseColor: {r: 1, g: 0.76, b: 0.3, a: 1}
 --- !u!1 &1913657676
 GameObject:
   m_ObjectHideFlags: 0
@@ -5035,10 +5053,745 @@ Transform:
   - {fileID: 1723104083}
   - {fileID: 2100300204}
   - {fileID: 2100300304}
+  - {fileID: 2100300704}
   - {fileID: 2100300101}
   - {fileID: 1134372325}
   m_Father: {fileID: 230045232}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &1968310393
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1641900975}
+    m_Modifications:
+    - target: {fileID: 2919489355096964764, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_Name
+      value: Enemy_A02_Mobile_A
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.00000004371139
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2919489355096964764, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1968310396}
+  m_SourcePrefab: {fileID: 100100000, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+--- !u!4 &1968310394 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+  m_PrefabInstance: {fileID: 1968310393}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1968310395 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2919489355096964764, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
+  m_PrefabInstance: {fileID: 1968310393}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1968310396
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1968310395}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a08b5c9da69948b192a238ba551af8f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Interaction.EnemyEncounterMember
+  ownerEncounter: {fileID: 0}
+  enemyBrain: {fileID: 0}
+  health: {fileID: 0}
+  disableObjectOnDeath: 1
+--- !u!1 &1996450501
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1996450502}
+  - component: {fileID: 1996450505}
+  - component: {fileID: 1996450504}
+  - component: {fileID: 1996450503}
+  m_Layer: 0
+  m_Name: Wall_Front
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1996450502
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1996450501}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.5, z: 10.5}
+  m_LocalScale: {x: 18, y: 3, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1319809406}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1996450503
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1996450501}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &1996450504
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1996450501}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!33 &1996450505
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1996450501}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &2026227340
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2026227341}
+  - component: {fileID: 2026227344}
+  - component: {fileID: 2026227343}
+  - component: {fileID: 2026227342}
+  m_Layer: 0
+  m_Name: Floor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2026227341
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2026227340}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.5, z: 0}
+  m_LocalScale: {x: 18, y: 1, z: 20}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1913657677}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &2026227342
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2026227340}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &2026227343
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2026227340}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!33 &2026227344
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2026227340}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &2051760639
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2051760640}
+  - component: {fileID: 2051760642}
+  - component: {fileID: 2051760641}
+  m_Layer: 0
+  m_Name: Encounter_EN_A01_TUTORIAL
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2051760640
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2051760639}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: 2}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 163643438}
+  - {fileID: 601715720}
+  m_Father: {fileID: 642366625}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2051760641
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2051760639}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88aafc8e338f74c1b805b7f02fad26e1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Interaction.EncounterController
+  encounterId: EN_A01_TUTORIAL
+  activateOnPlayerEnter: 1
+  startActive: 0
+  chapterProgressService: {fileID: 0}
+  members: []
+  blockersToEnableWhileActive: []
+--- !u!65 &2051760642
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2051760639}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 14, y: 3, z: 10}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &2071717799
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2071717804}
+  - component: {fileID: 2071717803}
+  - component: {fileID: 2071717802}
+  - component: {fileID: 2071717800}
+  - component: {fileID: 2071717801}
+  - component: {fileID: 2071717807}
+  - component: {fileID: 2071717808}
+  - component: {fileID: 2071717811}
+  - component: {fileID: 2071717810}
+  - component: {fileID: 2071717809}
+  - component: {fileID: 2071717805}
+  - component: {fileID: 2071717812}
+  - component: {fileID: 2071717813}
+  - component: {fileID: 2071717806}
+  m_Layer: 0
+  m_Name: ChapterFlow
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2071717800
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da1df298ac53b401b9958add866e929f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.CheckpointRestoreCoordinator
+  chapterId: Chapter01
+  player: {fileID: 921209018}
+  saveService: {fileID: 2071717803}
+  checkpointService: {fileID: 2071717802}
+  chapterProgressService: {fileID: 2071717801}
+  respawnDelaySeconds: 0.5
+  autoLoadFromSaveOnStart: 1
+  autoSaveOnStart: 1
+  defaultCheckpointId: CP01
+  defaultRespawnOffset: {x: 0, y: 0, z: 0}
+  defaultRestoreFullHealth: 1
+  defaultRestoreFullMana: 1
+--- !u!114 &2071717801
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cda5f76fa040f4af1974b2130aaeaa9f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.ChapterProgressService
+  progression: {fileID: 11400000, guid: 480d16d828e844fbb833edb30783c8e4, type: 2}
+  checkpointRestoreCoordinator: {fileID: 2071717800}
+  currentAreaId: 
+  chapterCompleted: 0
+--- !u!114 &2071717802
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d80ecb976094b4eb3b58f447cb73a305, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.CheckpointService
+  currentCheckpointId: 
+--- !u!114 &2071717803
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ceab63366766436482a9a565b5f1059, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.SaveService
+  fileName: slot_auto_chapter01.json
+--- !u!4 &2071717804
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2071717805
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e731a8d3279d454c8d6ecf4a8a196806, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.ChapterObjectiveView
+  chapterProgressService: {fileID: 2071717801}
+  panelTitle: Current Objective
+  highlightDurationSeconds: 2.4
+--- !u!114 &2071717806
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f35f39f6a8e4c1eb497d1477626fdc1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.ChapterTutorialHintView
+  chapterProgressService: {fileID: 2071717801}
+  inputReader: {fileID: 701803118}
+  panelTitle: Tutorial Hint
+--- !u!114 &2071717807
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f0b79aab2f54f7fae12ef8468350b63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.CheckpointActivationView
+  checkpointService: {fileID: 2071717802}
+  visibleDurationSeconds: 1.8
+--- !u!114 &2071717808
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7536213151364b389dddc07f97f5577b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.KeyItemAcquisitionView
+  chapterProgressService: {fileID: 2071717801}
+  visibleDurationSeconds: 2.2
+--- !u!114 &2071717809
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a156541acd04ad69592425f50c1b1d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.ChapterRouteBlockHintView
+  visibleDurationSeconds: 2.1
+  panelTitle: Route Blocked
+--- !u!114 &2071717810
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0365575f78b54e91ae8d4146328dce38, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.EncounterClearView
+  chapterProgressService: {fileID: 2071717801}
+  visibleDurationSeconds: 1.9
+--- !u!114 &2071717811
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b10fe8cc7f3f4ce1b7e20b943c8d9e56, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.EncounterSealView
+  visibleDurationSeconds: 1.8
+--- !u!114 &2071717812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 271d7204b44846be8bb0bd0b13524351, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.AreaEntryView
+  chapterProgressService: {fileID: 2071717801}
+  saveService: {fileID: 0}
+  visibleDurationSeconds: 2.2
+--- !u!114 &2071717813
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071717799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4cccd3d0a437434f9b9550eeec051805, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.ChapterResumeContextView
+  saveService: {fileID: 2071717803}
+  visibleDurationSeconds: 2.6
+--- !u!1 &2088103855
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2088103856}
+  - component: {fileID: 2088103859}
+  - component: {fileID: 2088103858}
+  - component: {fileID: 2088103857}
+  m_Layer: 0
+  m_Name: Wall_Back
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2088103856
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2088103855}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.5, z: -10.5}
+  m_LocalScale: {x: 18, y: 3, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1319809406}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &2088103857
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2088103855}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &2088103858
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2088103855}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!33 &2088103859
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2088103855}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &2100300100
 GameObject:
   m_ObjectHideFlags: 0
@@ -5598,93 +6351,7 @@ MonoBehaviour:
   enemyBrain: {fileID: 0}
   health: {fileID: 0}
   disableObjectOnDeath: 1
---- !u!1001 &1968310393
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 1641900975}
-    m_Modifications:
-    - target: {fileID: 2919489355096964764, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_Name
-      value: Enemy_A02_Mobile_A
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 4
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: -0.00000004371139
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 2919489355096964764, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1968310396}
-  m_SourcePrefab: {fileID: 100100000, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
---- !u!4 &1968310394 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 4797999245816111292, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-  m_PrefabInstance: {fileID: 1968310393}
-  m_PrefabAsset: {fileID: 0}
---- !u!1 &1968310395 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 2919489355096964764, guid: b14d94990390c4b1ca5997b77ab81df8, type: 3}
-  m_PrefabInstance: {fileID: 1968310393}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &1968310396
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1968310395}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1a08b5c9da69948b192a238ba551af8f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Interaction.EnemyEncounterMember
-  ownerEncounter: {fileID: 0}
-  enemyBrain: {fileID: 0}
-  health: {fileID: 0}
-  disableObjectOnDeath: 1
---- !u!1 &1996450501
+--- !u!1 &2100300700
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -5692,39 +6359,24 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1996450502}
-  - component: {fileID: 1996450505}
-  - component: {fileID: 1996450504}
-  - component: {fileID: 1996450503}
+  - component: {fileID: 2100300704}
+  - component: {fileID: 2100300703}
+  - component: {fileID: 2100300702}
+  - component: {fileID: 2100300701}
   m_Layer: 0
-  m_Name: Wall_Front
+  m_Name: TraversalMantle_InteriorApproach
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1996450502
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1996450501}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.5, z: 10.5}
-  m_LocalScale: {x: 18, y: 3, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1319809406}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!23 &1996450503
+--- !u!23 &2100300701
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1996450501}
+  m_GameObject: {fileID: 2100300700}
   m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
@@ -5767,13 +6419,13 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &1996450504
+--- !u!65 &2100300702
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1996450501}
+  m_GameObject: {fileID: 2100300700}
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -5788,549 +6440,29 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!33 &1996450505
+--- !u!33 &2100300703
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1996450501}
+  m_GameObject: {fileID: 2100300700}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &2026227340
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2026227341}
-  - component: {fileID: 2026227344}
-  - component: {fileID: 2026227343}
-  - component: {fileID: 2026227342}
-  m_Layer: 0
-  m_Name: Floor
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2026227341
+--- !u!4 &2100300704
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2026227340}
+  m_GameObject: {fileID: 2100300700}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.5, z: 0}
-  m_LocalScale: {x: 18, y: 1, z: 20}
+  m_LocalPosition: {x: 0, y: 0.56, z: -8.200001}
+  m_LocalScale: {x: 3.2, y: 1.12, z: 1.6}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1913657677}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!23 &2026227342
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2026227340}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 1
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &2026227343
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2026227340}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!33 &2026227344
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2026227340}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &2051760639
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2051760640}
-  - component: {fileID: 2051760642}
-  - component: {fileID: 2051760641}
-  m_Layer: 0
-  m_Name: Encounter_EN_A01_TUTORIAL
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2051760640
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2051760639}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: 2}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 163643438}
-  - {fileID: 601715720}
-  m_Father: {fileID: 642366625}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2051760641
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2051760639}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 88aafc8e338f74c1b805b7f02fad26e1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Interaction.EncounterController
-  encounterId: EN_A01_TUTORIAL
-  activateOnPlayerEnter: 1
-  startActive: 0
-  chapterProgressService: {fileID: 0}
-  members: []
-  blockersToEnableWhileActive: []
---- !u!65 &2051760642
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2051760639}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 14, y: 3, z: 10}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!1 &2071717799
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2071717804}
-  - component: {fileID: 2071717803}
-  - component: {fileID: 2071717802}
-  - component: {fileID: 2071717800}
-  - component: {fileID: 2071717801}
-  - component: {fileID: 2071717807}
-  - component: {fileID: 2071717808}
-  - component: {fileID: 2071717811}
-  - component: {fileID: 2071717810}
-  - component: {fileID: 2071717809}
-  - component: {fileID: 2071717805}
-  - component: {fileID: 2071717812}
-  - component: {fileID: 2071717813}
-  - component: {fileID: 2071717806}
-  m_Layer: 0
-  m_Name: ChapterFlow
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2071717800
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: da1df298ac53b401b9958add866e929f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.CheckpointRestoreCoordinator
-  chapterId: Chapter01
-  player: {fileID: 921209018}
-  saveService: {fileID: 2071717803}
-  checkpointService: {fileID: 2071717802}
-  chapterProgressService: {fileID: 2071717801}
-  respawnDelaySeconds: 0.5
-  autoLoadFromSaveOnStart: 1
-  autoSaveOnStart: 1
-  defaultCheckpointId: CP01
-  defaultRespawnOffset: {x: 0, y: 0, z: 0}
-  defaultRestoreFullHealth: 1
-  defaultRestoreFullMana: 1
---- !u!114 &2071717801
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cda5f76fa040f4af1974b2130aaeaa9f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.ChapterProgressService
-  progression: {fileID: 11400000, guid: 480d16d828e844fbb833edb30783c8e4, type: 2}
-  checkpointRestoreCoordinator: {fileID: 2071717800}
-  currentAreaId: 
-  chapterCompleted: 0
---- !u!114 &2071717805
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e731a8d3279d454c8d6ecf4a8a196806, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.ChapterObjectiveView
-  chapterProgressService: {fileID: 2071717801}
-  panelTitle: Current Objective
-  highlightDurationSeconds: 2.4
---- !u!114 &2071717812
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 271d7204b44846be8bb0bd0b13524351, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.AreaEntryView
-  chapterProgressService: {fileID: 2071717801}
-  visibleDurationSeconds: 2.2
---- !u!114 &2071717813
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4cccd3d0a437434f9b9550eeec051805, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.ChapterResumeContextView
-  saveService: {fileID: 2071717803}
-  visibleDurationSeconds: 2.6
---- !u!114 &2071717807
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8f0b79aab2f54f7fae12ef8468350b63, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.CheckpointActivationView
-  checkpointService: {fileID: 2071717802}
-  visibleDurationSeconds: 1.8
---- !u!114 &2071717808
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7536213151364b389dddc07f97f5577b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.KeyItemAcquisitionView
-  chapterProgressService: {fileID: 2071717801}
-  visibleDurationSeconds: 2.2
---- !u!114 &2071717811
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b10fe8cc7f3f4ce1b7e20b943c8d9e56, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.EncounterSealView
-  visibleDurationSeconds: 1.8
---- !u!114 &2071717810
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0365575f78b54e91ae8d4146328dce38, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.EncounterClearView
-  chapterProgressService: {fileID: 2071717801}
-  visibleDurationSeconds: 1.9
---- !u!114 &2071717809
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2a156541acd04ad69592425f50c1b1d6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.ChapterRouteBlockHintView
-  visibleDurationSeconds: 2.1
-  panelTitle: Route Blocked
---- !u!114 &2071717806
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5f35f39f6a8e4c1eb497d1477626fdc1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.UI.ChapterTutorialHintView
-  chapterProgressService: {fileID: 2071717801}
-  inputReader: {fileID: 701803118}
-  panelTitle: Tutorial Hint
---- !u!114 &2071717802
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d80ecb976094b4eb3b58f447cb73a305, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.CheckpointService
-  currentCheckpointId: 
---- !u!114 &2071717803
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5ceab63366766436482a9a565b5f1059, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.SaveService
-  fileName: slot_auto_chapter01.json
---- !u!4 &2071717804
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2071717799}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2088103855
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2088103856}
-  - component: {fileID: 2088103859}
-  - component: {fileID: 2088103858}
-  - component: {fileID: 2088103857}
-  m_Layer: 0
-  m_Name: Wall_Back
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2088103856
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2088103855}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.5, z: -10.5}
-  m_LocalScale: {x: 18, y: 3, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1319809406}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!23 &2088103857
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2088103855}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 1
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &2088103858
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2088103855}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!33 &2088103859
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2088103855}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &2106387679
 GameObject:
   m_ObjectHideFlags: 0

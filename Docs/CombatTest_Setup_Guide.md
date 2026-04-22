@@ -9,6 +9,8 @@
 - `CampusRPG/Setup/Build CombatTest Scene`
 - `CampusRPG/Setup/Build CombatTest Scene (Force Rebuild)`
 - `CampusRPG/Setup/Repair CombatTest Prefab Wiring`
+- `CampusRPG/Setup/Repair CombatTest Scene NavMesh`
+- `CampusRPG/Setup/Local Preview/Apply Imported Enemy Avatar Chain To CombatTest Enemy Prefabs`
 
 它会自动：
 
@@ -20,16 +22,17 @@
 - 生成 `PF_VFX_ProjectileImpact_SpellBolt`
 - 生成 `AC_Player_CombatTest`、玩家攻击片段，以及基础动作层片段
   当前玩家控制器除了攻击状态，还会生成 `Locomotion / Block / Airborne / Dodge / Hit / Death` 基础状态
-  仓库默认会生成可提交的代理动作片段；只有在你本地手动打开预览开关后，这些本地片段才会复制导入动作
+  仓库默认只生成可提交的 proxy / approved `_Game` 动作片段；只有在你本地手动打开预览开关并执行 local preview 菜单时，才会重建 imported preview 动作
   玩家攻击片段现在会保留一小段导入动作的收招尾巴，而不是只按命中窗口长度硬裁；运行时也会把 `forwardMovement` 用到玩家攻击前送上
   因此现在已经可以直接评估移动、格挡、闪避、受击和死亡的整体手感，而不只是静态壳子加命中事件
-- 当项目里已经导入兼容的 Humanoid 角色与动作资源时，你可以手动切到本地预览模式，让玩家本地 `CombatTest` 动画片段重建成真实动作副本，并把玩家 prefab 切到导入的人物外观；详细规则见 [素材来源清单](Docs/Asset_Source_List.md)
+- 当项目里已经导入兼容的 Humanoid 角色与动作资源时，你可以手动切到 local preview 模式，让玩家本地 `CombatTest` 动画片段重建成真实动作副本，并把玩家 prefab 切到导入的人物外观；详细规则见 [素材来源清单](Docs/Asset_Source_List.md)
+- 敌人 imported Avatar chain 目前不属于标准 build / repair 链；如果你要实验，只能走单独的 local preview 菜单。它会给 enemy root 挂单独的 `Animator + EnemyCombatAnimationRelay`，而不是再把 skinned humanoid 塞进旧 proxy 表现链
 - 重建 `Assets/_Game/Scenes/CombatTest.unity`
 - 在场景内放入 `CombatDebugHUD`
 
 如果你只是想快速进入战斗测试，优先使用这个菜单，而不是按下面清单逐项手工创建。
 
-如果你已经有现成的 `CombatTest` 角色 prefab，不想整包重建场景，只想把 `RequireComponent` 造成的重复组件清掉，并把玩家的 `PlayerCombatAnimationRelay` 接回 prefab，请使用 `Repair CombatTest Prefab Wiring`。它会就地修复 `PF_Player_CombatTest` 和三类敌人 prefab 的内部组件引用，不会重建整个场景。
+如果你已经有现成的 `CombatTest` 角色 prefab，不想整包重建场景，只想把 `RequireComponent` 造成的重复组件清掉，并把玩家的 `PlayerCombatAnimationRelay` 接回 prefab，请使用 `Repair CombatTest Prefab Wiring`。它会就地修复 `PF_Player_CombatTest` 和三类敌人 prefab 的内部组件引用，并把玩家/敌人一起恢复到 public-safe proxy baseline；敌人 imported Avatar chain 即使之前做过 local preview，也会在这里被拆回稳定的 proxy 基线，不会重建整个场景。
 当前修复流程也会把玩家的 `Animator`、`PlayerCharacter`、`PlayerStateMachine`、`PlayerMotor` 和 `PlayerCombatAnimationRelay` 的新动作层引用重新接齐。
 
 当前默认入口在检测到以下目标已存在时，会先弹确认框，再执行覆盖：
@@ -118,13 +121,17 @@
 - `ManaComponent`
 - `GaugeComponent`
 
-当前自动生成的 `PF_Player_CombatTest` 现在会优先使用导入角色与 Humanoid 动作；只有在找不到可用素材源时，才会回退到 `CombatProxyVisualRoot` 代理外形：
+当前自动生成的 `PF_Player_CombatTest` 默认恢复为 `CombatProxyVisualRoot` 代理外形：
 
-- 若工程里存在支持的玩家 prefab / Avatar / 动作源，`Repair CombatTest Prefab Wiring` 与 `Build CombatTest Scene` 会默认把它们接成正式显示层
-- 若当前机器没有这些素材，系统会自动回退到代理角色，保证工程依旧可打开、可构建、可通过核心回归
-- 如果你想强制退回代理链，可以关闭菜单 `CampusRPG/Setup/CombatTest/Prefer Imported Player Sources When Available`
-- 如果你只想把当前玩家 prefab 立刻重绑到导入角色，也可以手动执行 `CampusRPG/Setup/Apply Imported Player Visuals To CombatTest Player Prefab`
-- 如果后续给 prefab 接入你自己的正式角色模型，只要保留子物体 `Renderer`，重跑修复脚本时也会继续优先保留正式模型，不会额外再叠一层代理外形
+- `Repair CombatTest Prefab Wiring` 与 `Build CombatTest Scene` 的标准路径都会把玩家拉回 proxy baseline，而不是根据本机素材目录自动改正式输出
+- 如果你想做 local preview，先打开菜单 `CampusRPG/Setup/CombatTest/Prefer Imported Player Sources When Available`
+- 然后手动执行 `CampusRPG/Setup/Local Preview/Rebuild CombatTest Imported Player Animations`
+  当前这条 local preview 攻击链会优先尝试 `DoubleL` / `Kevin 1H` 的单手挥砍资源；只有在这些资源缺失时，才回退到 `2H / Polearm` 候选
+- 如需把当前玩家 prefab 切到导入角色，再执行 `CampusRPG/Setup/Local Preview/Apply Imported Player Visuals To CombatTest Player Prefab`
+  当前会优先使用 `Assets/JC_LP_MedievalCharacters_LITE/Prefabs/SM_MedievalMaleLite_01.prefab`；若该资源不存在，再回退到 `Assets/Kevin Iglesias/` 下的兼容 Humanoid prefab
+  如果首选角色材质仍指向 HDRP / 不受支持 shader，本地预览现在会自动在 `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/Materials/Player/` 下生成 built-in 兼容材质，避免玩家在 CombatTest 里整个人变成粉紫色
+  如果本机存在 `Assets/Free medieval weapons/Prefabs/Sword_DH.prefab`，同一步还会把第三方剑模型挂到 imported 右手骨，并自动隐藏 proxy 剑体，只留下前向标记方便读朝向
+- local preview 结束后，再执行一次 `Repair CombatTest Prefab Wiring`，把 prefab 恢复回 public-safe baseline
 
 `PlayerCharacter` 需要连接：
 
@@ -210,6 +217,16 @@
 - `Health` -> 本体 `HealthComponent`
 
 `EnemyAttackController.attackOrigin` 默认可留空，未填时会回退到自身 Transform。
+
+敌人当前默认固定走 `CombatProxyVisualRoot` 代理外形：
+
+- `Build CombatTest Scene` 与 `Repair CombatTest Prefab Wiring` 的标准路径都会把三类敌人拉回 proxy baseline
+- 如果当前场景里敌人再次提示 `no valid NavMesh`，先执行 `CampusRPG/Setup/Repair CombatTest Scene NavMesh`，把 `Ground` 和四面墙重新标成导航静态体并重烘当前 `CombatTest.unity`
+- 如果你手动执行 `CampusRPG/Setup/Local Preview/Apply Imported Enemy Avatar Chain To CombatTest Enemy Prefabs`，会在本机给敌人单独挂一条 `Animator / Avatar / EnemyCombatAnimationRelay` 预览链，但它不属于正式默认输出
+- 这条 local preview 会按 skinned mesh 的最低点自动补正 Y 偏移，避免敌人 imported 角色埋地
+- `EnemyCombatAnimationRelay` 现在会在每次重新进入攻击 / 受击 / 死亡状态时强制从头重播对应 clip，避免 attack 看起来没触发
+- 这条 local preview 会生成 `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/AC_Enemy_ImportedPreview.controller` 之类的本地资产；该目录只服务预览，不应提交
+- 标准 `Repair` 会把 enemy root 上这条 Avatar 链拆掉，并重新启用 `EnemyVisualPresentationRelay`
 
 当前占位资产里，`SO_Attack_Enemy_Ranged` 已默认挂到 `PF_Projectile_SpellBolt`，因此远程兵会走实体投射物链路，而不是直接在远距离瞬时结算伤害；该攻击当前会覆盖成最小弧线弹道，并且 AI 只会在存在 clear shot 时出手，没视线时会先侧移找角度；如果前摇期间失去视线，也会直接取消这次抬手并重新找角度；投射物本身也会被墙体等场景阻挡体拦截；命中时共用 `PF_VFX_ProjectileImpact_SpellBolt` 作为最小反馈，并播放经过 `SO_AudioSettings` 全局 SFX 音量的 one-shot 命中音效。
 

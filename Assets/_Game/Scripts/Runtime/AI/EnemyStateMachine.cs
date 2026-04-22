@@ -14,8 +14,10 @@ namespace CampusRPG.AI
         private EnemyDeathState deathState;
 
         [SerializeField] private string currentStateName = "IdleGuard";
+        [SerializeField] private int stateRevision;
 
         public string CurrentStateName => currentStateName;
+        public int StateRevision => stateRevision;
 
         public EnemyState CurrentState { get; private set; }
 
@@ -83,6 +85,7 @@ namespace CampusRPG.AI
             CurrentState?.Exit();
             CurrentState = nextState;
             currentStateName = stateName;
+            stateRevision++;
             CurrentState?.Enter();
         }
     }

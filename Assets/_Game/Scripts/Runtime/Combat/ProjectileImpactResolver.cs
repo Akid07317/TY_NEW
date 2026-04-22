@@ -230,9 +230,34 @@ namespace CampusRPG.Combat
                 return false;
             }
 
-            Vector3 closestPoint = collider.ClosestPoint(origin);
+            Vector3 closestPoint = ResolveHitPoint(collider, origin);
             float overlapThreshold = hitRadius + 0.01f;
             return (closestPoint - origin).sqrMagnitude > overlapThreshold * overlapThreshold;
+        }
+
+        private static Vector3 ResolveHitPoint(Collider collider, Vector3 fallbackPoint)
+        {
+            if (collider == null)
+            {
+                return fallbackPoint;
+            }
+
+            if (CanSafelyUseClosestPoint(collider))
+            {
+                return collider.ClosestPoint(fallbackPoint);
+            }
+
+            return collider.bounds.ClosestPoint(fallbackPoint);
+        }
+
+        private static bool CanSafelyUseClosestPoint(Collider collider)
+        {
+            if (collider is BoxCollider || collider is SphereCollider || collider is CapsuleCollider)
+            {
+                return true;
+            }
+
+            return collider is MeshCollider meshCollider && meshCollider.convex;
         }
     }
 }

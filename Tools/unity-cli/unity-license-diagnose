@@ -1815,6 +1815,7 @@ print_metrics_db_evidence
 print_write_probe_evidence
 print_home_db_inventory
 
+rm -f "$LOG_FILE"
 trap cleanup_child INT TERM EXIT
 ACTIVE_USER_VALUE="${OVERRIDE_USER:-${USER:-}}"
 ACTIVE_LOGNAME_VALUE="${LOGNAME:-}"
@@ -1833,11 +1834,14 @@ START_TIME=$(date +%s)
 
 while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
   if log_contains "COMMAND LINE ARGUMENTS:" || log_contains "[Package Manager] Connected to IPC stream" || log_contains "Successfully changed project path to:"; then
-    echo "STATUS: startup-ok"
-    echo "DETAIL: Unity passed licensing and entered normal batchmode startup."
-    trap - INT TERM EXIT
-    wait "$UNITY_PID"
-    exit 0
+    if ! log_contains "Found 0 entitlement groups and 0 free entitlements" \
+      && ! log_contains "'com.unity.editor.headless' was not found."; then
+      echo "STATUS: startup-ok"
+      echo "DETAIL: Unity passed licensing and entered normal batchmode startup."
+      trap - INT TERM EXIT
+      wait "$UNITY_PID"
+      exit 0
+    fi
   fi
 
   NOW=$(date +%s)

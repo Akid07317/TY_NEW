@@ -13,6 +13,7 @@ namespace CampusRPG.Editor
     public static class CombatTestAssetGenerator
     {
         private const string RootMenu = "CampusRPG/Setup/Create CombatTest Placeholder Assets";
+        private const string RebuildImportedPlayerAnimationsMenu = "CampusRPG/Setup/Local Preview/Rebuild CombatTest Imported Player Animations";
         private const string AudioSettingsPath = "Assets/_Game/Data/Audio/SO_AudioSettings.asset";
         private const string SpellBoltProjectilePrefabPath = "Assets/_Game/Prefabs/Combat/PF_Projectile_SpellBolt.prefab";
         private const string SpellBoltImpactVfxPrefabPath = "Assets/_Game/Prefabs/VFX/PF_VFX_ProjectileImpact_SpellBolt.prefab";
@@ -72,6 +73,10 @@ namespace CampusRPG.Editor
         private const string PlayerProxyForwardMarkerPath = PlayerProxyRootPath + "/ForwardMarker";
         private const string PlayerProxyGuardPath = PlayerProxyRootPath + "/Guard";
         private const string PlayerProxyBladePath = PlayerProxyRootPath + "/Blade";
+        private const string PlayerProxyWeaponGripPath = PlayerProxyRootPath + "/WeaponGrip";
+        private const string PlayerProxyWeaponGripGuardPath = PlayerProxyWeaponGripPath + "/Guard";
+        private const string PlayerProxyWeaponGripBladePath = PlayerProxyWeaponGripPath + "/Blade";
+        private static bool allowImportedPlayerAnimationPreviewBuild;
 
         [MenuItem(RootMenu)]
         public static void CreateCombatTestAssets()
@@ -142,7 +147,7 @@ namespace CampusRPG.Editor
                 0.22f,
                 1.6f,
                 0.45f,
-                hitboxActivationMode: AttackHitboxActivationMode.AnimationEvent);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO light02 = CreateAttackAsset(
                 Light02Path,
                 "Light_02",
@@ -153,7 +158,7 @@ namespace CampusRPG.Editor
                 0.24f,
                 1.7f,
                 0.5f,
-                hitboxActivationMode: AttackHitboxActivationMode.AnimationEvent);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO light03 = CreateAttackAsset(
                 Light03Path,
                 "Light_03",
@@ -164,7 +169,7 @@ namespace CampusRPG.Editor
                 0.30f,
                 1.9f,
                 0.55f,
-                hitboxActivationMode: AttackHitboxActivationMode.AnimationEvent);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO heavy = CreateAttackAsset(
                 HeavyPath,
                 "Heavy_01",
@@ -175,7 +180,7 @@ namespace CampusRPG.Editor
                 0.42f,
                 2.1f,
                 0.65f,
-                hitboxActivationMode: AttackHitboxActivationMode.AnimationEvent);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO dodgeFollowUp = CreateAttackAsset(
                 DodgeFollowUpPath,
                 "DodgeFollowUp",
@@ -186,7 +191,7 @@ namespace CampusRPG.Editor
                 0.25f,
                 1.8f,
                 0.55f,
-                hitboxActivationMode: AttackHitboxActivationMode.AnimationEvent);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO counter = CreateAttackAsset(
                 CounterPath,
                 "Counter",
@@ -197,7 +202,7 @@ namespace CampusRPG.Editor
                 0.28f,
                 1.9f,
                 0.6f,
-                hitboxActivationMode: AttackHitboxActivationMode.AnimationEvent);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO empoweredCounter = CreateAttackAsset(
                 EnhancedCounterPath,
                 "Counter_Enhanced",
@@ -208,7 +213,7 @@ namespace CampusRPG.Editor
                 0.32f,
                 2.1f,
                 0.7f,
-                hitboxActivationMode: AttackHitboxActivationMode.AnimationEvent);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO empoweredDodge = CreateAttackAsset(
                 EnhancedDodgePath,
                 "DodgeFollowUp_Enhanced",
@@ -219,7 +224,7 @@ namespace CampusRPG.Editor
                 0.28f,
                 2.0f,
                 0.65f,
-                hitboxActivationMode: AttackHitboxActivationMode.AnimationEvent);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO enemyMelee = CreateAttackAsset(
                 "Assets/_Game/Data/Enemies/SO_Attack_Enemy_Melee.asset",
                 "Enemy_Melee",
@@ -384,7 +389,7 @@ namespace CampusRPG.Editor
             AssetDatabase.Refresh();
 
             Selection.activeObject = enemyArchetype;
-            Debug.Log("CombatTest placeholder assets created or updated.");
+            Debug.Log("CombatTest placeholder assets created or updated using the public-safe proxy baseline.");
         }
 
         public static RuntimeAnimatorController EnsurePlayerCombatAnimationAssets()
@@ -394,6 +399,51 @@ namespace CampusRPG.Editor
             EnsureFolder(PlayerAnimationRootFolder);
 
             return EnsurePlayerCombatAnimationAssets(
+                false,
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(Light01Path),
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(Light02Path),
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(Light03Path),
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(HeavyPath),
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(DodgeFollowUpPath),
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(CounterPath),
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(EnhancedCounterPath),
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(EnhancedDodgePath));
+        }
+
+        [MenuItem(RebuildImportedPlayerAnimationsMenu)]
+        public static void RebuildPlayerCombatAnimationAssetsForLocalPreviewMenu()
+        {
+            if (EnsurePlayerCombatAnimationAssetsForLocalPreview() == null)
+            {
+                return;
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("CombatTest player animation assets rebuilt from imported preview sources. Treat these outputs as local-preview-only.");
+        }
+
+        public static RuntimeAnimatorController EnsurePlayerCombatAnimationAssetsForLocalPreview()
+        {
+            if (!CombatImportedPlayerVisualUtility.UseImportedPlayerSourcesForLocalPreview)
+            {
+                Debug.LogWarning(
+                    "Imported player preview is disabled. Enable 'CampusRPG/Setup/CombatTest/Prefer Imported Player Sources When Available' before rebuilding imported preview animations.");
+                return null;
+            }
+
+            if (!CombatImportedPlayerVisualUtility.HasPlayerVisualSource())
+            {
+                Debug.LogWarning("No imported player visual source was found. Install a supported player package first.");
+                return null;
+            }
+
+            EnsureFolder("Assets/_Game/Animations");
+            EnsureFolder("Assets/_Game/Animations/Characters");
+            EnsureFolder(PlayerAnimationRootFolder);
+
+            return EnsurePlayerCombatAnimationAssets(
+                true,
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(Light01Path),
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(Light02Path),
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(Light03Path),
@@ -655,102 +705,112 @@ namespace CampusRPG.Editor
             return asset;
         }
 
-        private static RuntimeAnimatorController EnsurePlayerCombatAnimationAssets(params AttackDefinitionSO[] attackDefinitions)
+        private static RuntimeAnimatorController EnsurePlayerCombatAnimationAssets(bool allowImportedPlayerPreview, params AttackDefinitionSO[] attackDefinitions)
         {
-            AnimationClip idleClip = CreateOrUpdatePlayerIdleClip();
-            AnimationClip walkForwardClip = CreateOrUpdatePlayerWalkForwardClip();
-            AnimationClip walkBackwardClip = CreateOrUpdatePlayerWalkBackwardClip();
-            AnimationClip walkLeftClip = CreateOrUpdatePlayerWalkLeftClip();
-            AnimationClip walkRightClip = CreateOrUpdatePlayerWalkRightClip();
-            AnimationClip runForwardClip = CreateOrUpdatePlayerRunForwardClip();
-            AnimationClip runBackwardClip = CreateOrUpdatePlayerRunBackwardClip();
-            AnimationClip runLeftClip = CreateOrUpdatePlayerRunLeftClip();
-            AnimationClip runRightClip = CreateOrUpdatePlayerRunRightClip();
-            AnimationClip runForwardLeftClip = CreateOrUpdatePlayerRunForwardLeftClip();
-            AnimationClip runForwardRightClip = CreateOrUpdatePlayerRunForwardRightClip();
-            AnimationClip runBackwardLeftClip = CreateOrUpdatePlayerRunBackwardLeftClip();
-            AnimationClip runBackwardRightClip = CreateOrUpdatePlayerRunBackwardRightClip();
-            AnimationClip airborneClip = CreateOrUpdatePlayerAirborneClip();
-            AnimationClip blockClip = CreateOrUpdatePlayerBlockClip();
-            AnimationClip dodgeClip = CreateOrUpdatePlayerDodgeClip();
-            AnimationClip hitClip = CreateOrUpdatePlayerHitClip();
-            AnimationClip deathClip = CreateOrUpdatePlayerDeathClip();
-            AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(PlayerAnimatorControllerPath);
+            bool previousAllowImportedPreview = allowImportedPlayerAnimationPreviewBuild;
+            allowImportedPlayerAnimationPreviewBuild = allowImportedPlayerPreview;
 
-            if (controller == null)
+            try
             {
-                controller = AnimatorController.CreateAnimatorControllerAtPath(PlayerAnimatorControllerPath);
-            }
+                AnimationClip idleClip = CreateOrUpdatePlayerIdleClip();
+                AnimationClip walkForwardClip = CreateOrUpdatePlayerWalkForwardClip();
+                AnimationClip walkBackwardClip = CreateOrUpdatePlayerWalkBackwardClip();
+                AnimationClip walkLeftClip = CreateOrUpdatePlayerWalkLeftClip();
+                AnimationClip walkRightClip = CreateOrUpdatePlayerWalkRightClip();
+                AnimationClip runForwardClip = CreateOrUpdatePlayerRunForwardClip();
+                AnimationClip runBackwardClip = CreateOrUpdatePlayerRunBackwardClip();
+                AnimationClip runLeftClip = CreateOrUpdatePlayerRunLeftClip();
+                AnimationClip runRightClip = CreateOrUpdatePlayerRunRightClip();
+                AnimationClip runForwardLeftClip = CreateOrUpdatePlayerRunForwardLeftClip();
+                AnimationClip runForwardRightClip = CreateOrUpdatePlayerRunForwardRightClip();
+                AnimationClip runBackwardLeftClip = CreateOrUpdatePlayerRunBackwardLeftClip();
+                AnimationClip runBackwardRightClip = CreateOrUpdatePlayerRunBackwardRightClip();
+                AnimationClip airborneClip = CreateOrUpdatePlayerAirborneClip();
+                AnimationClip blockClip = CreateOrUpdatePlayerBlockClip();
+                AnimationClip dodgeClip = CreateOrUpdatePlayerDodgeClip();
+                AnimationClip hitClip = CreateOrUpdatePlayerHitClip();
+                AnimationClip deathClip = CreateOrUpdatePlayerDeathClip();
+                AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(PlayerAnimatorControllerPath);
 
-            AnimatorControllerLayer layer = EnsureBaseLayer(controller);
-            AnimatorStateMachine stateMachine = layer.stateMachine;
-            ClearStateMachine(stateMachine);
-            EnsurePlayerAnimatorParameters(controller);
-
-            BlendTree locomotionBlendTree = CreateOrUpdateLocomotionBlendTree(
-                controller,
-                idleClip,
-                walkForwardClip,
-                walkBackwardClip,
-                walkLeftClip,
-                walkRightClip,
-                runForwardClip,
-                runBackwardClip,
-                runLeftClip,
-                runRightClip,
-                runForwardLeftClip,
-                runForwardRightClip,
-                runBackwardLeftClip,
-                runBackwardRightClip);
-
-            AnimatorState locomotionState = stateMachine.AddState(PlayerLocomotionStateName);
-            locomotionState.motion = locomotionBlendTree;
-            stateMachine.defaultState = locomotionState;
-
-            AnimatorState blockState = stateMachine.AddState(PlayerBlockStateName);
-            blockState.motion = blockClip;
-
-            AnimatorState airborneState = stateMachine.AddState(PlayerAirborneStateName);
-            airborneState.motion = airborneClip;
-
-            AnimatorState dodgeState = stateMachine.AddState(PlayerDodgeStateName);
-            dodgeState.motion = dodgeClip;
-
-            AnimatorState hitState = stateMachine.AddState(PlayerHitStateName);
-            hitState.motion = hitClip;
-
-            AnimatorState deathState = stateMachine.AddState(PlayerDeathStateName);
-            deathState.motion = deathClip;
-
-            AddBlockingTransition(locomotionState, blockState, true);
-            AddBlockingTransition(blockState, locomotionState, false);
-            AddGroundedTransition(locomotionState, airborneState, false);
-            AddGroundedTransition(blockState, airborneState, false);
-            AddAirborneRecoveryTransition(airborneState, locomotionState, false);
-            AddAirborneRecoveryTransition(airborneState, blockState, true);
-            AddReturnToLocomotionTransition(dodgeState, locomotionState);
-            AddReturnToLocomotionTransition(hitState, locomotionState);
-
-            for (int i = 0; i < attackDefinitions.Length; i++)
-            {
-                AttackDefinitionSO attackDefinition = attackDefinitions[i];
-
-                if (attackDefinition == null || string.IsNullOrWhiteSpace(attackDefinition.AnimationStateName))
+                if (controller == null)
                 {
-                    continue;
+                    controller = AnimatorController.CreateAnimatorControllerAtPath(PlayerAnimatorControllerPath);
                 }
 
-                AnimationClip attackClip = CreateOrUpdateAttackClip(attackDefinition);
-                SyncAttackAnimationMetadata(attackDefinition, attackClip);
-                AnimatorState attackState = stateMachine.AddState(attackDefinition.AnimationStateName);
-                attackState.motion = attackClip;
+                AnimatorControllerLayer layer = EnsureBaseLayer(controller);
+                AnimatorStateMachine stateMachine = layer.stateMachine;
+                ClearStateMachine(stateMachine);
+                EnsurePlayerAnimatorParameters(controller);
 
-                AddReturnToLocomotionTransition(attackState, locomotionState);
+                BlendTree locomotionBlendTree = CreateOrUpdateLocomotionBlendTree(
+                    controller,
+                    idleClip,
+                    walkForwardClip,
+                    walkBackwardClip,
+                    walkLeftClip,
+                    walkRightClip,
+                    runForwardClip,
+                    runBackwardClip,
+                    runLeftClip,
+                    runRightClip,
+                    runForwardLeftClip,
+                    runForwardRightClip,
+                    runBackwardLeftClip,
+                    runBackwardRightClip);
+
+                AnimatorState locomotionState = stateMachine.AddState(PlayerLocomotionStateName);
+                locomotionState.motion = locomotionBlendTree;
+                stateMachine.defaultState = locomotionState;
+
+                AnimatorState blockState = stateMachine.AddState(PlayerBlockStateName);
+                blockState.motion = blockClip;
+
+                AnimatorState airborneState = stateMachine.AddState(PlayerAirborneStateName);
+                airborneState.motion = airborneClip;
+
+                AnimatorState dodgeState = stateMachine.AddState(PlayerDodgeStateName);
+                dodgeState.motion = dodgeClip;
+
+                AnimatorState hitState = stateMachine.AddState(PlayerHitStateName);
+                hitState.motion = hitClip;
+
+                AnimatorState deathState = stateMachine.AddState(PlayerDeathStateName);
+                deathState.motion = deathClip;
+
+                AddBlockingTransition(locomotionState, blockState, true);
+                AddBlockingTransition(blockState, locomotionState, false);
+                AddGroundedTransition(locomotionState, airborneState, false);
+                AddGroundedTransition(blockState, airborneState, false);
+                AddAirborneRecoveryTransition(airborneState, locomotionState, false);
+                AddAirborneRecoveryTransition(airborneState, blockState, true);
+                AddReturnToLocomotionTransition(dodgeState, locomotionState);
+                AddReturnToLocomotionTransition(hitState, locomotionState);
+
+                for (int i = 0; i < attackDefinitions.Length; i++)
+                {
+                    AttackDefinitionSO attackDefinition = attackDefinitions[i];
+
+                    if (attackDefinition == null || string.IsNullOrWhiteSpace(attackDefinition.AnimationStateName))
+                    {
+                        continue;
+                    }
+
+                    AnimationClip attackClip = CreateOrUpdateAttackClip(attackDefinition);
+                    SyncAttackAnimationMetadata(attackDefinition, attackClip);
+                    AnimatorState attackState = stateMachine.AddState(attackDefinition.AnimationStateName);
+                    attackState.motion = attackClip;
+
+                    AddReturnToLocomotionTransition(attackState, locomotionState);
+                }
+
+                EditorUtility.SetDirty(stateMachine);
+                EditorUtility.SetDirty(controller);
+                return controller;
             }
-
-            EditorUtility.SetDirty(stateMachine);
-            EditorUtility.SetDirty(controller);
-            return controller;
+            finally
+            {
+                allowImportedPlayerAnimationPreviewBuild = previousAllowImportedPreview;
+            }
         }
 
         private static void EnsurePlayerAnimatorParameters(AnimatorController controller)
@@ -1002,12 +1062,20 @@ namespace CampusRPG.Editor
             if (importedClip != null)
             {
                 float importedAttackDuration = ResolveImportedAttackDuration(importedClip.length, duration);
-                return CreateOrUpdateImportedClip(
+                AnimationClip clip = CreateOrUpdateImportedClip(
                     GetPlayerAttackClipPath(attackDefinition.AnimationStateName),
                     importedClip,
                     importedAttackDuration,
                     false,
                     animationEvents);
+                ApplyPlayerProxyMotionCurves(
+                    clip,
+                    ResolvePlayerProxyMotionProfile(GetPlayerAttackClipPath(attackDefinition.AnimationStateName), attackDefinition.AnimationStateName),
+                    importedAttackDuration,
+                    openTime,
+                    closeTime);
+                EditorUtility.SetDirty(clip);
+                return clip;
             }
 
             return CreateOrUpdatePlaceholderClip(
@@ -1190,7 +1258,7 @@ namespace CampusRPG.Editor
                 0.4f,
                 false,
                 "Player Dodge",
-                0.48f);
+                0.42f);
         }
 
         private static AnimationClip CreateOrUpdatePlayerHitClip()
@@ -1290,14 +1358,14 @@ namespace CampusRPG.Editor
                 return gameplayDuration;
             }
 
-            float settleExtension = Mathf.Clamp(gameplayDuration * 0.4f, 0.08f, 0.22f);
+            float settleExtension = Mathf.Clamp(gameplayDuration * 0.18f, 0.05f, 0.12f);
             float targetDuration = gameplayDuration + settleExtension;
             return Mathf.Clamp(targetDuration, gameplayDuration, sourceDuration);
         }
 
         private static float ResolvePlaceholderAttackDuration(float gameplayDuration)
         {
-            float settleExtension = Mathf.Clamp(gameplayDuration * 0.4f, 0.08f, 0.22f);
+            float settleExtension = Mathf.Clamp(gameplayDuration * 0.18f, 0.05f, 0.12f);
             return gameplayDuration + settleExtension;
         }
 
@@ -1325,7 +1393,8 @@ namespace CampusRPG.Editor
 
         private static AnimationClip TryLoadImportedPlayerClip(string[] candidatePaths)
         {
-            if (!CombatImportedPlayerVisualUtility.ShouldUseImportedPlayerSources
+            if (!allowImportedPlayerAnimationPreviewBuild
+                || !CombatImportedPlayerVisualUtility.ShouldUseImportedPlayerSources
                 || !CombatImportedPlayerVisualUtility.HasPlayerVisualSource()
                 || candidatePaths == null)
             {
@@ -1575,55 +1644,90 @@ namespace CampusRPG.Editor
                     {
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_1_InPlace.fbx",
-                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx"
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_1_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx"
                     };
                 case "Light_02":
                     return new[]
                     {
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
-                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx"
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_2_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx"
                     };
                 case "Light_03":
                     return new[]
                     {
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_3_InPlace.fbx",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_3_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"
                     };
                 case "Heavy_01":
                     return new[]
                     {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_3_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_3_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"
                     };
                 case "DodgeFollowUp":
                     return new[]
                     {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_1_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_1_InPlace.fbx",
-                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx"
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx"
                     };
                 case "DodgeFollowUp_Enhanced":
                     return new[]
                     {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_2_InPlace.fbx",
-                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx"
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx"
                     };
                 case "Counter":
                     return new[]
                     {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_2_InPlace.fbx",
-                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx"
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx"
                     };
                 case "Counter_Enhanced":
                     return new[]
                     {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_3_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_3_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"
                     };
                 default:
@@ -2025,17 +2129,38 @@ namespace CampusRPG.Editor
                 new[] { new ProxyCurveKey(0f, 0.54f), new ProxyCurveKey(anticipationTime, anticipationBladePosition.z), new ProxyCurveKey(strikeTime, strikeBladePosition.z), new ProxyCurveKey(settleTime, 0.66f), new ProxyCurveKey(duration, 0.54f) });
             SetVector3PropertyCurves(
                 clip,
+                PlayerProxyWeaponGripBladePath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0.58f), new ProxyCurveKey(anticipationTime, anticipationBladePosition.x - 0.34f + 0.58f), new ProxyCurveKey(strikeTime, strikeBladePosition.x - 0.34f + 0.58f), new ProxyCurveKey(settleTime, 0.58f), new ProxyCurveKey(duration, 0.58f) },
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(anticipationTime, anticipationBladePosition.y - 1.04f), new ProxyCurveKey(strikeTime, strikeBladePosition.y - 1.04f), new ProxyCurveKey(settleTime, 0.01f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(anticipationTime, anticipationBladePosition.z - 0.54f), new ProxyCurveKey(strikeTime, strikeBladePosition.z - 0.54f), new ProxyCurveKey(settleTime, 0.12f), new ProxyCurveKey(duration, 0f) });
+            SetVector3PropertyCurves(
+                clip,
                 PlayerProxyBladePath,
                 "m_LocalScale",
                 new[] { new ProxyCurveKey(0f, 0.07f), new ProxyCurveKey(anticipationTime, anticipationBladeScale.x), new ProxyCurveKey(strikeTime, strikeBladeScale.x), new ProxyCurveKey(settleTime, 0.07f), new ProxyCurveKey(duration, 0.07f) },
                 new[] { new ProxyCurveKey(0f, 0.07f), new ProxyCurveKey(anticipationTime, anticipationBladeScale.y), new ProxyCurveKey(strikeTime, strikeBladeScale.y), new ProxyCurveKey(settleTime, 0.07f), new ProxyCurveKey(duration, 0.07f) },
                 new[] { new ProxyCurveKey(0f, 0.82f), new ProxyCurveKey(anticipationTime, anticipationBladeScale.z), new ProxyCurveKey(strikeTime, strikeBladeScale.z), new ProxyCurveKey(settleTime, 0.94f), new ProxyCurveKey(duration, 0.82f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyWeaponGripBladePath,
+                "m_LocalScale",
+                new[] { new ProxyCurveKey(0f, 1.14f), new ProxyCurveKey(anticipationTime, Mathf.Max(0.7f, anticipationBladeScale.z * 1.35f)), new ProxyCurveKey(strikeTime, Mathf.Max(0.82f, strikeBladeScale.z * 1.35f)), new ProxyCurveKey(settleTime, 1.24f), new ProxyCurveKey(duration, 1.14f) },
+                new[] { new ProxyCurveKey(0f, 0.08f), new ProxyCurveKey(anticipationTime, Mathf.Max(0.08f, anticipationBladeScale.x)), new ProxyCurveKey(strikeTime, Mathf.Max(0.09f, strikeBladeScale.x)), new ProxyCurveKey(settleTime, 0.08f), new ProxyCurveKey(duration, 0.08f) },
+                new[] { new ProxyCurveKey(0f, 0.08f), new ProxyCurveKey(anticipationTime, Mathf.Max(0.08f, anticipationBladeScale.y)), new ProxyCurveKey(strikeTime, Mathf.Max(0.09f, strikeBladeScale.y)), new ProxyCurveKey(settleTime, 0.08f), new ProxyCurveKey(duration, 0.08f) });
             SetLocalPositionCurve(clip, PlayerProxyGuardPath, 'z',
                 new ProxyCurveKey(0f, 0.34f),
                 new ProxyCurveKey(anticipationTime, 0.28f),
                 new ProxyCurveKey(strikeTime, 0.4f),
                 new ProxyCurveKey(settleTime, 0.36f),
                 new ProxyCurveKey(duration, 0.34f));
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyWeaponGripGuardPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0.02f), new ProxyCurveKey(anticipationTime, -0.02f), new ProxyCurveKey(strikeTime, 0.05f), new ProxyCurveKey(settleTime, 0.03f), new ProxyCurveKey(duration, 0.02f) },
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(anticipationTime, 0f), new ProxyCurveKey(strikeTime, 0.01f), new ProxyCurveKey(settleTime, 0f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(anticipationTime, -0.06f), new ProxyCurveKey(strikeTime, 0.06f), new ProxyCurveKey(settleTime, 0.02f), new ProxyCurveKey(duration, 0f) });
         }
 
         private static void SetVector3PropertyCurves(

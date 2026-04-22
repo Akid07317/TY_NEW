@@ -94,7 +94,32 @@ namespace CampusRPG.Combat
                 return;
             }
 
-            damageable.ReceiveDamage(damage, collider.ClosestPoint(hitReferencePoint), source);
+            damageable.ReceiveDamage(damage, ResolveHitPoint(collider, hitReferencePoint), source);
+        }
+
+        private static Vector3 ResolveHitPoint(Collider collider, Vector3 fallbackPoint)
+        {
+            if (collider == null)
+            {
+                return fallbackPoint;
+            }
+
+            if (CanSafelyUseClosestPoint(collider))
+            {
+                return collider.ClosestPoint(fallbackPoint);
+            }
+
+            return collider.bounds.ClosestPoint(fallbackPoint);
+        }
+
+        private static bool CanSafelyUseClosestPoint(Collider collider)
+        {
+            if (collider is BoxCollider || collider is SphereCollider || collider is CapsuleCollider)
+            {
+                return true;
+            }
+
+            return collider is MeshCollider meshCollider && meshCollider.convex;
         }
 
         private void OnDrawGizmosSelected()

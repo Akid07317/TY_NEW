@@ -20,6 +20,8 @@ namespace CampusRPG.Editor
     {
         private const string RootMenu = "CampusRPG/Setup/Build Chapter01 Combined Scene";
         private const string ForceRebuildMenu = "CampusRPG/Setup/Build Chapter01 Combined Scene (Force Rebuild)";
+        private const string RepairBaselineTraversalMenu = "CampusRPG/Setup/Repair Chapter01 Baseline And Traversal Wiring";
+        private const string LegacyRepairTraversalMenu = "CampusRPG/Setup/Repair Chapter01 Traversal Wiring";
         private const string ScenePath = "Assets/_Game/Scenes/Chapter01_Combined.unity";
         private const string ChapterProgressionPath = "Assets/_Game/Data/Chapter/SO_Chapter01_Progression.asset";
         private const string PlayerPrefabPath = "Assets/_Game/Prefabs/Characters/PF_Player_CombatTest.prefab";
@@ -33,6 +35,11 @@ namespace CampusRPG.Editor
         private const string RangedEnemyArchetypePath = "Assets/_Game/Data/Enemies/SO_Enemy_Ranged.asset";
         private const string BossEnemyArchetypePath = "Assets/_Game/Data/Enemies/SO_Enemy_Gatekeeper.asset";
         private const string BossTelegraphStylePath = "Assets/_Game/Data/Enemies/SO_BossTelegraphStyle_Gatekeeper.asset";
+        private const string MantleProbeOriginName = "MantleProbeOrigin";
+        private const string InteriorMantleObstacleName = "TraversalMantle_InteriorApproach";
+        private static readonly Vector3 MantleProbeOriginLocalPosition = new Vector3(0f, 1.0f, 0.18f);
+        private static readonly Vector3 InteriorMantleObstaclePosition = new Vector3(0f, 0.56f, 47.8f);
+        private static readonly Vector3 InteriorMantleObstacleScale = new Vector3(3.2f, 1.12f, 1.6f);
 
         [MenuItem(RootMenu)]
         public static void BuildChapter01CombinedScene()
@@ -49,6 +56,59 @@ namespace CampusRPG.Editor
         public static void ForceBuildChapter01CombinedScene()
         {
             BuildChapter01CombinedSceneInternal();
+        }
+
+        [MenuItem(RepairBaselineTraversalMenu)]
+        public static void RepairChapter01BaselineAndTraversalWiring()
+        {
+            RepairChapter01BaselineAndTraversalWiringInternal();
+        }
+
+        [MenuItem(LegacyRepairTraversalMenu)]
+        public static void RepairChapter01TraversalWiring()
+        {
+            RepairChapter01BaselineAndTraversalWiringInternal();
+        }
+
+        private static void RepairChapter01BaselineAndTraversalWiringInternal()
+        {
+            CombatTestSceneBuilder.RepairCombatTestPrefabWiring();
+
+            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject flowRoot = FindSceneObject("ChapterFlow");
+            GameObject player = FindSceneObject("Player");
+            GameObject area03 = FindSceneObject(Chapter01Ids.Areas.Interior);
+
+            if (flowRoot == null || player == null || area03 == null)
+            {
+                Debug.LogError("Failed to repair Chapter01 baseline/traversal wiring because a required scene object is missing.");
+                return;
+            }
+
+            SaveService saveService = flowRoot.GetComponent<SaveService>();
+            ChapterResumeContextView resumeContextView = GetOrAddComponent<ChapterResumeContextView>(flowRoot);
+            PlayerCharacter playerCharacter = player.GetComponent<PlayerCharacter>();
+            PlayerMotor playerMotor = player.GetComponent<PlayerMotor>();
+            LockOnTargetSelector lockOnTargetSelector = player.GetComponent<LockOnTargetSelector>();
+            PlayerMovementProbe movementProbe = GetOrAddComponent<PlayerMovementProbe>(player);
+            Transform mantleProbeOrigin = FindOrCreateChild(player.transform, MantleProbeOriginName, MantleProbeOriginLocalPosition);
+
+            SetObjectReference(resumeContextView, "saveService", saveService);
+            SetObjectReference(playerCharacter, "movementProbe", movementProbe);
+            SetObjectReference(playerCharacter, "lockOnTargetSelector", lockOnTargetSelector);
+            SetObjectReference(playerMotor, "lockOnTargetSelector", lockOnTargetSelector);
+            SetObjectReference(movementProbe, "probeOrigin", mantleProbeOrigin);
+            CreateOrUpdateTraversalMantleObstacle(
+                area03.transform,
+                InteriorMantleObstacleName,
+                InteriorMantleObstaclePosition,
+                InteriorMantleObstacleScale);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, ScenePath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("Chapter01 baseline/traversal wiring repaired: CombatTest prefabs were restored to the public-safe proxy baseline, and the Chapter01 resume/mantle hooks were synchronized.");
         }
 
         private static void BuildChapter01CombinedSceneInternal()
@@ -129,6 +189,7 @@ namespace CampusRPG.Editor
             CheckpointService checkpointService = flowRoot.GetComponent<CheckpointService>();
             ChapterProgressService chapterProgressService = flowRoot.AddComponent<ChapterProgressService>();
             AreaEntryView areaEntryView = flowRoot.AddComponent<AreaEntryView>();
+            ChapterResumeContextView resumeContextView = flowRoot.AddComponent<ChapterResumeContextView>();
             CheckpointActivationView checkpointActivationView = flowRoot.AddComponent<CheckpointActivationView>();
             KeyItemAcquisitionView keyItemAcquisitionView = flowRoot.AddComponent<KeyItemAcquisitionView>();
             flowRoot.AddComponent<EncounterSealView>();
@@ -143,14 +204,21 @@ namespace CampusRPG.Editor
             EnemyBrain gatekeeperBoss = null;
 
             PlayerCharacter playerCharacter = player.GetComponent<PlayerCharacter>();
+            PlayerMotor playerMotor = player.GetComponent<PlayerMotor>();
             LockOnTargetSelector lockOnTargetSelector = player.GetComponent<LockOnTargetSelector>();
+            PlayerMovementProbe movementProbe = player.GetComponent<PlayerMovementProbe>();
+            Transform mantleProbeOrigin = FindOrCreateChild(player.transform, MantleProbeOriginName, MantleProbeOriginLocalPosition);
 
             SetObjectReference(playerCharacter, "inputReader", inputReader);
             SetObjectReference(playerCharacter, "cameraTransform", cameraObject.transform);
+            SetObjectReference(playerCharacter, "movementProbe", movementProbe);
+            SetObjectReference(playerCharacter, "lockOnTargetSelector", lockOnTargetSelector);
             SetObjectReference(lockOnTargetSelector, "inputReader", inputReader);
             SetObjectReference(lockOnTargetSelector, "cameraController", cameraController);
             SetObjectReference(lockOnTargetSelector, "cameraTransform", cameraObject.transform);
             SetLayerMask(lockOnTargetSelector, "targetMask", ~0);
+            SetObjectReference(playerMotor, "lockOnTargetSelector", lockOnTargetSelector);
+            SetObjectReference(movementProbe, "probeOrigin", mantleProbeOrigin);
             SetObjectReference(cameraController, "followTarget", player.transform);
             SetObjectReference(cameraController, "inputReader", inputReader);
 
@@ -181,6 +249,7 @@ namespace CampusRPG.Editor
             SetObjectReference(debugHud, "playerCharacter", playerCharacter);
             SetObjectReference(debugHud, "lockOnTargetSelector", lockOnTargetSelector);
             SetObjectReference(areaEntryView, "chapterProgressService", chapterProgressService);
+            SetObjectReference(resumeContextView, "saveService", saveService);
             SetObjectReference(checkpointActivationView, "checkpointService", checkpointService);
             SetObjectReference(keyItemAcquisitionView, "chapterProgressService", chapterProgressService);
             SetObjectReference(encounterClearView, "chapterProgressService", chapterProgressService);
@@ -192,6 +261,11 @@ namespace CampusRPG.Editor
             CreateCheckpoint(area01.transform, "Checkpoint_CP01", Chapter01Ids.Checkpoints.Start, new Vector3(0f, 0.5f, -7f), checkpointCoordinator);
             CreateCheckpoint(area02.transform, "Checkpoint_CP02", Chapter01Ids.Checkpoints.Courtyard, new Vector3(0f, 0.5f, 20f), checkpointCoordinator);
             CreateCheckpoint(area03.transform, "Checkpoint_CP03", Chapter01Ids.Checkpoints.Interior, new Vector3(0f, 0.5f, 64.5f), checkpointCoordinator);
+            CreateOrUpdateTraversalMantleObstacle(
+                area03.transform,
+                InteriorMantleObstacleName,
+                InteriorMantleObstaclePosition,
+                InteriorMantleObstacleScale);
 
             CreateTriggerVolume(
                 area01.transform,
@@ -386,7 +460,7 @@ namespace CampusRPG.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("Chapter01 combined scene graybox and progression asset were generated.");
+            Debug.Log("Chapter01 combined scene graybox and progression asset were generated using the public-safe proxy baseline.");
         }
 
         private static ChapterProgressionSO CreateOrLoadChapterProgressionAsset()
@@ -539,6 +613,22 @@ namespace CampusRPG.Editor
             barrier.transform.localScale = scale;
             barrier.SetActive(false);
             return barrier;
+        }
+
+        private static GameObject CreateOrUpdateTraversalMantleObstacle(Transform parent, string name, Vector3 position, Vector3 scale)
+        {
+            GameObject obstacle = FindSceneObject(name);
+
+            if (obstacle == null)
+            {
+                obstacle = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                obstacle.name = name;
+            }
+
+            obstacle.transform.SetParent(parent);
+            obstacle.transform.position = position;
+            obstacle.transform.localScale = scale;
+            return obstacle;
         }
 
         private static EnemyBrain CreateEncounter(
@@ -782,6 +872,57 @@ namespace CampusRPG.Editor
             }
 
             AssetDatabase.CreateFolder(parent, folderName);
+        }
+
+        private static GameObject FindSceneObject(string objectName)
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            GameObject[] roots = scene.GetRootGameObjects();
+
+            for (int i = 0; i < roots.Length; i++)
+            {
+                Transform[] transforms = roots[i].GetComponentsInChildren<Transform>(true);
+
+                for (int j = 0; j < transforms.Length; j++)
+                {
+                    if (transforms[j].name == objectName)
+                    {
+                        return transforms[j].gameObject;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static T GetOrAddComponent<T>(GameObject gameObject) where T : Component
+        {
+            T component = gameObject.GetComponent<T>();
+            return component != null ? component : gameObject.AddComponent<T>();
+        }
+
+        private static Transform FindOrCreateChild(Transform parent, string name, Vector3 localPosition)
+        {
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform child = parent.GetChild(i);
+
+                if (child.name == name)
+                {
+                    child.localPosition = localPosition;
+                    child.localRotation = Quaternion.identity;
+                    child.localScale = Vector3.one;
+                    return child;
+                }
+            }
+
+            GameObject childObject = new GameObject(name);
+            Transform childTransform = childObject.transform;
+            childTransform.SetParent(parent);
+            childTransform.localPosition = localPosition;
+            childTransform.localRotation = Quaternion.identity;
+            childTransform.localScale = Vector3.one;
+            return childTransform;
         }
 
         private readonly struct EncounterEnemySpec

@@ -1,8 +1,11 @@
 using System.Reflection;
+using System.IO;
+using CampusRPG.AI;
 using CampusRPG.Camera;
 using CampusRPG.Character;
 using CampusRPG.Composition;
 using CampusRPG.Core;
+using CampusRPG.Editor;
 using CampusRPG.Input;
 using CampusRPG.Save;
 using CampusRPG.UI;
@@ -65,16 +68,22 @@ namespace CampusRPG.Tests.EditMode
             GameBootstrap bootstrap = FindRequiredComponent<GameBootstrap>("Bootstrap");
             InputReader inputReader = bootstrap.GetComponent<InputReader>();
             PlayerCharacter player = FindRequiredComponent<PlayerCharacter>("Player");
+            PlayerMovementProbe movementProbe = player.GetComponent<PlayerMovementProbe>();
             ThirdPersonCameraController cameraController = FindRequiredComponent<ThirdPersonCameraController>("Main Camera");
             LockOnTargetSelector lockOnTargetSelector = player.GetComponent<LockOnTargetSelector>();
             SceneRuntimeContext sceneContext = FindRequiredComponent<SceneRuntimeContext>("SceneRuntimeContext");
             CombatDebugHUD debugHud = FindRequiredComponent<CombatDebugHUD>("CombatDebugHUD");
+            Transform probeOrigin = movementProbe != null ? GetPrivateField<Transform>(movementProbe, "probeOrigin") : null;
 
             Assert.IsNotNull(inputReader);
             Assert.IsNotNull(lockOnTargetSelector);
+            Assert.IsNotNull(movementProbe);
+            Assert.IsNotNull(probeOrigin);
             Assert.AreSame(inputReader, bootstrap.InputReader);
             Assert.AreSame(inputReader, player.InputReader);
             Assert.AreSame(cameraController.transform, player.CameraTransform);
+            Assert.AreSame(lockOnTargetSelector, player.LockOnTargetSelector);
+            Assert.AreSame(movementProbe, player.MovementProbe);
             Assert.AreSame(player.transform, cameraController.FollowTarget);
             Assert.AreSame(inputReader, GetPrivateField<InputReader>(lockOnTargetSelector, "inputReader"));
             Assert.AreSame(cameraController, GetPrivateField<ThirdPersonCameraController>(lockOnTargetSelector, "cameraController"));
@@ -110,6 +119,45 @@ namespace CampusRPG.Tests.EditMode
             Assert.AreEqual("CP01", GetPrivateField<string>(checkpointCoordinator, "defaultCheckpointId"));
             Assert.AreSame(checkpointCoordinator, GetPrivateField<CheckpointRestoreCoordinator>(checkpointAnchor, "coordinator"));
             Assert.AreEqual("CP01", checkpointAnchor.CheckpointId);
+        }
+
+        [Test]
+        public void EnemyVisualPresentationRelays_AreWiredToProxyRoots()
+        {
+            string[] enemyNames =
+            {
+                "Enemy_Melee_A",
+                "Enemy_Mobile_A",
+                "Enemy_Ranged_A"
+            };
+
+            for (int i = 0; i < enemyNames.Length; i++)
+            {
+                EnemyBrain enemyBrain = FindRequiredComponent<EnemyBrain>(enemyNames[i]);
+                EnemyStateMachine enemyStateMachine = FindRequiredComponent<EnemyStateMachine>(enemyNames[i]);
+                EnemyVisualPresentationRelay relay = FindRequiredComponent<EnemyVisualPresentationRelay>(enemyNames[i]);
+                Transform visualRoot = GetPrivateField<Transform>(relay, "visualRoot");
+                Transform accentTransform = GetPrivateField<Transform>(relay, "accentTransform");
+
+                Assert.IsNull(enemyBrain.GetComponent<Animator>(), enemyNames[i]);
+                Assert.IsNull(enemyBrain.GetComponent<EnemyCombatAnimationRelay>(), enemyNames[i]);
+                Assert.AreSame(enemyBrain, GetPrivateField<EnemyBrain>(relay, "enemyBrain"));
+                Assert.AreSame(enemyStateMachine, GetPrivateField<EnemyStateMachine>(relay, "stateMachine"));
+                Assert.IsNotNull(visualRoot, enemyNames[i]);
+                Assert.AreEqual("CombatProxyVisualRoot", visualRoot.name, enemyNames[i]);
+                Assert.IsTrue(relay.enabled, enemyNames[i]);
+                Assert.IsNull(enemyBrain.transform.Find(CombatImportedEnemyVisualUtility.ImportedVisualRootName), enemyNames[i]);
+                Assert.IsNull(visualRoot.Find(CombatImportedEnemyVisualUtility.ImportedVisualRootName), enemyNames[i]);
+                Assert.IsNotNull(accentTransform, enemyNames[i]);
+                Assert.IsTrue(accentTransform.IsChildOf(visualRoot), enemyNames[i]);
+            }
+        }
+
+        [Test]
+        public void SceneFile_ContainsBakedNavMeshData()
+        {
+            string sceneYaml = File.ReadAllText(ScenePath);
+            StringAssert.DoesNotContain("m_NavMeshData: {fileID: 0}", sceneYaml);
         }
 
         private static TComponent FindRequiredComponent<TComponent>(string objectName) where TComponent : Component

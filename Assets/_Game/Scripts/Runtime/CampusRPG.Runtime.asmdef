@@ -3,7 +3,8 @@
   "rootNamespace": "CampusRPG",
   "references": [
     "CampusRPG.Runtime.Input",
-    "CampusRPG.Runtime.Core"
+    "CampusRPG.Runtime.Core",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

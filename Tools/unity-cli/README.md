@@ -53,6 +53,7 @@ Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.Ed
 - `unity-license-warmup` 会先正常拉起一次 Unity 编辑器，等待 `[Project] Loading completed` 和授权恢复日志出现，再尝试软退出 `Unity Hub`；适合在 batchmode 又掉回 `0 entitlement groups` / `com.unity.editor.headless was not found` 之前，先把当前用户授权会话“热起来”
 - 若 `unity-license-warmup` 本身超时，但 `Editor.log` 已明确出现 `[Project] Loading completed` 和 `Successfully updated access token`，可视为 GUI 侧预热已成功；这时继续确认 `Unity Hub` 已退出，再接 `unity-license-diagnose` / `unity-run-tests`
 - `unity-license-diagnose` 用于先探测“当前 batchmode 授权是否已恢复”，适合在正式跑 `unity-run-tests` 前先做一次快速健康检查；它会同时输出本地 `UnityEntitlementLicense.xml` / `packageAccessControlList.xml` 摘要，以及 `Unity.Licensing.Client.log` 的最近关键证据，帮助区分“本地许可证缺项”还是“运行时授权解析会话失真”
+- `unity-license-diagnose` 现在会在每次探测前清理本次 batchmode 的 probe log，避免旧的 `COMMAND LINE ARGUMENTS` / `Package Manager` 残留把新失败误判成 `STATUS: startup-ok`
 - `unity-license-diagnose` 支持 `--override-user <name>`：会在启动 Unity 时覆盖 `USER`，用于验证 Licensing channel 是否跟环境身份绑定。如果通道从 `LicenseClient-don` 切到 `LicenseClient-codex`，且客户端开始处理 sandbox-home 里的 license，就说明当前问题确实和用户级授权通道绑定有关
 - `unity-license-diagnose` 还支持 `--fresh-sandbox-home`：会创建一个全新的临时 HOME，但不复制原来的 `Library/Unity`、`UnityEntitlementLicense.xml`、PACL 或 `Unity.Licensing.Client.log`。如果这时再配合 `--override-user codex` 仍然出现 `readonly database` 和 `0 entitlement groups`，就说明问题已经不只是旧用户态文件污染
 - `unity-license-diagnose` 现在还支持 `--override-hostname <name>`、`--hostaliases-local`、`--override-localdomain <value>`、`--override-res-options <value>`：可把 `HOSTNAME`、临时 `HOSTALIASES`、`LOCALDOMAIN`、`RES_OPTIONS` 一起带进 Unity 启动环境，用来验证“给 Unity 进程补主机名 / resolver 环境变量回退是否足够”
@@ -89,7 +90,7 @@ Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.Ed
 - 若同项目已有 Unity Editor 打开，`unity-run-tests` 会自动把工程复制到临时克隆目录后再跑批处理，避免 `Library` 与项目锁冲突
 - 若你想主动隔离本次回归，可显式追加 `--use-temp-clone`；临时克隆默认创建在 `${TMPDIR:-/tmp}`，也可通过 `--clone-root <path>` 指定
 - `unity-run-tests` 现在会在每次启动前删除旧的 `/tmp/*tests.log` 与结果 XML，避免启动监控误读上一次残留的 entitlement / readonly 错误日志；如果你看到“秒失败”现象，先确认是不是旧版脚本
-- `unity-run-tests` 会在启动阶段监控日志；若 Unity 长时间没进入 `Package Manager` / `COMMAND LINE ARGUMENTS`，或已经出现 `0 entitlement groups`、`com.unity.editor.headless was not found`、`attempt to write a readonly database`，脚本会尽快中止并给出更明确的环境诊断
+- `unity-run-tests` 会在启动阶段监控日志；若 Unity 长时间没进入 `Package Manager` / `COMMAND LINE ARGUMENTS`，或已经出现 `0 entitlement groups`、`com.unity.editor.headless was not found`，脚本会尽快中止并给出更明确的环境诊断；`attempt to write a readonly database` 仍会被保留在输出里，但不会再抢在更明确的 entitlement / headless 失败前把根因盖掉
 - 当 `unity-run-tests` 明确提示 entitlement / headless / readonly database 启动阻塞时，优先执行一次 `Tools/unity-cli/unity-license-warmup`，再重跑 `unity-license-diagnose` 或 `unity-run-tests`；本项目已重复验证过“先正常拉起 GUI 编辑器热授权，再退掉 Unity Hub”的恢复路径
 - `unity-run-tests` 故意不传 `-quit`；当前 `com.unity.test-framework@1.6.0` 会在测试完成后自行退出，额外附带 `-quit` 会导致测试不启动也不产出结果文件
 - `unity-run-tests` 的 `--group-filter` 会原样转发到 Unity `-testFilter`，更适合按命名空间 / Fixture 正则过滤，而不是按单个测试方法名过滤

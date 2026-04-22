@@ -45,3 +45,10 @@ coverage/
 *.app
 *.exe
 *.unitypackage
+
+# Local analysis exports
+Exports/
+
+# Local preview generated assets
+Assets/_Game/Animations/Characters/CombatTest/LocalPreview/
+Assets/_Game/Animations/Characters/CombatTest/LocalPreview.meta

@@ -13,10 +13,11 @@ Unity 菜单：
 
 - `CampusRPG/Setup/Build Chapter01 Combined Scene`
 - `CampusRPG/Setup/Build Chapter01 Combined Scene (Force Rebuild)`
+- `CampusRPG/Setup/Repair Chapter01 Baseline And Traversal Wiring`
 
 当前构建器会自动：
 
-- 确保 `CombatTest` 占位资产与玩家 / 敌人 prefab 可用
+- 确保 `CombatTest` 占位资产与玩家 / 敌人 prefab 可用，并恢复 public-safe proxy baseline
 - 生成或更新 `SO_Chapter01_Progression.asset`
 - 重建 `Chapter01_Combined.unity`
 - 搭起检查点、区域触发、门禁、关键物品和 Encounter 骨架
@@ -25,6 +26,7 @@ Unity 菜单：
 
 - 普通入口检测到目标文件已存在时会弹确认框
 - `Force Rebuild` 会直接覆盖当前章节骨架输出
+- `Repair Chapter01 Baseline And Traversal Wiring` 会先把 `CombatTest` prefab 恢复到 proxy baseline，再同步 `Chapter01` 的 Resume / mantle 接线
 - 如果已经对 `Chapter01_Combined.unity` 做了手工布置，请先备份
 
 ## 2. 章节流转

@@ -168,22 +168,7 @@ namespace CampusRPG.Character
 
         private static float ResolveRecoverySeconds(AttackDefinitionSO attackDefinition)
         {
-            if (attackDefinition == null)
-            {
-                return 0f;
-            }
-
-            float configuredDuration = attackDefinition.AnimationDurationSeconds;
-
-            if (configuredDuration <= 0f)
-            {
-                return attackDefinition.RecoverySeconds;
-            }
-
-            float animationRecoverySeconds = Mathf.Max(
-                0f,
-                configuredDuration - attackDefinition.StartupSeconds - attackDefinition.ActiveSeconds);
-            return Mathf.Max(attackDefinition.RecoverySeconds, animationRecoverySeconds);
+            return PlayerCombatRuntimeUtility.ResolveAttackRecoverySeconds(attackDefinition);
         }
     }
 }

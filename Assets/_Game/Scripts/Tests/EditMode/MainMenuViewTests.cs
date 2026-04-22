@@ -116,6 +116,20 @@ namespace CampusRPG.Tests.EditMode
             Assert.AreEqual("Campus Chapter 01", GetPrivateField<string>(view, "menuTitle"));
         }
 
+        [Test]
+        public void MainMenuView_Update_DoesNotThrow_WhenInputSystemIsActive()
+        {
+            GameObject cameraObject = GameObject.Find("Main Camera");
+            Assert.IsNotNull(cameraObject);
+
+            MainMenuView view = cameraObject.GetComponent<MainMenuView>();
+            Assert.IsNotNull(view);
+
+            MethodInfo updateMethod = typeof(MainMenuView).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(updateMethod);
+            Assert.DoesNotThrow(() => updateMethod.Invoke(view, null));
+        }
+
         private static TValue GetPrivateField<TValue>(object instance, string fieldName)
         {
             FieldInfo field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);

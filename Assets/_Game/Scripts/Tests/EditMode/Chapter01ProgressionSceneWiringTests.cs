@@ -1,10 +1,17 @@
 using System.Reflection;
+using System.Linq;
 using CampusRPG.AI;
+using CampusRPG.Camera;
+using CampusRPG.Character;
+using CampusRPG.Composition;
+using CampusRPG.Core;
+using CampusRPG.Editor;
 using CampusRPG.Input;
 using CampusRPG.Interaction;
 using CampusRPG.Save;
 using CampusRPG.UI;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -14,6 +21,13 @@ namespace CampusRPG.Tests.EditMode
     public sealed class Chapter01ProgressionSceneWiringTests
     {
         private const string ScenePath = "Assets/_Game/Scenes/Chapter01_Combined.unity";
+        private static readonly string[] ImportedSourceRoots =
+        {
+            "Assets/Kevin Iglesias/",
+            "Assets/DoubleL/",
+            "Assets/ithappy/",
+            "Assets/JC_LP_MedievalCharacters_LITE/"
+        };
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -118,6 +132,70 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
+        public void Chapter01_PlayerTraversalHooks_AreWiredForLockOnAndMantle()
+        {
+            AssertSceneOpen();
+
+            GameBootstrap bootstrap = FindRequiredComponent<GameBootstrap>("Bootstrap");
+            InputReader inputReader = bootstrap.GetComponent<InputReader>();
+            PlayerCharacter player = FindRequiredComponent<PlayerCharacter>("Player");
+            PlayerMovementProbe movementProbe = FindRequiredComponent<PlayerMovementProbe>("Player");
+            ThirdPersonCameraController cameraController = FindRequiredComponent<ThirdPersonCameraController>("Main Camera");
+            LockOnTargetSelector lockOnTargetSelector = player.GetComponent<LockOnTargetSelector>();
+            SceneRuntimeContext sceneContext = FindRequiredComponent<SceneRuntimeContext>("SceneRuntimeContext");
+            Transform probeOrigin = GetPrivateField<Transform>(movementProbe, "probeOrigin");
+
+            Assert.IsNotNull(inputReader);
+            Assert.IsNotNull(lockOnTargetSelector);
+            Assert.IsNotNull(player.BaseStats);
+            Assert.AreSame(inputReader, player.InputReader);
+            Assert.AreSame(cameraController.transform, player.CameraTransform);
+            Assert.AreSame(lockOnTargetSelector, player.LockOnTargetSelector);
+            Assert.AreSame(movementProbe, player.MovementProbe);
+            Assert.IsNotNull(probeOrigin);
+            Assert.AreSame(inputReader, GetPrivateField<InputReader>(lockOnTargetSelector, "inputReader"));
+            Assert.AreSame(cameraController, GetPrivateField<ThirdPersonCameraController>(lockOnTargetSelector, "cameraController"));
+            Assert.AreSame(cameraController.transform, GetPrivateField<Transform>(lockOnTargetSelector, "cameraTransform"));
+            Assert.AreSame(player, sceneContext.PlayerCharacter);
+            Assert.AreSame(cameraController, sceneContext.CameraController);
+            Assert.AreSame(lockOnTargetSelector, sceneContext.LockOnTargetSelector);
+        }
+
+        [Test]
+        public void Chapter01_CombatActors_UsePublicProxyVisualBaseline()
+        {
+            AssertSceneOpen();
+
+            PlayerCharacter player = FindRequiredComponent<PlayerCharacter>("Player");
+            Animator animator = player.GetComponent<Animator>();
+            PlayerCombatAnimationRelay relay = player.GetComponent<PlayerCombatAnimationRelay>();
+            EnemyBrain[] enemies = Object.FindObjectsByType<EnemyBrain>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+            Assert.IsNotNull(animator);
+            Assert.IsNotNull(relay);
+            Assert.IsNull(animator.avatar);
+            Assert.IsNull(player.transform.Find("ImportedVisualRoot"));
+            Assert.IsNotNull(player.transform.Find("CombatProxyVisualRoot"));
+            Assert.IsNull(GetPrivateField<Transform>(relay, "proxyWeaponGrip"));
+            Assert.That(enemies, Is.Not.Empty);
+
+            for (int i = 0; i < enemies.Length; i++)
+            {
+                EnemyBrain enemy = enemies[i];
+                EnemyVisualPresentationRelay enemyRelay = enemy.GetComponent<EnemyVisualPresentationRelay>();
+                Transform visualRoot = enemy.transform.Find("CombatProxyVisualRoot");
+
+                Assert.IsNotNull(enemyRelay, enemy.name);
+                Assert.IsNull(enemy.GetComponent<Animator>(), enemy.name);
+                Assert.IsNull(enemy.GetComponent<EnemyCombatAnimationRelay>(), enemy.name);
+                Assert.IsNotNull(visualRoot, enemy.name);
+                Assert.IsNull(enemy.transform.Find(CombatImportedEnemyVisualUtility.ImportedVisualRootName), enemy.name);
+                Assert.IsNull(visualRoot.Find(CombatImportedEnemyVisualUtility.ImportedVisualRootName), enemy.name);
+                Assert.IsNotNull(EnemyVisualPresentationRelay.FindDefaultAccentTransform(visualRoot), enemy.name);
+            }
+        }
+
+        [Test]
         public void Chapter01_CheckpointActivationView_IsBoundToChapterFlow()
         {
             AssertSceneOpen();
@@ -206,6 +284,57 @@ namespace CampusRPG.Tests.EditMode
             Assert.AreEqual(EnemyArchetypeType.Ranged, rangedEnemy.Archetype.ArchetypeType);
         }
 
+        [Test]
+        public void Chapter01_InteriorTraversalObstacle_IsMantleableFromMainRoute()
+        {
+            AssertSceneOpen();
+
+            PlayerCharacter player = FindRequiredComponent<PlayerCharacter>("Player");
+            PlayerMovementProbe movementProbe = FindRequiredComponent<PlayerMovementProbe>("Player");
+            GameObject obstacle = FindSceneObject("TraversalMantle_InteriorApproach");
+            BoxCollider collider = obstacle != null ? obstacle.GetComponent<BoxCollider>() : null;
+
+            Assert.IsNotNull(obstacle);
+            Assert.IsNotNull(collider);
+            Assert.IsNotNull(player.BaseStats);
+
+            Bounds bounds = collider.bounds;
+            Assert.GreaterOrEqual(bounds.size.y, player.BaseStats.MantleMinHeight);
+            Assert.LessOrEqual(bounds.size.y, player.BaseStats.MantleMaxHeight);
+
+            Vector3 originalPosition = player.transform.position;
+            Quaternion originalRotation = player.transform.rotation;
+
+            try
+            {
+                Vector3 startPosition = new Vector3(bounds.center.x, originalPosition.y, bounds.min.z - 0.55f);
+                player.transform.SetPositionAndRotation(startPosition, Quaternion.identity);
+                Physics.SyncTransforms();
+
+                bool foundTarget = movementProbe.TryFindMantleTarget(player.BaseStats, player.transform, out Vector3 mantleTarget);
+
+                Assert.IsTrue(foundTarget);
+                Assert.Greater(mantleTarget.y, originalPosition.y + 0.45f);
+                Assert.Greater(mantleTarget.z, bounds.min.z);
+            }
+            finally
+            {
+                player.transform.SetPositionAndRotation(originalPosition, originalRotation);
+                Physics.SyncTransforms();
+            }
+        }
+
+        [Test]
+        public void Chapter01_BaselineSceneDependencies_DoNotDependOnImportedSourceDirectories()
+        {
+            string[] dependencies = AssetDatabase.GetDependencies(ScenePath, true);
+            string[] importedDependencies = dependencies.Where(IsImportedSourcePath).ToArray();
+
+            CollectionAssert.IsEmpty(
+                importedDependencies,
+                importedDependencies.Length == 0 ? string.Empty : string.Join("\n", importedDependencies));
+        }
+
         private static void AssertSceneOpen()
         {
             Assert.AreEqual(ScenePath, SceneManager.GetActiveScene().path);
@@ -247,6 +376,11 @@ namespace CampusRPG.Tests.EditMode
             FieldInfo field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(field, fieldName);
             return (TField)field.GetValue(instance);
+        }
+
+        private static bool IsImportedSourcePath(string path)
+        {
+            return ImportedSourceRoots.Any(root => path.StartsWith(root));
         }
     }
 }

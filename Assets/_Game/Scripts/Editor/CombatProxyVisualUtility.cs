@@ -15,6 +15,7 @@ namespace CampusRPG.Editor
     {
         private const string MaterialsFolder = "Assets/_Game/Materials";
         private const string ProxyRootName = "CombatProxyVisualRoot";
+        private const string WeaponGripName = "WeaponGrip";
 
         public static bool Apply(GameObject actor, CombatProxyVisualKind kind)
         {
@@ -25,16 +26,33 @@ namespace CampusRPG.Editor
 
             bool changed = RemoveRootPrimitiveRenderers(actor);
             Transform proxyRoot = actor.transform.Find(ProxyRootName);
+            bool hasExternalVisuals = HasExternalVisuals(actor.transform, proxyRoot);
 
-            if (HasExternalVisuals(actor.transform, proxyRoot))
+            if (hasExternalVisuals)
             {
+                if (kind != CombatProxyVisualKind.Player)
+                {
+                    if (proxyRoot != null)
+                    {
+                        Object.DestroyImmediate(proxyRoot.gameObject);
+                        changed = true;
+                    }
+
+                    return changed;
+                }
+
                 if (proxyRoot != null)
                 {
                     Object.DestroyImmediate(proxyRoot.gameObject);
                     changed = true;
                 }
 
-                return changed;
+                EnsureFolder(MaterialsFolder);
+                Material overlayPrimaryMaterial = CreateOrLoadMaterial(GetPrimaryMaterialPath(kind), GetPrimaryColor(kind));
+                Material overlayAccentMaterial = CreateOrLoadMaterial(GetAccentMaterialPath(kind), GetAccentColor(kind));
+                Transform overlayRoot = CreateTransformChild(actor.transform, ProxyRootName, Vector3.zero, Quaternion.identity, Vector3.one);
+                BuildImportedPlayerOverlay(overlayRoot, overlayPrimaryMaterial, overlayAccentMaterial);
+                return true;
             }
 
             if (proxyRoot != null)
@@ -52,6 +70,16 @@ namespace CampusRPG.Editor
             changed = true;
 
             return changed;
+        }
+
+        private static void BuildImportedPlayerOverlay(Transform root, Material primaryMaterial, Material accentMaterial)
+        {
+            CreatePrimitive(root, "ForwardMarker", PrimitiveType.Cube, new Vector3(0f, 0.94f, 0.62f), Quaternion.identity, new Vector3(0.14f, 0.18f, 0.56f), accentMaterial);
+            Transform weaponGrip = CreateTransformChild(root, WeaponGripName, new Vector3(0.3f, 1f, 0.38f), Quaternion.Euler(2f, 16f, 72f), Vector3.one);
+            CreatePrimitive(weaponGrip, "Handle", PrimitiveType.Cube, new Vector3(-0.18f, 0f, 0f), Quaternion.identity, new Vector3(0.32f, 0.06f, 0.06f), accentMaterial);
+            CreatePrimitive(weaponGrip, "Pommel", PrimitiveType.Sphere, new Vector3(-0.34f, 0f, 0f), Quaternion.identity, new Vector3(0.1f, 0.1f, 0.1f), accentMaterial);
+            CreatePrimitive(weaponGrip, "Guard", PrimitiveType.Cube, new Vector3(0.03f, 0f, 0f), Quaternion.identity, new Vector3(0.1f, 0.18f, 0.22f), accentMaterial);
+            CreatePrimitive(weaponGrip, "Blade", PrimitiveType.Cube, new Vector3(0.64f, 0f, 0f), Quaternion.identity, new Vector3(1.28f, 0.1f, 0.1f), primaryMaterial);
         }
 
         private static bool RemoveRootPrimitiveRenderers(GameObject actor)

@@ -22,7 +22,8 @@ namespace CampusRPG.Character
         private Vector2 animationMoveAxes;
         private float verticalVelocity;
         private float dodgeRemainingSeconds;
-        private float dodgePlanarSpeed;
+        private float dodgeDurationSeconds;
+        private float dodgeDistance;
         private Vector3 dodgeDirection;
         private bool faceLockTargetDuringDodge;
         private float mantleRemainingSeconds;
@@ -77,7 +78,8 @@ namespace CampusRPG.Character
             animationMoveAxes = Vector2.zero;
             verticalVelocity = 0f;
             dodgeRemainingSeconds = 0f;
-            dodgePlanarSpeed = 0f;
+            dodgeDurationSeconds = 0f;
+            dodgeDistance = 0f;
             dodgeDirection = Vector3.zero;
             faceLockTargetDuringDodge = false;
             FinishMantleInternal();
@@ -156,7 +158,8 @@ namespace CampusRPG.Character
 
             float resolvedDuration = Mathf.Max(0.01f, durationSeconds);
             dodgeDirection = planarDirection.normalized;
-            dodgePlanarSpeed = Mathf.Max(0f, distance) / resolvedDuration;
+            dodgeDistance = Mathf.Max(0f, distance);
+            dodgeDurationSeconds = resolvedDuration;
             dodgeRemainingSeconds = resolvedDuration;
             faceLockTargetDuringDodge = keepFacingLockOnTarget;
             planarVelocity = Vector3.zero;
@@ -276,7 +279,11 @@ namespace CampusRPG.Character
                 return false;
             }
 
+            float previousRemainingSeconds = dodgeRemainingSeconds;
+            float previousProgress = ResolveDodgeTranslationProgress(previousRemainingSeconds, dodgeDurationSeconds);
             dodgeRemainingSeconds = Mathf.Max(0f, dodgeRemainingSeconds - deltaTime);
+            float currentProgress = ResolveDodgeTranslationProgress(dodgeRemainingSeconds, dodgeDurationSeconds);
+            float planarDistanceStep = dodgeDistance * Mathf.Max(0f, currentProgress - previousProgress);
 
             if (characterController.isGrounded && verticalVelocity < 0f)
             {
@@ -284,7 +291,9 @@ namespace CampusRPG.Character
             }
 
             verticalVelocity += gravity * deltaTime;
-            planarVelocity = dodgeDirection * dodgePlanarSpeed;
+            planarVelocity = deltaTime > Mathf.Epsilon
+                ? dodgeDirection * (planarDistanceStep / deltaTime)
+                : Vector3.zero;
 
             if (faceLockTargetDuringDodge && lockOnTarget != null)
             {
@@ -297,9 +306,9 @@ namespace CampusRPG.Character
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, rotationSpeed * deltaTime);
             }
 
-            Vector3 velocity = planarVelocity;
-            velocity.y = verticalVelocity;
-            characterController.Move(velocity * deltaTime);
+            Vector3 displacement = dodgeDirection * planarDistanceStep;
+            displacement.y = verticalVelocity * deltaTime;
+            characterController.Move(displacement);
 
             if (dodgeRemainingSeconds <= 0f)
             {
@@ -307,6 +316,17 @@ namespace CampusRPG.Character
             }
 
             return true;
+        }
+
+        private static float ResolveDodgeTranslationProgress(float remainingSeconds, float durationSeconds)
+        {
+            if (durationSeconds <= Mathf.Epsilon)
+            {
+                return 1f;
+            }
+
+            float normalizedTime = 1f - Mathf.Clamp01(remainingSeconds / durationSeconds);
+            return Mathf.SmoothStep(0f, 1f, normalizedTime);
         }
 
         private bool UpdateMantle(float deltaTime)

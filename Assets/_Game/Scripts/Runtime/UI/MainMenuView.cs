@@ -1,5 +1,6 @@
 using CampusRPG.Save;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 namespace CampusRPG.UI
@@ -249,19 +250,26 @@ namespace CampusRPG.UI
 
         private void Update()
         {
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
+            Keyboard keyboard = Keyboard.current;
+
+            if (keyboard == null)
+            {
+                return;
+            }
+
+            if (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)
             {
                 ExecutePrimaryAction();
                 return;
             }
 
-            if (currentPlan.ShowSecondaryAction && UnityEngine.Input.GetKeyDown(KeyCode.R))
+            if (currentPlan.ShowSecondaryAction && keyboard.rKey.wasPressedThisFrame)
             {
                 ExecuteSecondaryAction();
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Escape))
+            if (keyboard.escapeKey.wasPressedThisFrame)
             {
                 QuitApplication();
             }

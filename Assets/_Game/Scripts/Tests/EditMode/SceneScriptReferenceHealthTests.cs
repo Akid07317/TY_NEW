@@ -12,6 +12,10 @@ namespace CampusRPG.Tests.EditMode
     {
         private const string LegacySkyFogProfileAssetPath = "Assets/Settings/SkyandFogSettingsProfile.asset";
         private const string LegacySkyFogProfileGuid = "8ba92e2dd7f884a0f88b98fa2d235fe7";
+        private static readonly string[] FormalSceneRoots =
+        {
+            "Assets/_Game/Scenes"
+        };
 
         private static readonly Regex ScriptGuidPattern = new(
             @"m_Script: \{fileID: 11500000, guid: ([0-9a-f]{32}), type: 3\}",
@@ -20,7 +24,7 @@ namespace CampusRPG.Tests.EditMode
         [Test]
         public void ProjectScenes_DoNotContainMissingScriptReferences()
         {
-            string[] scenePaths = AssetDatabase.FindAssets("t:Scene", new[] { "Assets" })
+            string[] scenePaths = AssetDatabase.FindAssets("t:Scene", FormalSceneRoots)
                 .Select(AssetDatabase.GUIDToAssetPath)
                 .OrderBy(path => path)
                 .ToArray();

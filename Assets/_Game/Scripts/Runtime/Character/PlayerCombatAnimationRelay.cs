@@ -25,11 +25,33 @@ namespace CampusRPG.Character
         [SerializeField] private PlayerStateMachine stateMachine;
         [SerializeField] private PlayerMotor motor;
         [SerializeField] private Animator animator;
+        [SerializeField] private Transform proxyWeaponGrip;
+        [SerializeField] private Transform importedWeaponAnchor;
         [SerializeField] private int baseLayerIndex;
         [SerializeField] private float crossFadeSeconds = 0.05f;
         [SerializeField] private float locomotionDampSeconds = 0.08f;
         [SerializeField] private float dodgeAnimationDurationSeconds = 0.4f;
         [SerializeField] private float hitAnimationDurationSeconds = 0.35f;
+        [SerializeField] private float proxyWeaponFollowSmoothing = 24f;
+        [SerializeField] private float immediateProxyWeaponFollowSeconds = 0.12f;
+        [SerializeField] private float snapProxyWeaponFollowAngleDegrees = 12f;
+        [SerializeField] private float snapProxyWeaponFollowDistance = 0.025f;
+
+        private static readonly string[] ImportedWeaponAnchorCandidateNames =
+        {
+            "RightHand",
+            "Hand_R",
+            "R_Hand",
+            "mixamorig:RightHand",
+            "Bip001 R Hand"
+        };
+
+        private static readonly Vector3 ImportedWeaponAnchorLocalPosition = new Vector3(0.02f, -0.02f, 0.02f);
+        private static readonly Quaternion ImportedWeaponAnchorLocalRotation = Quaternion.Euler(8f, 18f, 92f);
+        private Vector3 defaultProxyWeaponGripLocalScale = Vector3.one;
+        private bool proxyWeaponDefaultsCaptured;
+        private bool proxyWeaponSnappedToAnchor;
+        private float immediateProxyWeaponFollowTimer;
 
         public float DodgeAnimationDurationSeconds => Mathf.Max(0.01f, dodgeAnimationDurationSeconds);
 
@@ -61,6 +83,9 @@ namespace CampusRPG.Character
             {
                 animator = GetComponent<Animator>();
             }
+
+            EnsureProxyWeaponReferences();
+            CaptureProxyWeaponDefaults();
         }
 
         private void Update()
@@ -91,6 +116,46 @@ namespace CampusRPG.Character
             animator.SetFloat(VerticalSpeedHash, motor != null ? motor.VerticalVelocity : 0f);
         }
 
+        private void LateUpdate()
+        {
+            if (!EnsureProxyWeaponReferences())
+            {
+                return;
+            }
+
+            if (!proxyWeaponDefaultsCaptured)
+            {
+                CaptureProxyWeaponDefaults();
+            }
+
+            immediateProxyWeaponFollowTimer = PlayerCombatRuntimeUtility.TickWindow(immediateProxyWeaponFollowTimer, Time.deltaTime);
+            float followT = 1f - Mathf.Exp(-Mathf.Max(0f, proxyWeaponFollowSmoothing) * Mathf.Max(Time.deltaTime, 0.0001f));
+            Vector3 targetPosition = importedWeaponAnchor.TransformPoint(ImportedWeaponAnchorLocalPosition);
+            Quaternion targetRotation = importedWeaponAnchor.rotation * ImportedWeaponAnchorLocalRotation;
+            bool shouldSnapToAnchor = PlayerCombatRuntimeUtility.ShouldSnapProxyWeaponFollow(
+                proxyWeaponSnappedToAnchor,
+                RequiresImmediateProxyWeaponFollow(stateMachine != null ? stateMachine.CurrentState : null),
+                immediateProxyWeaponFollowTimer,
+                proxyWeaponGrip != null ? Quaternion.Angle(proxyWeaponGrip.rotation, targetRotation) : 0f,
+                proxyWeaponGrip != null ? Vector3.Distance(proxyWeaponGrip.position, targetPosition) : 0f,
+                snapProxyWeaponFollowAngleDegrees,
+                snapProxyWeaponFollowDistance);
+
+            if (shouldSnapToAnchor)
+            {
+                proxyWeaponGrip.position = targetPosition;
+                proxyWeaponGrip.rotation = targetRotation;
+                proxyWeaponSnappedToAnchor = true;
+            }
+            else
+            {
+                proxyWeaponGrip.position = Vector3.Lerp(proxyWeaponGrip.position, targetPosition, followT);
+                proxyWeaponGrip.rotation = Quaternion.Slerp(proxyWeaponGrip.rotation, targetRotation, followT);
+            }
+
+            proxyWeaponGrip.localScale = defaultProxyWeaponGripLocalScale;
+        }
+
         public void PlayAttack(AttackDefinitionSO attackDefinition)
         {
             if (animator == null || attackDefinition == null || string.IsNullOrWhiteSpace(attackDefinition.AnimationStateName))
@@ -118,6 +183,13 @@ namespace CampusRPG.Character
                 return;
             }
 
+            if (RequiresImmediateProxyWeaponFollow(previousState) || RequiresImmediateProxyWeaponFollow(currentState))
+            {
+                immediateProxyWeaponFollowTimer = PlayerCombatRuntimeUtility.OpenWindow(
+                    immediateProxyWeaponFollowTimer,
+                    immediateProxyWeaponFollowSeconds);
+            }
+
             if (currentState is PlayerDodgeState)
             {
                 CrossFadeState(DodgeStateName);
@@ -142,7 +214,8 @@ namespace CampusRPG.Character
                 return;
             }
 
-            bool isRecoveringFromAction = previousState is PlayerDodgeState
+            bool isRecoveringFromAction = previousState is PlayerAttackState
+                || previousState is PlayerDodgeState
                 || previousState is PlayerMantleState
                 || previousState is PlayerHitState
                 || previousState is PlayerSkillState;
@@ -167,6 +240,104 @@ namespace CampusRPG.Character
             }
 
             animator.CrossFadeInFixedTime(stateName, Mathf.Max(0f, crossFadeSeconds), baseLayerIndex);
+        }
+
+        private static bool RequiresImmediateProxyWeaponFollow(PlayerState state)
+        {
+            return state is PlayerAttackState
+                || state is PlayerSkillState
+                || state is PlayerDodgeState
+                || state is PlayerHitState
+                || state is PlayerMantleState
+                || state is PlayerBlockState;
+        }
+
+        public static Transform FindDefaultProxyWeaponGrip(Transform actorRoot)
+        {
+            return actorRoot != null ? actorRoot.Find("CombatProxyVisualRoot/WeaponGrip") : null;
+        }
+
+        public static Transform FindDefaultImportedWeaponAnchor(Transform actorRoot)
+        {
+            Transform importedRoot = actorRoot != null ? actorRoot.Find("ImportedVisualRoot") : null;
+
+            if (importedRoot == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < ImportedWeaponAnchorCandidateNames.Length; i++)
+            {
+                Transform candidate = FindDeepChild(importedRoot, ImportedWeaponAnchorCandidateNames[i]);
+
+                if (candidate != null)
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        private bool EnsureProxyWeaponReferences()
+        {
+            if (proxyWeaponGrip == null)
+            {
+                proxyWeaponGrip = FindDefaultProxyWeaponGrip(transform);
+            }
+
+            if (importedWeaponAnchor == null)
+            {
+                if (animator != null && animator.avatar != null && animator.isHuman)
+                {
+                    importedWeaponAnchor = animator.GetBoneTransform(HumanBodyBones.RightHand);
+                }
+
+                if (importedWeaponAnchor == null)
+                {
+                    importedWeaponAnchor = FindDefaultImportedWeaponAnchor(transform);
+                }
+            }
+
+            return proxyWeaponGrip != null && importedWeaponAnchor != null;
+        }
+
+        private void CaptureProxyWeaponDefaults()
+        {
+            if (proxyWeaponGrip == null)
+            {
+                proxyWeaponDefaultsCaptured = false;
+                proxyWeaponSnappedToAnchor = false;
+                return;
+            }
+
+            defaultProxyWeaponGripLocalScale = proxyWeaponGrip.localScale;
+            proxyWeaponDefaultsCaptured = true;
+        }
+
+        private static Transform FindDeepChild(Transform root, string targetName)
+        {
+            if (root == null || string.IsNullOrWhiteSpace(targetName))
+            {
+                return null;
+            }
+
+            if (root.name == targetName)
+            {
+                return root;
+            }
+
+            for (int i = 0; i < root.childCount; i++)
+            {
+                Transform result = FindDeepChild(root.GetChild(i), targetName);
+
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
         }
     }
 }
