@@ -33,6 +33,20 @@ namespace CampusRPG.Editor
         private const string EnhancedDodgePath = "Assets/_Game/Data/Combat/SO_Attack_DodgeFollowUp_Enhanced.asset";
         private const string CounterPath = "Assets/_Game/Data/Combat/SO_Attack_Counter.asset";
         private const string EnhancedCounterPath = "Assets/_Game/Data/Combat/SO_Attack_Counter_Enhanced.asset";
+        private const string SidewindCutAttackPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_SidewindCut.asset";
+        private const string CrossStepAttackPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_CrossStep.asset";
+        private const string RisingCleaveAttackPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_RisingCleave.asset";
+        private const string IronGateBreakAttackPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_IronGateBreak.asset";
+        private const string FallingStarAttackPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_FallingStar.asset";
+        private const string MoonSeverAttackPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_MoonSever.asset";
+        private const string GatekeeperSkyHookAttackPath = "Assets/_Game/Data/Enemies/SO_Attack_Enemy_Gatekeeper_SkyHook.asset";
+        private const string GatekeeperRollCatcherAttackPath = "Assets/_Game/Data/Enemies/SO_Attack_Enemy_Gatekeeper_RollCatcher.asset";
+        private const string SidewindCutPath = "Assets/_Game/Data/Combat/SO_SwordArt_SidewindCut.asset";
+        private const string CrossStepPath = "Assets/_Game/Data/Combat/SO_SwordArt_CrossStep.asset";
+        private const string RisingCleavePath = "Assets/_Game/Data/Combat/SO_SwordArt_RisingCleave.asset";
+        private const string IronGateBreakPath = "Assets/_Game/Data/Combat/SO_SwordArt_IronGateBreak.asset";
+        private const string FallingStarPath = "Assets/_Game/Data/Combat/SO_SwordArt_FallingStar.asset";
+        private const string MoonSeverPath = "Assets/_Game/Data/Combat/SO_SwordArt_MoonSever.asset";
         private const string PlayerAnimationRootFolder = "Assets/_Game/Animations/Characters/CombatTest";
         private const string PlayerAnimatorControllerPath = PlayerAnimationRootFolder + "/AC_Player_CombatTest.controller";
         private const string PlayerIdleClipPath = PlayerAnimationRootFolder + "/AN_Player_Idle_CombatTest.anim";
@@ -51,15 +65,22 @@ namespace CampusRPG.Editor
         private const string PlayerAirborneClipPath = PlayerAnimationRootFolder + "/AN_Player_Airborne_CombatTest.anim";
         private const string PlayerBlockClipPath = PlayerAnimationRootFolder + "/AN_Player_Block_CombatTest.anim";
         private const string PlayerDodgeClipPath = PlayerAnimationRootFolder + "/AN_Player_Dodge_CombatTest.anim";
+        private const string PlayerCombatRollClipPath = PlayerAnimationRootFolder + "/AN_Player_CombatRoll_CombatTest.anim";
+        private const string PlayerAirDodgeClipPath = PlayerAnimationRootFolder + "/AN_Player_AirDodge_CombatTest.anim";
         private const string PlayerHitClipPath = PlayerAnimationRootFolder + "/AN_Player_Hit_CombatTest.anim";
+        private const string PlayerGuardBreakClipPath = PlayerAnimationRootFolder + "/AN_Player_GuardBreak_CombatTest.anim";
         private const string PlayerDeathClipPath = PlayerAnimationRootFolder + "/AN_Player_Death_CombatTest.anim";
         private const string PlayerLocomotionBlendTreeName = "BT_Player_Locomotion_CombatTest";
         private const string PlayerLocomotionStateName = "Locomotion";
         private const string PlayerBlockStateName = "Block";
         private const string PlayerAirborneStateName = "Airborne";
         private const string PlayerDodgeStateName = "Dodge";
+        private const string PlayerCombatRollStateName = "CombatRoll";
+        private const string PlayerAirDodgeStateName = "AirDodge";
         private const string PlayerHitStateName = "Hit";
+        private const string PlayerGuardBreakStateName = "GuardBreak";
         private const string PlayerDeathStateName = "Death";
+        private const float PlayerGuardBreakStateSpeed = 1f;
         private const string GroundSpeedParameterName = "GroundSpeed";
         private const string MoveXParameterName = "MoveX";
         private const string MoveYParameterName = "MoveY";
@@ -76,6 +97,10 @@ namespace CampusRPG.Editor
         private const string PlayerProxyWeaponGripPath = PlayerProxyRootPath + "/WeaponGrip";
         private const string PlayerProxyWeaponGripGuardPath = PlayerProxyWeaponGripPath + "/Guard";
         private const string PlayerProxyWeaponGripBladePath = PlayerProxyWeaponGripPath + "/Blade";
+        private const float PlayerHitClipFallbackDuration = 0.24f;
+        private const float PlayerHitClipImportedDuration = 0.26f;
+        private const float PlayerGuardBreakClipFallbackDuration = 0.42f;
+        private const float PlayerGuardBreakClipImportedDuration = 0.48f;
         private static bool allowImportedPlayerAnimationPreviewBuild;
 
         [MenuItem(RootMenu)]
@@ -145,8 +170,9 @@ namespace CampusRPG.Editor
                 0.10f,
                 0.08f,
                 0.22f,
-                1.6f,
-                0.45f,
+                1.75f,
+                0.52f,
+                movementSpeedScale: 0.78f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO light02 = CreateAttackAsset(
                 Light02Path,
@@ -156,8 +182,9 @@ namespace CampusRPG.Editor
                 0.10f,
                 0.08f,
                 0.24f,
-                1.7f,
-                0.5f,
+                1.9f,
+                0.58f,
+                movementSpeedScale: 0.76f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO light03 = CreateAttackAsset(
                 Light03Path,
@@ -167,8 +194,9 @@ namespace CampusRPG.Editor
                 0.14f,
                 0.10f,
                 0.30f,
-                1.9f,
-                0.55f,
+                2.05f,
+                0.62f,
+                movementSpeedScale: 0.72f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO heavy = CreateAttackAsset(
                 HeavyPath,
@@ -178,8 +206,10 @@ namespace CampusRPG.Editor
                 0.20f,
                 0.12f,
                 0.42f,
-                2.1f,
-                0.65f,
+                2.3f,
+                0.72f,
+                movementSpeedScale: 0.55f,
+                hitStopSeconds: 0.08f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO dodgeFollowUp = CreateAttackAsset(
                 DodgeFollowUpPath,
@@ -189,8 +219,9 @@ namespace CampusRPG.Editor
                 0.08f,
                 0.10f,
                 0.25f,
-                1.8f,
-                0.55f,
+                2.0f,
+                0.62f,
+                movementSpeedScale: 0.82f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO counter = CreateAttackAsset(
                 CounterPath,
@@ -200,8 +231,9 @@ namespace CampusRPG.Editor
                 0.10f,
                 0.10f,
                 0.28f,
-                1.9f,
-                0.6f,
+                2.05f,
+                0.66f,
+                movementSpeedScale: 0.7f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO empoweredCounter = CreateAttackAsset(
                 EnhancedCounterPath,
@@ -211,8 +243,9 @@ namespace CampusRPG.Editor
                 0.12f,
                 0.12f,
                 0.32f,
-                2.1f,
-                0.7f,
+                2.3f,
+                0.78f,
+                movementSpeedScale: 0.65f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
             AttackDefinitionSO empoweredDodge = CreateAttackAsset(
                 EnhancedDodgePath,
@@ -222,9 +255,16 @@ namespace CampusRPG.Editor
                 0.08f,
                 0.12f,
                 0.28f,
-                2.0f,
-                0.65f,
+                2.2f,
+                0.72f,
+                movementSpeedScale: 0.82f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+            AttackDefinitionSO sidewindCutAttack = CreateSidewindCutAttackAsset();
+            AttackDefinitionSO crossStepAttack = CreateCrossStepAttackAsset();
+            AttackDefinitionSO risingCleaveAttack = CreateRisingCleaveAttackAsset();
+            AttackDefinitionSO ironGateBreakAttack = CreateIronGateBreakAttackAsset();
+            AttackDefinitionSO fallingStarAttack = CreateFallingStarAttackAsset();
+            AttackDefinitionSO moonSeverAttack = CreateMoonSeverAttackAsset();
             AttackDefinitionSO enemyMelee = CreateAttackAsset(
                 "Assets/_Game/Data/Enemies/SO_Attack_Enemy_Melee.asset",
                 "Enemy_Melee",
@@ -233,8 +273,10 @@ namespace CampusRPG.Editor
                 0.18f,
                 0.10f,
                 0.35f,
-                1.8f,
-                0.5f);
+                1.55f,
+                0.42f,
+                0.35f,
+                blockStunSeconds: 0.06f);
             AttackDefinitionSO enemyMobile = CreateAttackAsset(
                 "Assets/_Game/Data/Enemies/SO_Attack_Enemy_Mobile.asset",
                 "Enemy_Mobile",
@@ -243,9 +285,9 @@ namespace CampusRPG.Editor
                 0.12f,
                 0.08f,
                 0.28f,
-                1.7f,
-                0.45f,
-                0.35f);
+                1.45f,
+                0.36f,
+                0.25f);
             AttackDefinitionSO enemyRanged = CreateAttackAsset(
                 "Assets/_Game/Data/Enemies/SO_Attack_Enemy_Ranged.asset",
                 "Enemy_Ranged",
@@ -272,7 +314,9 @@ namespace CampusRPG.Editor
                 0.12f,
                 0.42f,
                 2.3f,
-                0.7f);
+                0.7f,
+                breaksGuard: true,
+                guardBreakHitStunSeconds: 0.16f);
             AttackDefinitionSO enemyBossReach = CreateAttackAsset(
                 "Assets/_Game/Data/Enemies/SO_Attack_Enemy_Gatekeeper_Reach.asset",
                 "Enemy_Gatekeeper_Reach",
@@ -282,7 +326,8 @@ namespace CampusRPG.Editor
                 0.14f,
                 0.55f,
                 3.8f,
-                0.9f);
+                0.9f,
+                blockStunSeconds: 0.10f);
             AttackDefinitionSO enemyBossProjectile = CreateAttackAsset(
                 "Assets/_Game/Data/Enemies/SO_Attack_Enemy_Gatekeeper_Arc.asset",
                 "Enemy_Gatekeeper_Arc",
@@ -317,6 +362,39 @@ namespace CampusRPG.Editor
                 projectileSpawnOffset: 0.55f,
                 projectileTrajectoryMode: ProjectileTrajectoryMode.Straight,
                 projectileArcHeight: 0f);
+            AttackDefinitionSO enemyBossSkyHook = CreateAttackAsset(
+                GatekeeperSkyHookAttackPath,
+                "Enemy_Gatekeeper_SkyHook",
+                "Sky Hook",
+                1.05f,
+                0.20f,
+                0.10f,
+                0.38f,
+                5.8f,
+                0.35f,
+                forwardMovement: 0f,
+                projectilePrefab: spellBoltProjectile,
+                projectileSpeed: 20f,
+                projectileLifetimeSeconds: 0.95f,
+                projectileSpawnOffset: 0.7f,
+                projectileTrajectoryMode: ProjectileTrajectoryMode.Straight,
+                projectileArcHeight: 0f,
+                enemyTargetResponse: EnemyTargetResponseType.AntiAir);
+            AttackDefinitionSO enemyBossRollCatcher = CreateAttackAsset(
+                GatekeeperRollCatcherAttackPath,
+                "Enemy_Gatekeeper_RollCatcher",
+                "Pursuit Slam",
+                1.12f,
+                0.28f,
+                0.12f,
+                0.44f,
+                4.25f,
+                0.65f,
+                forwardMovement: 1.35f,
+                movementSpeedScale: 0.88f,
+                hitStopSeconds: 0.08f,
+                blockStunSeconds: 0.08f,
+                enemyTargetResponse: EnemyTargetResponseType.ChaseRoll);
 
             EnemyArchetypeSO enemyArchetype = CreateOrLoadAsset<EnemyArchetypeSO>(
                 "Assets/_Game/Data/Enemies/SO_Enemy_Melee.asset");
@@ -337,7 +415,14 @@ namespace CampusRPG.Editor
             ConfigureMeleeArchetype(enemyArchetype, enemyMelee);
             ConfigureMobileArchetype(mobileArchetype, enemyMobile);
             ConfigureRangedArchetype(rangedArchetype, enemyRanged);
-            ConfigureBossArchetype(gatekeeperArchetype, enemyBoss, enemyBossReach, enemyBossBurst, enemyBossProjectile);
+            ConfigureBossArchetype(
+                gatekeeperArchetype,
+                enemyBoss,
+                enemyBossReach,
+                enemyBossBurst,
+                enemyBossProjectile,
+                enemyBossSkyHook,
+                enemyBossRollCatcher);
             ConfigureBossTelegraphStyle(
                 bossTelegraphStyle,
                 bossGroundTelegraphPrefab,
@@ -354,6 +439,8 @@ namespace CampusRPG.Editor
                 20f,
                 6f,
                 0.18f,
+                true,
+                0.55f,
                 9f,
                 1.6f,
                 0.75f,
@@ -371,11 +458,15 @@ namespace CampusRPG.Editor
                 35f,
                 12f,
                 0.30f,
+                false,
+                1f,
                 2.5f,
                 2.2f,
                 2.25f,
                 SkillTargetMode.Self);
+            CreateOrUpdateCombatTestSwordArtAssets(sidewindCutAttack, crossStepAttack, risingCleaveAttack, ironGateBreakAttack, fallingStarAttack, moonSeverAttack);
             EnsurePlayerCombatAnimationAssets(
+                false,
                 light01,
                 light02,
                 light03,
@@ -383,7 +474,13 @@ namespace CampusRPG.Editor
                 dodgeFollowUp,
                 counter,
                 empoweredCounter,
-                empoweredDodge);
+                empoweredDodge,
+                sidewindCutAttack,
+                crossStepAttack,
+                risingCleaveAttack,
+                ironGateBreakAttack,
+                fallingStarAttack,
+                moonSeverAttack);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -392,8 +489,34 @@ namespace CampusRPG.Editor
             Debug.Log("CombatTest placeholder assets created or updated using the public-safe proxy baseline.");
         }
 
+        [MenuItem("CampusRPG/Setup/Create CombatTest Sword Art Placeholder Assets")]
+        public static void EnsureCombatTestSwordArtAssetsMenu()
+        {
+            EnsureCombatTestSwordArtAssets();
+            EnsurePlayerCombatAnimationAssets();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("CombatTest sword art placeholder assets and animation states created or updated.");
+        }
+
+        public static SwordArtDefinitionSO[] EnsureCombatTestSwordArtAssets()
+        {
+            EnsureFolder("Assets/_Game/Data");
+            EnsureFolder("Assets/_Game/Data/Combat");
+
+            return CreateOrUpdateCombatTestSwordArtAssets(
+                CreateSidewindCutAttackAsset(),
+                CreateCrossStepAttackAsset(),
+                CreateRisingCleaveAttackAsset(),
+                CreateIronGateBreakAttackAsset(),
+                CreateFallingStarAttackAsset(),
+                CreateMoonSeverAttackAsset());
+        }
+
         public static RuntimeAnimatorController EnsurePlayerCombatAnimationAssets()
         {
+            EnsureFolder("Assets/_Game/Data");
+            EnsureFolder("Assets/_Game/Data/Combat");
             EnsureFolder("Assets/_Game/Animations");
             EnsureFolder("Assets/_Game/Animations/Characters");
             EnsureFolder(PlayerAnimationRootFolder);
@@ -407,7 +530,22 @@ namespace CampusRPG.Editor
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(DodgeFollowUpPath),
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(CounterPath),
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(EnhancedCounterPath),
-                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(EnhancedDodgePath));
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(EnhancedDodgePath),
+                CreateSidewindCutAttackAsset(),
+                CreateCrossStepAttackAsset(),
+                CreateRisingCleaveAttackAsset(),
+                CreateIronGateBreakAttackAsset(),
+                CreateFallingStarAttackAsset(),
+                CreateMoonSeverAttackAsset());
+        }
+
+        [MenuItem("CampusRPG/Setup/Create CombatTest Player Animation Assets")]
+        public static void EnsurePlayerCombatAnimationAssetsMenu()
+        {
+            EnsurePlayerCombatAnimationAssets();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("CombatTest player animation assets and animator states created or updated.");
         }
 
         [MenuItem(RebuildImportedPlayerAnimationsMenu)]
@@ -438,6 +576,8 @@ namespace CampusRPG.Editor
                 return null;
             }
 
+            EnsureFolder("Assets/_Game/Data");
+            EnsureFolder("Assets/_Game/Data/Combat");
             EnsureFolder("Assets/_Game/Animations");
             EnsureFolder("Assets/_Game/Animations/Characters");
             EnsureFolder(PlayerAnimationRootFolder);
@@ -451,7 +591,13 @@ namespace CampusRPG.Editor
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(DodgeFollowUpPath),
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(CounterPath),
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(EnhancedCounterPath),
-                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(EnhancedDodgePath));
+                AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(EnhancedDodgePath),
+                CreateSidewindCutAttackAsset(),
+                CreateCrossStepAttackAsset(),
+                CreateRisingCleaveAttackAsset(),
+                CreateIronGateBreakAttackAsset(),
+                CreateFallingStarAttackAsset(),
+                CreateMoonSeverAttackAsset());
         }
 
         public static float GetPlayerDodgeAnimationDuration()
@@ -493,9 +639,11 @@ namespace CampusRPG.Editor
             serializedObject.FindProperty("counterWindowSeconds").floatValue = 0.8f;
             serializedObject.FindProperty("dodgeFollowUpWindowSeconds").floatValue = 0.8f;
             serializedObject.FindProperty("dodgeDurationSeconds").floatValue = 0.25f;
+            serializedObject.FindProperty("dodgeInvulnerableStartupSeconds").floatValue = 0.04f;
             serializedObject.FindProperty("dodgeInvulnerableSeconds").floatValue = 0.2f;
             serializedObject.FindProperty("dodgeDistance").floatValue = 2.8f;
             serializedObject.FindProperty("dodgeBackwardDistanceScale").floatValue = 0.88f;
+            serializedObject.FindProperty("guardStartupSeconds").floatValue = 0.08f;
             serializedObject.FindProperty("guardCounterGaugeGain").floatValue = 20f;
             serializedObject.FindProperty("dodgeAgilityGaugeGain").floatValue = 25f;
             serializedObject.FindProperty("defaultHitStopSeconds").floatValue = 0.05f;
@@ -583,7 +731,9 @@ namespace CampusRPG.Editor
             AttackDefinitionSO attackClose,
             AttackDefinitionSO attackReach,
             AttackDefinitionSO attackBurst,
-            AttackDefinitionSO attackProjectile)
+            AttackDefinitionSO attackProjectile,
+            AttackDefinitionSO attackAntiAir,
+            AttackDefinitionSO attackRollCatcher)
         {
             SerializedObject serializedObject = new SerializedObject(asset);
             serializedObject.FindProperty("archetypeType").enumValueIndex = (int)EnemyArchetypeType.Boss;
@@ -601,11 +751,13 @@ namespace CampusRPG.Editor
             serializedObject.FindProperty("dropTableId").stringValue = "BossGatekeeper";
 
             SerializedProperty attacks = serializedObject.FindProperty("attacks");
-            attacks.arraySize = 4;
+            attacks.arraySize = 6;
             attacks.GetArrayElementAtIndex(0).objectReferenceValue = attackClose;
             attacks.GetArrayElementAtIndex(1).objectReferenceValue = attackReach;
             attacks.GetArrayElementAtIndex(2).objectReferenceValue = attackBurst;
             attacks.GetArrayElementAtIndex(3).objectReferenceValue = attackProjectile;
+            attacks.GetArrayElementAtIndex(4).objectReferenceValue = attackAntiAir;
+            attacks.GetArrayElementAtIndex(5).objectReferenceValue = attackRollCatcher;
 
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
@@ -618,6 +770,8 @@ namespace CampusRPG.Editor
             float manaCost,
             float cooldownSeconds,
             float castDurationSeconds,
+            bool allowsMovementDuringCast,
+            float movementSpeedScale,
             float range,
             float damageMultiplier,
             float impactRadius,
@@ -635,6 +789,8 @@ namespace CampusRPG.Editor
             serializedObject.FindProperty("manaCost").floatValue = manaCost;
             serializedObject.FindProperty("cooldownSeconds").floatValue = cooldownSeconds;
             serializedObject.FindProperty("castDurationSeconds").floatValue = castDurationSeconds;
+            serializedObject.FindProperty("allowsMovementDuringCast").boolValue = allowsMovementDuringCast;
+            serializedObject.FindProperty("movementSpeedScale").floatValue = movementSpeedScale;
             serializedObject.FindProperty("range").floatValue = range;
             serializedObject.FindProperty("damageMultiplier").floatValue = damageMultiplier;
             serializedObject.FindProperty("impactRadius").floatValue = impactRadius;
@@ -650,6 +806,230 @@ namespace CampusRPG.Editor
             EditorUtility.SetDirty(asset);
         }
 
+        private static SwordArtDefinitionSO[] CreateOrUpdateCombatTestSwordArtAssets(
+            AttackDefinitionSO sidewindAttack,
+            AttackDefinitionSO crossStepAttack,
+            AttackDefinitionSO risingAttack,
+            AttackDefinitionSO gateBreakAttack,
+            AttackDefinitionSO fallingStarAttack,
+            AttackDefinitionSO moonSeverAttack)
+        {
+            SwordArtDefinitionSO sidewindCut = CreateOrLoadAsset<SwordArtDefinitionSO>(SidewindCutPath);
+            SwordArtDefinitionSO crossStep = CreateOrLoadAsset<SwordArtDefinitionSO>(CrossStepPath);
+            SwordArtDefinitionSO risingCleave = CreateOrLoadAsset<SwordArtDefinitionSO>(RisingCleavePath);
+            SwordArtDefinitionSO ironGateBreak = CreateOrLoadAsset<SwordArtDefinitionSO>(IronGateBreakPath);
+            SwordArtDefinitionSO fallingStar = CreateOrLoadAsset<SwordArtDefinitionSO>(FallingStarPath);
+            SwordArtDefinitionSO moonSever = CreateOrLoadAsset<SwordArtDefinitionSO>(MoonSeverPath);
+
+            ConfigureSwordArt(
+                sidewindCut,
+                "SwordArt_SidewindCut",
+                "Sidewind Cut",
+                sidewindAttack,
+                SwordArtTriggerAction.LightAttack,
+                SwordArtDirectionMask.Left | SwordArtDirectionMask.Right,
+                SwordArtContextTags.AfterDodge,
+                SwordArtContextTags.None,
+                0.25f,
+                0.18f,
+                0f);
+            ConfigureSwordArt(
+                crossStep,
+                "SwordArt_CrossStep",
+                "Cross Step",
+                crossStepAttack,
+                SwordArtTriggerAction.LightAttack,
+                SwordArtDirectionMask.Any,
+                SwordArtContextTags.AfterDodge | SwordArtContextTags.AfterCombatRoll,
+                SwordArtContextTags.None,
+                0.3f,
+                0.18f,
+                0f);
+            ConfigureSwordArt(
+                risingCleave,
+                "SwordArt_RisingCleave",
+                "Rising Cleave",
+                risingAttack,
+                SwordArtTriggerAction.HeavyAttack,
+                SwordArtDirectionMask.Any,
+                SwordArtContextTags.None,
+                SwordArtContextTags.ForwardInput | SwordArtContextTags.Airborne,
+                0.3f,
+                0.2f,
+                0f);
+            ConfigureSwordArt(
+                ironGateBreak,
+                "SwordArt_IronGateBreak",
+                "Iron Gate Break",
+                gateBreakAttack,
+                SwordArtTriggerAction.HeavyAttack,
+                SwordArtDirectionMask.Any,
+                SwordArtContextTags.None,
+                SwordArtContextTags.AfterBlock | SwordArtContextTags.AfterHeavy,
+                0.35f,
+                0.22f,
+                0f);
+            ConfigureSwordArt(
+                fallingStar,
+                "SwordArt_FallingStar",
+                "Falling Star",
+                fallingStarAttack,
+                SwordArtTriggerAction.HeavyAttack,
+                SwordArtDirectionMask.Neutral | SwordArtDirectionMask.Backward,
+                SwordArtContextTags.Airborne,
+                SwordArtContextTags.None,
+                0.32f,
+                0.18f,
+                0f);
+            ConfigureSwordArt(
+                moonSever,
+                "SwordArt_MoonSever",
+                "Moon Sever",
+                moonSeverAttack,
+                SwordArtTriggerAction.LightAttack,
+                SwordArtDirectionMask.Any,
+                SwordArtContextTags.Airborne | SwordArtContextTags.AfterDodge | SwordArtContextTags.AfterAirDodge,
+                SwordArtContextTags.None,
+                0.28f,
+                0.16f,
+                0f);
+
+            return new[] { sidewindCut, crossStep, risingCleave, ironGateBreak, fallingStar, moonSever };
+        }
+
+        private static void ConfigureSwordArt(
+            SwordArtDefinitionSO asset,
+            string artId,
+            string displayName,
+            AttackDefinitionSO attackDefinition,
+            SwordArtTriggerAction triggerAction,
+            SwordArtDirectionMask acceptedDirections,
+            SwordArtContextTags requiredContextTags,
+            SwordArtContextTags anyContextTags,
+            float triggerWindowSeconds,
+            float cancelWindowSeconds,
+            float resourceCost)
+        {
+            SerializedObject serializedObject = new SerializedObject(asset);
+            serializedObject.FindProperty("artId").stringValue = artId;
+            serializedObject.FindProperty("displayName").stringValue = displayName;
+            serializedObject.FindProperty("attackDefinition").objectReferenceValue = attackDefinition;
+            serializedObject.FindProperty("triggerAction").enumValueIndex = (int)triggerAction;
+            serializedObject.FindProperty("acceptedDirections").intValue = (int)acceptedDirections;
+            serializedObject.FindProperty("requiredContextTags").intValue = (int)requiredContextTags;
+            serializedObject.FindProperty("anyContextTags").intValue = (int)anyContextTags;
+            serializedObject.FindProperty("triggerWindowSeconds").floatValue = triggerWindowSeconds;
+            serializedObject.FindProperty("cancelWindowSeconds").floatValue = cancelWindowSeconds;
+            serializedObject.FindProperty("resourceCost").floatValue = resourceCost;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
+        private static AttackDefinitionSO CreateSidewindCutAttackAsset()
+        {
+            return CreateAttackAsset(
+                SidewindCutAttackPath,
+                "SwordArt_SidewindCut",
+                "Sidewind Cut",
+                1.55f,
+                0.08f,
+                0.1f,
+                0.25f,
+                2.05f,
+                0.66f,
+                forwardMovement: 0.72f,
+                movementSpeedScale: 0.82f,
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+        }
+
+        private static AttackDefinitionSO CreateCrossStepAttackAsset()
+        {
+            return CreateAttackAsset(
+                CrossStepAttackPath,
+                "SwordArt_CrossStep",
+                "Cross Step",
+                1.7f,
+                0.09f,
+                0.1f,
+                0.27f,
+                2.25f,
+                0.72f,
+                forwardMovement: 0.86f,
+                movementSpeedScale: 0.84f,
+                hitStopSeconds: 0.06f,
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+        }
+
+        private static AttackDefinitionSO CreateRisingCleaveAttackAsset()
+        {
+            return CreateAttackAsset(
+                RisingCleaveAttackPath,
+                "SwordArt_RisingCleave",
+                "Rising Cleave",
+                1.9f,
+                0.18f,
+                0.12f,
+                0.38f,
+                2.35f,
+                0.74f,
+                forwardMovement: 0.62f,
+                movementSpeedScale: 0.58f,
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+        }
+
+        private static AttackDefinitionSO CreateIronGateBreakAttackAsset()
+        {
+            return CreateAttackAsset(
+                IronGateBreakAttackPath,
+                "SwordArt_IronGateBreak",
+                "Iron Gate Break",
+                2.1f,
+                0.14f,
+                0.12f,
+                0.34f,
+                2.25f,
+                0.8f,
+                forwardMovement: 0.55f,
+                movementSpeedScale: 0.62f,
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+        }
+
+        private static AttackDefinitionSO CreateFallingStarAttackAsset()
+        {
+            return CreateAttackAsset(
+                FallingStarAttackPath,
+                "SwordArt_FallingStar",
+                "Falling Star",
+                2.05f,
+                0.16f,
+                0.14f,
+                0.42f,
+                2.05f,
+                0.86f,
+                forwardMovement: 0.38f,
+                movementSpeedScale: 0.52f,
+                hitStopSeconds: 0.09f,
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+        }
+
+        private static AttackDefinitionSO CreateMoonSeverAttackAsset()
+        {
+            return CreateAttackAsset(
+                MoonSeverAttackPath,
+                "SwordArt_MoonSever",
+                "Moon Sever",
+                1.65f,
+                0.10f,
+                0.10f,
+                0.26f,
+                2.15f,
+                0.68f,
+                forwardMovement: 0.58f,
+                movementSpeedScale: 0.72f,
+                hitStopSeconds: 0.065f,
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+        }
+
         private static AttackDefinitionSO CreateAttackAsset(
             string path,
             string attackId,
@@ -661,13 +1041,19 @@ namespace CampusRPG.Editor
             float range,
             float radius,
             float forwardMovement = 0.5f,
+            float movementSpeedScale = 1f,
+            float hitStopSeconds = 0.05f,
             AttackHitboxActivationMode hitboxActivationMode = AttackHitboxActivationMode.TimedWindow,
             GameObject projectilePrefab = null,
             float projectileSpeed = 0f,
             float projectileLifetimeSeconds = 0f,
             float projectileSpawnOffset = 0f,
             ProjectileTrajectoryMode projectileTrajectoryMode = ProjectileTrajectoryMode.PrefabDefault,
-            float projectileArcHeight = 0f)
+            float projectileArcHeight = 0f,
+            bool breaksGuard = false,
+            float blockStunSeconds = 0f,
+            float guardBreakHitStunSeconds = 0.12f,
+            EnemyTargetResponseType enemyTargetResponse = EnemyTargetResponseType.None)
         {
             AttackDefinitionSO asset = CreateOrLoadAsset<AttackDefinitionSO>(path);
             SerializedObject serializedObject = new SerializedObject(asset);
@@ -678,8 +1064,12 @@ namespace CampusRPG.Editor
             serializedObject.FindProperty("startupSeconds").floatValue = startup;
             serializedObject.FindProperty("activeSeconds").floatValue = active;
             serializedObject.FindProperty("recoverySeconds").floatValue = recovery;
-            serializedObject.FindProperty("hitStopSeconds").floatValue = 0.05f;
+            serializedObject.FindProperty("hitStopSeconds").floatValue = hitStopSeconds;
+            serializedObject.FindProperty("breaksGuard").boolValue = breaksGuard;
+            serializedObject.FindProperty("blockStunSeconds").floatValue = blockStunSeconds;
+            serializedObject.FindProperty("guardBreakHitStunSeconds").floatValue = guardBreakHitStunSeconds;
             serializedObject.FindProperty("forwardMovement").floatValue = forwardMovement;
+            serializedObject.FindProperty("movementSpeedScale").floatValue = movementSpeedScale;
             serializedObject.FindProperty("range").floatValue = range;
             serializedObject.FindProperty("radius").floatValue = radius;
             serializedObject.FindProperty("hitboxShape").enumValueIndex = projectilePrefab == null
@@ -700,6 +1090,7 @@ namespace CampusRPG.Editor
             serializedObject.FindProperty("projectileSpawnOffset").floatValue = projectileSpawnOffset;
             serializedObject.FindProperty("projectileTrajectoryMode").enumValueIndex = (int)projectileTrajectoryMode;
             serializedObject.FindProperty("projectileArcHeight").floatValue = projectileArcHeight;
+            serializedObject.FindProperty("enemyTargetResponse").enumValueIndex = (int)enemyTargetResponse;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
             return asset;
@@ -728,7 +1119,10 @@ namespace CampusRPG.Editor
                 AnimationClip airborneClip = CreateOrUpdatePlayerAirborneClip();
                 AnimationClip blockClip = CreateOrUpdatePlayerBlockClip();
                 AnimationClip dodgeClip = CreateOrUpdatePlayerDodgeClip();
+                AnimationClip combatRollClip = CreateOrUpdatePlayerCombatRollClip();
+                AnimationClip airDodgeClip = CreateOrUpdatePlayerAirDodgeClip();
                 AnimationClip hitClip = CreateOrUpdatePlayerHitClip();
+                AnimationClip guardBreakClip = CreateOrUpdatePlayerGuardBreakClip();
                 AnimationClip deathClip = CreateOrUpdatePlayerDeathClip();
                 AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(PlayerAnimatorControllerPath);
 
@@ -771,8 +1165,18 @@ namespace CampusRPG.Editor
                 AnimatorState dodgeState = stateMachine.AddState(PlayerDodgeStateName);
                 dodgeState.motion = dodgeClip;
 
+                AnimatorState combatRollState = stateMachine.AddState(PlayerCombatRollStateName);
+                combatRollState.motion = combatRollClip;
+
+                AnimatorState airDodgeState = stateMachine.AddState(PlayerAirDodgeStateName);
+                airDodgeState.motion = airDodgeClip;
+
                 AnimatorState hitState = stateMachine.AddState(PlayerHitStateName);
                 hitState.motion = hitClip;
+
+                AnimatorState guardBreakState = stateMachine.AddState(PlayerGuardBreakStateName);
+                guardBreakState.motion = guardBreakClip;
+                guardBreakState.speed = PlayerGuardBreakStateSpeed;
 
                 AnimatorState deathState = stateMachine.AddState(PlayerDeathStateName);
                 deathState.motion = deathClip;
@@ -784,7 +1188,10 @@ namespace CampusRPG.Editor
                 AddAirborneRecoveryTransition(airborneState, locomotionState, false);
                 AddAirborneRecoveryTransition(airborneState, blockState, true);
                 AddReturnToLocomotionTransition(dodgeState, locomotionState);
+                AddReturnToLocomotionTransition(combatRollState, locomotionState);
+                AddReturnToLocomotionTransition(airDodgeState, locomotionState);
                 AddReturnToLocomotionTransition(hitState, locomotionState);
+                AddReturnToLocomotionTransition(guardBreakState, locomotionState);
 
                 for (int i = 0; i < attackDefinitions.Length; i++)
                 {
@@ -796,6 +1203,7 @@ namespace CampusRPG.Editor
                     }
 
                     AnimationClip attackClip = CreateOrUpdateAttackClip(attackDefinition);
+                    ApplyImportedPreviewAttackTimingOverridesIfNeeded(attackDefinition, attackClip);
                     SyncAttackAnimationMetadata(attackDefinition, attackClip);
                     AnimatorState attackState = stateMachine.AddState(attackDefinition.AnimationStateName);
                     attackState.motion = attackClip;
@@ -996,10 +1404,18 @@ namespace CampusRPG.Editor
         private enum PlayerProxyMotionProfile
         {
             Idle,
+            Block,
+            GuardBreak,
             Light01,
             Light02,
             Light03,
             Heavy01,
+            FallingStar,
+            CrossStep,
+            MoonSever,
+            Dodge,
+            CombatRoll,
+            AirDodge,
             DodgeFollowUp,
             DodgeFollowUpEnhanced,
             Counter,
@@ -1062,20 +1478,12 @@ namespace CampusRPG.Editor
             if (importedClip != null)
             {
                 float importedAttackDuration = ResolveImportedAttackDuration(importedClip.length, duration);
-                AnimationClip clip = CreateOrUpdateImportedClip(
+                return CreateOrUpdateImportedClip(
                     GetPlayerAttackClipPath(attackDefinition.AnimationStateName),
                     importedClip,
                     importedAttackDuration,
                     false,
                     animationEvents);
-                ApplyPlayerProxyMotionCurves(
-                    clip,
-                    ResolvePlayerProxyMotionProfile(GetPlayerAttackClipPath(attackDefinition.AnimationStateName), attackDefinition.AnimationStateName),
-                    importedAttackDuration,
-                    openTime,
-                    closeTime);
-                EditorUtility.SetDirty(clip);
-                return clip;
             }
 
             return CreateOrUpdatePlaceholderClip(
@@ -1261,15 +1669,48 @@ namespace CampusRPG.Editor
                 0.42f);
         }
 
+        private static AnimationClip CreateOrUpdatePlayerCombatRollClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerCombatRollClipPath,
+                ResolveImportedCombatRollClipCandidatePaths(),
+                0.52f,
+                false,
+                PlayerCombatRollStateName,
+                0.52f);
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerAirDodgeClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerAirDodgeClipPath,
+                ResolveImportedAirDodgeClipCandidatePaths(),
+                0.34f,
+                false,
+                PlayerAirDodgeStateName,
+                0.34f);
+        }
+
         private static AnimationClip CreateOrUpdatePlayerHitClip()
         {
             return CreateOrUpdateMotionClip(
                 PlayerHitClipPath,
                 ResolveImportedHitClipCandidatePaths(),
-                0.35f,
+                PlayerHitClipFallbackDuration,
                 false,
                 "Player Hit",
-                0.38f);
+                PlayerHitClipImportedDuration);
+        }
+
+        private static AnimationClip CreateOrUpdatePlayerGuardBreakClip()
+        {
+            return CreateOrUpdateMotionClip(
+                PlayerGuardBreakClipPath,
+                ResolveImportedGuardBreakClipCandidatePaths(),
+                PlayerGuardBreakClipFallbackDuration,
+                false,
+                PlayerGuardBreakStateName,
+                PlayerGuardBreakClipImportedDuration);
         }
 
         private static AnimationClip CreateOrUpdatePlayerDeathClip()
@@ -1336,6 +1777,7 @@ namespace CampusRPG.Editor
                 AssetDatabase.CreateAsset(clip, path);
             }
 
+            ClearClipContent(clip);
             EditorUtility.CopySerialized(sourceClip, clip);
             clip.name = System.IO.Path.GetFileNameWithoutExtension(path);
             AnimationUtility.SetAnimationEvents(clip, animationEvents ?? System.Array.Empty<AnimationEvent>());
@@ -1389,6 +1831,62 @@ namespace CampusRPG.Editor
                 : 0f;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(attackDefinition);
+        }
+
+        private static void ApplyImportedPreviewAttackTimingOverridesIfNeeded(AttackDefinitionSO attackDefinition, AnimationClip attackClip)
+        {
+            if (!allowImportedPlayerAnimationPreviewBuild
+                || attackDefinition == null
+                || attackClip == null)
+            {
+                return;
+            }
+
+            float durationOverride = ResolveImportedPreviewAttackDurationOverride(attackDefinition.AnimationStateName);
+
+            if (durationOverride <= 0f)
+            {
+                return;
+            }
+
+            ConfigureClipSettings(attackClip, durationOverride, false);
+            EditorUtility.SetDirty(attackClip);
+        }
+
+        private static float ResolveImportedPreviewAttackDurationOverride(string animationStateName)
+        {
+            switch (animationStateName)
+            {
+                case "Light_01":
+                    return 0.58f;
+                case "Light_02":
+                    return 0.7f;
+                case "Light_03":
+                    return 0.82f;
+                case "Heavy_01":
+                    return 1.02f;
+                case "DodgeFollowUp":
+                case "SwordArt_SidewindCut":
+                    return 0.6f;
+                case "DodgeFollowUp_Enhanced":
+                    return 0.68f;
+                case "Counter":
+                    return 0.56640005f;
+                case "Counter_Enhanced":
+                    return 0.78f;
+                case "SwordArt_CrossStep":
+                    return 0.62f;
+                case "SwordArt_RisingCleave":
+                    return 1f;
+                case "SwordArt_IronGateBreak":
+                    return 0.9f;
+                case "SwordArt_FallingStar":
+                    return 1.05f;
+                case "SwordArt_MoonSever":
+                    return 0.72f;
+                default:
+                    return 0f;
+            }
         }
 
         private static AnimationClip TryLoadImportedPlayerClip(string[] candidatePaths)
@@ -1616,6 +2114,27 @@ namespace CampusRPG.Editor
             };
         }
 
+        private static string[] ResolveImportedCombatRollClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Dodge_Roll",
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Roll_Forward",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx",
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B_InPlace.anim"
+            };
+        }
+
+        private static string[] ResolveImportedAirDodgeClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx",
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Dodge_Sidestep",
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B_InPlace.anim"
+            };
+        }
+
         private static string[] ResolveImportedHitClipCandidatePaths()
         {
             return new[]
@@ -1623,6 +2142,18 @@ namespace CampusRPG.Editor
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Hit_Reaction_Light",
                 "Assets/DoubleL/Demo/Anim/Hit_F_1_InPlace.anim",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatDamage01.fbx"
+            };
+        }
+
+        private static string[] ResolveImportedGuardBreakClipCandidatePaths()
+        {
+            return new[]
+            {
+                "Assets/DoubleL/Demo/Anim/OneHand_Up_Shield_Block_Hit_1_InPlace.anim",
+                "Assets/DoubleL/Demo/Anim/Hit_F_2_InPlace.anim",
+                "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Hit_Reaction_Heavy",
+                "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatDamage01.fbx",
+                "Assets/DoubleL/Demo/Anim/Hit_F_1_InPlace.anim"
             };
         }
 
@@ -1674,6 +2205,7 @@ namespace CampusRPG.Editor
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"
                     };
                 case "Heavy_01":
+                case "SwordArt_RisingCleave":
                     return new[]
                     {
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
@@ -1685,7 +2217,36 @@ namespace CampusRPG.Editor
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"
                     };
+                case "SwordArt_FallingStar":
+                    return new[]
+                    {
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_3_InPlace.fbx",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim"
+                    };
+                case "SwordArt_CrossStep":
+                    return new[]
+                    {
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_2_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx"
+                    };
+                case "SwordArt_MoonSever":
+                    return new[]
+                    {
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx"
+                    };
                 case "DodgeFollowUp":
+                case "SwordArt_SidewindCut":
                     return new[]
                     {
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim",
@@ -1708,13 +2269,14 @@ namespace CampusRPG.Editor
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx"
                     };
                 case "Counter":
+                case "SwordArt_IronGateBreak":
                     return new[]
                     {
-                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
-                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
-                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
-                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_2_InPlace.fbx",
-                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_1_InPlace.fbx",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_1_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx"
                     };
@@ -1782,6 +2344,31 @@ namespace CampusRPG.Editor
                 return PlayerProxyMotionProfile.Idle;
             }
 
+            if (string.Equals(path, PlayerBlockClipPath, global::System.StringComparison.Ordinal))
+            {
+                return PlayerProxyMotionProfile.Block;
+            }
+
+            if (string.Equals(path, PlayerDodgeClipPath, global::System.StringComparison.Ordinal))
+            {
+                return PlayerProxyMotionProfile.Dodge;
+            }
+
+            if (string.Equals(path, PlayerCombatRollClipPath, global::System.StringComparison.Ordinal))
+            {
+                return PlayerProxyMotionProfile.CombatRoll;
+            }
+
+            if (string.Equals(path, PlayerAirDodgeClipPath, global::System.StringComparison.Ordinal))
+            {
+                return PlayerProxyMotionProfile.AirDodge;
+            }
+
+            if (string.Equals(path, PlayerGuardBreakClipPath, global::System.StringComparison.Ordinal))
+            {
+                return PlayerProxyMotionProfile.GuardBreak;
+            }
+
             switch (animationStateName)
             {
                 case "Light_01":
@@ -1791,12 +2378,21 @@ namespace CampusRPG.Editor
                 case "Light_03":
                     return PlayerProxyMotionProfile.Light03;
                 case "Heavy_01":
+                case "SwordArt_RisingCleave":
                     return PlayerProxyMotionProfile.Heavy01;
+                case "SwordArt_FallingStar":
+                    return PlayerProxyMotionProfile.FallingStar;
+                case "SwordArt_CrossStep":
+                    return PlayerProxyMotionProfile.CrossStep;
+                case "SwordArt_MoonSever":
+                    return PlayerProxyMotionProfile.MoonSever;
                 case "DodgeFollowUp":
+                case "SwordArt_SidewindCut":
                     return PlayerProxyMotionProfile.DodgeFollowUp;
                 case "DodgeFollowUp_Enhanced":
                     return PlayerProxyMotionProfile.DodgeFollowUpEnhanced;
                 case "Counter":
+                case "SwordArt_IronGateBreak":
                     return PlayerProxyMotionProfile.Counter;
                 case "Counter_Enhanced":
                     return PlayerProxyMotionProfile.CounterEnhanced;
@@ -1838,6 +2434,12 @@ namespace CampusRPG.Editor
 
             switch (profile)
             {
+                case PlayerProxyMotionProfile.Block:
+                    ApplyBlockProxyCurves(clip, duration);
+                    break;
+                case PlayerProxyMotionProfile.GuardBreak:
+                    ApplyGuardBreakProxyCurves(clip, duration);
+                    break;
                 case PlayerProxyMotionProfile.Light01:
                     ApplyAttackProxyCurves(
                         clip,
@@ -1925,6 +2527,138 @@ namespace CampusRPG.Editor
                         new Vector3(0.08f, 1.38f, 1.08f),
                         new Vector3(0.06f, 0.07f, 0.72f),
                         new Vector3(0.11f, 0.08f, 1.56f));
+                    break;
+                case PlayerProxyMotionProfile.FallingStar:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(0f, 1.18f, 0.08f),
+                        new Vector3(0f, 0.74f, 0.28f),
+                        new Vector3(0f, 1.42f, 0.06f),
+                        new Vector3(0f, 0.98f, 0.34f),
+                        new Vector3(0f, 1.92f, 0.02f),
+                        new Vector3(0f, 1.34f, 0.28f),
+                        new Vector3(0f, 1.06f, 0.54f),
+                        new Vector3(0f, 0.72f, 1.12f),
+                        new Vector3(0.12f, 0.22f, 0.62f),
+                        new Vector3(0.2f, 0.12f, 1.28f),
+                        new Vector3(0.18f, 1.42f, 0.12f),
+                        new Vector3(0.04f, 0.62f, 0.86f),
+                        new Vector3(0.06f, 0.09f, 0.76f),
+                        new Vector3(0.12f, 0.06f, 1.36f));
+                    break;
+                case PlayerProxyMotionProfile.CrossStep:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(-0.14f, 0.78f, 0.04f),
+                        new Vector3(0.18f, 0.88f, 0.32f),
+                        new Vector3(-0.16f, 1.02f, 0.14f),
+                        new Vector3(0.2f, 1.15f, 0.46f),
+                        new Vector3(-0.12f, 1.48f, 0.06f),
+                        new Vector3(0.14f, 1.66f, 0.32f),
+                        new Vector3(-0.28f, 0.84f, 0.42f),
+                        new Vector3(0.12f, 0.96f, 1.28f),
+                        new Vector3(0.2f, 0.16f, 0.58f),
+                        new Vector3(0.18f, 0.18f, 1.42f),
+                        new Vector3(-0.36f, 0.92f, 0.26f),
+                        new Vector3(0.42f, 1.08f, 0.94f),
+                        new Vector3(0.08f, 0.06f, 0.58f),
+                        new Vector3(0.1f, 0.07f, 1.48f));
+                    break;
+                case PlayerProxyMotionProfile.MoonSever:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(-0.18f, 1.08f, 0.02f),
+                        new Vector3(0.2f, 1.08f, 0.28f),
+                        new Vector3(-0.22f, 1.3f, 0.1f),
+                        new Vector3(0.24f, 1.3f, 0.42f),
+                        new Vector3(-0.12f, 1.78f, 0.02f),
+                        new Vector3(0.14f, 1.78f, 0.28f),
+                        new Vector3(-0.34f, 1.18f, 0.48f),
+                        new Vector3(0.18f, 1.18f, 1.2f),
+                        new Vector3(0.18f, 0.16f, 0.64f),
+                        new Vector3(0.18f, 0.16f, 1.34f),
+                        new Vector3(-0.42f, 1.32f, 0.24f),
+                        new Vector3(0.46f, 1.24f, 0.86f),
+                        new Vector3(0.08f, 0.07f, 0.68f),
+                        new Vector3(0.1f, 0.07f, 1.38f));
+                    break;
+                case PlayerProxyMotionProfile.Dodge:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(-0.12f, 0.8f, -0.16f),
+                        new Vector3(0.16f, 0.76f, -0.54f),
+                        new Vector3(-0.14f, 1.04f, -0.14f),
+                        new Vector3(0.18f, 1f, -0.5f),
+                        new Vector3(-0.1f, 1.5f, -0.1f),
+                        new Vector3(0.14f, 1.44f, -0.44f),
+                        new Vector3(-0.18f, 0.86f, 0.36f),
+                        new Vector3(0.22f, 0.82f, 0.06f),
+                        new Vector3(0.2f, 0.16f, 0.68f),
+                        new Vector3(0.24f, 0.16f, 1.34f),
+                        new Vector3(0.12f, 0.9f, 0.18f),
+                        new Vector3(-0.1f, 0.82f, -0.12f),
+                        new Vector3(0.06f, 0.06f, 0.52f),
+                        new Vector3(0.07f, 0.06f, 0.74f));
+                    break;
+                case PlayerProxyMotionProfile.CombatRoll:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(0f, 0.66f, 0.12f),
+                        new Vector3(0f, 0.56f, 0.58f),
+                        new Vector3(0f, 0.88f, 0.08f),
+                        new Vector3(0f, 0.76f, 0.62f),
+                        new Vector3(0f, 1.28f, 0.08f),
+                        new Vector3(0f, 1.08f, 0.56f),
+                        new Vector3(0f, 0.72f, 0.58f),
+                        new Vector3(0f, 0.62f, 1.38f),
+                        new Vector3(0.18f, 0.16f, 0.72f),
+                        new Vector3(0.22f, 0.16f, 1.56f),
+                        new Vector3(0.18f, 0.78f, 0.22f),
+                        new Vector3(-0.18f, 0.68f, 0.54f),
+                        new Vector3(0.06f, 0.06f, 0.58f),
+                        new Vector3(0.08f, 0.06f, 0.82f));
+                    break;
+                case PlayerProxyMotionProfile.AirDodge:
+                    ApplyAttackProxyCurves(
+                        clip,
+                        duration,
+                        anticipationTime,
+                        strikeTime,
+                        settleTime,
+                        new Vector3(0f, 1.02f, 0.16f),
+                        new Vector3(0f, 1.18f, 0.64f),
+                        new Vector3(0f, 1.28f, 0.14f),
+                        new Vector3(0f, 1.42f, 0.7f),
+                        new Vector3(0f, 1.78f, 0.14f),
+                        new Vector3(0f, 1.92f, 0.68f),
+                        new Vector3(0f, 1.12f, 0.62f),
+                        new Vector3(0f, 1.3f, 1.36f),
+                        new Vector3(0.16f, 0.2f, 0.72f),
+                        new Vector3(0.22f, 0.22f, 1.46f),
+                        new Vector3(0.24f, 1.08f, 0.22f),
+                        new Vector3(0.28f, 1.24f, 0.74f),
+                        new Vector3(0.06f, 0.07f, 0.62f),
+                        new Vector3(0.08f, 0.08f, 1.12f));
                     break;
                 case PlayerProxyMotionProfile.DodgeFollowUp:
                     ApplyAttackProxyCurves(
@@ -2037,6 +2771,153 @@ namespace CampusRPG.Editor
                         new Vector3(0.08f, 0.07f, 1.22f));
                     break;
             }
+        }
+
+        private static void ApplyGuardBreakProxyCurves(AnimationClip clip, float duration)
+        {
+            float impactTime = Mathf.Clamp(duration * 0.18f, 0.05f, 0.1f);
+            float collapseTime = Mathf.Clamp(duration * 0.42f, impactTime + 0.03f, duration * 0.7f);
+            float holdTime = Mathf.Clamp(duration * 0.74f, collapseTime + 0.03f, duration);
+
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyTorsoPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(impactTime, -0.12f), new ProxyCurveKey(collapseTime, -0.18f), new ProxyCurveKey(holdTime, -0.12f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0.88f), new ProxyCurveKey(impactTime, 0.78f), new ProxyCurveKey(collapseTime, 0.62f), new ProxyCurveKey(holdTime, 0.66f), new ProxyCurveKey(duration, 0.88f) },
+                new[] { new ProxyCurveKey(0f, 0.04f), new ProxyCurveKey(impactTime, -0.05f), new ProxyCurveKey(collapseTime, -0.18f), new ProxyCurveKey(holdTime, -0.1f), new ProxyCurveKey(duration, 0.04f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyChestPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(impactTime, -0.16f), new ProxyCurveKey(collapseTime, -0.22f), new ProxyCurveKey(holdTime, -0.14f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 1.12f), new ProxyCurveKey(impactTime, 0.94f), new ProxyCurveKey(collapseTime, 0.76f), new ProxyCurveKey(holdTime, 0.8f), new ProxyCurveKey(duration, 1.12f) },
+                new[] { new ProxyCurveKey(0f, 0.24f), new ProxyCurveKey(impactTime, -0.04f), new ProxyCurveKey(collapseTime, -0.22f), new ProxyCurveKey(holdTime, -0.14f), new ProxyCurveKey(duration, 0.24f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyHeadPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(impactTime, -0.12f), new ProxyCurveKey(collapseTime, -0.2f), new ProxyCurveKey(holdTime, -0.1f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 1.62f), new ProxyCurveKey(impactTime, 1.42f), new ProxyCurveKey(collapseTime, 1.16f), new ProxyCurveKey(holdTime, 1.22f), new ProxyCurveKey(duration, 1.62f) },
+                new[] { new ProxyCurveKey(0f, 0.08f), new ProxyCurveKey(impactTime, -0.02f), new ProxyCurveKey(collapseTime, -0.16f), new ProxyCurveKey(holdTime, -0.08f), new ProxyCurveKey(duration, 0.08f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyForwardMarkerPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(impactTime, -0.1f), new ProxyCurveKey(collapseTime, -0.22f), new ProxyCurveKey(holdTime, -0.14f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0.94f), new ProxyCurveKey(impactTime, 0.8f), new ProxyCurveKey(collapseTime, 0.56f), new ProxyCurveKey(holdTime, 0.62f), new ProxyCurveKey(duration, 0.94f) },
+                new[] { new ProxyCurveKey(0f, 0.62f), new ProxyCurveKey(impactTime, 0.42f), new ProxyCurveKey(collapseTime, 0.28f), new ProxyCurveKey(holdTime, 0.34f), new ProxyCurveKey(duration, 0.62f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyForwardMarkerPath,
+                "m_LocalScale",
+                new[] { new ProxyCurveKey(0f, 0.14f), new ProxyCurveKey(impactTime, 0.24f), new ProxyCurveKey(collapseTime, 0.12f), new ProxyCurveKey(holdTime, 0.12f), new ProxyCurveKey(duration, 0.14f) },
+                new[] { new ProxyCurveKey(0f, 0.18f), new ProxyCurveKey(impactTime, 0.16f), new ProxyCurveKey(collapseTime, 0.12f), new ProxyCurveKey(holdTime, 0.12f), new ProxyCurveKey(duration, 0.18f) },
+                new[] { new ProxyCurveKey(0f, 0.56f), new ProxyCurveKey(impactTime, 0.46f), new ProxyCurveKey(collapseTime, 0.32f), new ProxyCurveKey(holdTime, 0.36f), new ProxyCurveKey(duration, 0.56f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyBladePath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0.34f), new ProxyCurveKey(impactTime, 0.08f), new ProxyCurveKey(collapseTime, -0.16f), new ProxyCurveKey(holdTime, -0.06f), new ProxyCurveKey(duration, 0.34f) },
+                new[] { new ProxyCurveKey(0f, 1.04f), new ProxyCurveKey(impactTime, 0.78f), new ProxyCurveKey(collapseTime, 0.34f), new ProxyCurveKey(holdTime, 0.44f), new ProxyCurveKey(duration, 1.04f) },
+                new[] { new ProxyCurveKey(0f, 0.54f), new ProxyCurveKey(impactTime, 0.28f), new ProxyCurveKey(collapseTime, 0.12f), new ProxyCurveKey(holdTime, 0.2f), new ProxyCurveKey(duration, 0.54f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyBladePath,
+                "m_LocalScale",
+                new[] { new ProxyCurveKey(0f, 0.07f), new ProxyCurveKey(impactTime, 0.08f), new ProxyCurveKey(collapseTime, 0.06f), new ProxyCurveKey(holdTime, 0.06f), new ProxyCurveKey(duration, 0.07f) },
+                new[] { new ProxyCurveKey(0f, 0.07f), new ProxyCurveKey(impactTime, 0.08f), new ProxyCurveKey(collapseTime, 0.06f), new ProxyCurveKey(holdTime, 0.06f), new ProxyCurveKey(duration, 0.07f) },
+                new[] { new ProxyCurveKey(0f, 0.82f), new ProxyCurveKey(impactTime, 0.62f), new ProxyCurveKey(collapseTime, 0.42f), new ProxyCurveKey(holdTime, 0.48f), new ProxyCurveKey(duration, 0.82f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyWeaponGripBladePath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0.58f), new ProxyCurveKey(impactTime, 0.22f), new ProxyCurveKey(collapseTime, -0.28f), new ProxyCurveKey(holdTime, -0.1f), new ProxyCurveKey(duration, 0.58f) },
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(impactTime, -0.22f), new ProxyCurveKey(collapseTime, -0.62f), new ProxyCurveKey(holdTime, -0.5f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(impactTime, -0.2f), new ProxyCurveKey(collapseTime, -0.42f), new ProxyCurveKey(holdTime, -0.26f), new ProxyCurveKey(duration, 0f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyWeaponGripBladePath,
+                "m_LocalScale",
+                new[] { new ProxyCurveKey(0f, 1.14f), new ProxyCurveKey(impactTime, 0.82f), new ProxyCurveKey(collapseTime, 0.58f), new ProxyCurveKey(holdTime, 0.72f), new ProxyCurveKey(duration, 1.14f) },
+                new[] { new ProxyCurveKey(0f, 0.08f), new ProxyCurveKey(impactTime, 0.08f), new ProxyCurveKey(collapseTime, 0.06f), new ProxyCurveKey(holdTime, 0.07f), new ProxyCurveKey(duration, 0.08f) },
+                new[] { new ProxyCurveKey(0f, 0.08f), new ProxyCurveKey(impactTime, 0.08f), new ProxyCurveKey(collapseTime, 0.06f), new ProxyCurveKey(holdTime, 0.07f), new ProxyCurveKey(duration, 0.08f) });
+            SetLocalPositionCurve(clip, PlayerProxyGuardPath, 'z',
+                new ProxyCurveKey(0f, 0.34f),
+                new ProxyCurveKey(impactTime, 0.16f),
+                new ProxyCurveKey(collapseTime, -0.02f),
+                new ProxyCurveKey(holdTime, 0.02f),
+                new ProxyCurveKey(duration, 0.34f));
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyWeaponGripGuardPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0.02f), new ProxyCurveKey(impactTime, -0.08f), new ProxyCurveKey(collapseTime, -0.18f), new ProxyCurveKey(holdTime, -0.12f), new ProxyCurveKey(duration, 0.02f) },
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(impactTime, -0.04f), new ProxyCurveKey(collapseTime, -0.08f), new ProxyCurveKey(holdTime, -0.06f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(impactTime, -0.16f), new ProxyCurveKey(collapseTime, -0.26f), new ProxyCurveKey(holdTime, -0.18f), new ProxyCurveKey(duration, 0f) });
+        }
+
+        private static void ApplyBlockProxyCurves(AnimationClip clip, float duration)
+        {
+            float braceTime = Mathf.Clamp(duration * 0.16f, 0.06f, 0.16f);
+            float holdTime = Mathf.Clamp(duration * 0.5f, braceTime + 0.05f, duration * 0.75f);
+            float breatheTime = Mathf.Clamp(duration * 0.64f, holdTime + 0.03f, duration);
+
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyTorsoPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(braceTime, -0.04f), new ProxyCurveKey(holdTime, -0.06f), new ProxyCurveKey(breatheTime, -0.04f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0.88f), new ProxyCurveKey(braceTime, 0.84f), new ProxyCurveKey(holdTime, 0.82f), new ProxyCurveKey(breatheTime, 0.83f), new ProxyCurveKey(duration, 0.88f) },
+                new[] { new ProxyCurveKey(0f, 0.04f), new ProxyCurveKey(braceTime, -0.04f), new ProxyCurveKey(holdTime, -0.08f), new ProxyCurveKey(breatheTime, -0.06f), new ProxyCurveKey(duration, 0.04f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyChestPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(braceTime, -0.06f), new ProxyCurveKey(holdTime, -0.08f), new ProxyCurveKey(breatheTime, -0.06f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 1.12f), new ProxyCurveKey(braceTime, 1.08f), new ProxyCurveKey(holdTime, 1.06f), new ProxyCurveKey(breatheTime, 1.07f), new ProxyCurveKey(duration, 1.12f) },
+                new[] { new ProxyCurveKey(0f, 0.24f), new ProxyCurveKey(braceTime, 0.14f), new ProxyCurveKey(holdTime, 0.12f), new ProxyCurveKey(breatheTime, 0.16f), new ProxyCurveKey(duration, 0.24f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyHeadPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(braceTime, -0.04f), new ProxyCurveKey(holdTime, -0.06f), new ProxyCurveKey(breatheTime, -0.04f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 1.62f), new ProxyCurveKey(braceTime, 1.56f), new ProxyCurveKey(holdTime, 1.54f), new ProxyCurveKey(breatheTime, 1.56f), new ProxyCurveKey(duration, 1.62f) },
+                new[] { new ProxyCurveKey(0f, 0.08f), new ProxyCurveKey(braceTime, 0.02f), new ProxyCurveKey(holdTime, 0f), new ProxyCurveKey(breatheTime, 0.03f), new ProxyCurveKey(duration, 0.08f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyForwardMarkerPath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0f), new ProxyCurveKey(braceTime, 0f), new ProxyCurveKey(holdTime, 0f), new ProxyCurveKey(breatheTime, 0f), new ProxyCurveKey(duration, 0f) },
+                new[] { new ProxyCurveKey(0f, 0.94f), new ProxyCurveKey(braceTime, 0.9f), new ProxyCurveKey(holdTime, 0.88f), new ProxyCurveKey(breatheTime, 0.9f), new ProxyCurveKey(duration, 0.94f) },
+                new[] { new ProxyCurveKey(0f, 0.62f), new ProxyCurveKey(braceTime, 0.48f), new ProxyCurveKey(holdTime, 0.42f), new ProxyCurveKey(breatheTime, 0.44f), new ProxyCurveKey(duration, 0.62f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyForwardMarkerPath,
+                "m_LocalScale",
+                new[] { new ProxyCurveKey(0f, 0.14f), new ProxyCurveKey(braceTime, 0.12f), new ProxyCurveKey(holdTime, 0.12f), new ProxyCurveKey(breatheTime, 0.12f), new ProxyCurveKey(duration, 0.14f) },
+                new[] { new ProxyCurveKey(0f, 0.18f), new ProxyCurveKey(braceTime, 0.16f), new ProxyCurveKey(holdTime, 0.16f), new ProxyCurveKey(breatheTime, 0.16f), new ProxyCurveKey(duration, 0.18f) },
+                new[] { new ProxyCurveKey(0f, 0.56f), new ProxyCurveKey(braceTime, 0.52f), new ProxyCurveKey(holdTime, 0.5f), new ProxyCurveKey(breatheTime, 0.52f), new ProxyCurveKey(duration, 0.56f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyBladePath,
+                "m_LocalPosition",
+                new[] { new ProxyCurveKey(0f, 0.34f), new ProxyCurveKey(braceTime, 0.14f), new ProxyCurveKey(holdTime, 0.1f), new ProxyCurveKey(breatheTime, 0.12f), new ProxyCurveKey(duration, 0.34f) },
+                new[] { new ProxyCurveKey(0f, 1.04f), new ProxyCurveKey(braceTime, 1.12f), new ProxyCurveKey(holdTime, 1.18f), new ProxyCurveKey(breatheTime, 1.15f), new ProxyCurveKey(duration, 1.04f) },
+                new[] { new ProxyCurveKey(0f, 0.54f), new ProxyCurveKey(braceTime, 0.34f), new ProxyCurveKey(holdTime, 0.28f), new ProxyCurveKey(breatheTime, 0.32f), new ProxyCurveKey(duration, 0.54f) });
+            SetVector3PropertyCurves(
+                clip,
+                PlayerProxyBladePath,
+                "m_LocalScale",
+                new[] { new ProxyCurveKey(0f, 0.07f), new ProxyCurveKey(braceTime, 0.07f), new ProxyCurveKey(holdTime, 0.07f), new ProxyCurveKey(breatheTime, 0.07f), new ProxyCurveKey(duration, 0.07f) },
+                new[] { new ProxyCurveKey(0f, 0.07f), new ProxyCurveKey(braceTime, 0.07f), new ProxyCurveKey(holdTime, 0.07f), new ProxyCurveKey(breatheTime, 0.07f), new ProxyCurveKey(duration, 0.07f) },
+                new[] { new ProxyCurveKey(0f, 0.82f), new ProxyCurveKey(braceTime, 0.9f), new ProxyCurveKey(holdTime, 0.86f), new ProxyCurveKey(breatheTime, 0.88f), new ProxyCurveKey(duration, 0.82f) });
+            SetLocalPositionCurve(clip, PlayerProxyGuardPath, 'z',
+                new ProxyCurveKey(0f, 0.34f),
+                new ProxyCurveKey(braceTime, 0.5f),
+                new ProxyCurveKey(holdTime, 0.58f),
+                new ProxyCurveKey(breatheTime, 0.54f),
+                new ProxyCurveKey(duration, 0.34f));
         }
 
         private static void ApplyIdleProxyCurves(AnimationClip clip, float duration)
@@ -2384,6 +3265,8 @@ namespace CampusRPG.Editor
                 serializedObject.FindProperty("straightProjectileCueAccentColor").colorValue = new Color(0.34f, 0.86f, 0.97f, 1f);
                 serializedObject.FindProperty("arcProjectileCueAccentColor").colorValue = new Color(0.97f, 0.53f, 0.28f, 1f);
                 serializedObject.FindProperty("rangedCueAccentColor").colorValue = new Color(0.74f, 0.91f, 0.67f, 1f);
+                serializedObject.FindProperty("antiAirCueAccentColor").colorValue = new Color(0.42f, 0.72f, 1f, 1f);
+                serializedObject.FindProperty("chaseRollCueAccentColor").colorValue = new Color(1f, 0.42f, 0.24f, 1f);
                 serializedObject.FindProperty("encounterPulseColor").colorValue = new Color(0.92f, 0.62f, 0.18f, 0.22f);
                 serializedObject.FindProperty("attackPulseColor").colorValue = new Color(0.9f, 0.2f, 0.18f, 0.26f);
                 serializedObject.FindProperty("engageTelegraphColor").colorValue = new Color(0.86f, 0.71f, 0.28f, 1f);

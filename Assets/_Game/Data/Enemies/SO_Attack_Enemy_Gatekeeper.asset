@@ -21,7 +21,11 @@ MonoBehaviour:
   recoverySeconds: 0.42
   animationDurationSeconds: 0
   hitStopSeconds: 0.05
+  breaksGuard: 1
+  blockStunSeconds: 0
+  guardBreakHitStunSeconds: 0.16
   forwardMovement: 0.5
+  movementSpeedScale: 1
   range: 2.3
   radius: 0.7
   hitboxShape: 2
@@ -35,3 +39,4 @@ MonoBehaviour:
   projectileSpawnOffset: 0
   projectileTrajectoryMode: 0
   projectileArcHeight: 0
+  enemyTargetResponse: 0

@@ -37,10 +37,7 @@ namespace CampusRPG.UI
 
             if (saveData.chapterCompleted)
             {
-                return new ChapterResumeContextPlan(
-                    "Resume: Chapter Complete",
-                    "The Ritual Core is already secured. Walk forward to review the ending card.",
-                    true);
+                return ChapterResumeContextPlan.Hidden;
             }
 
             if (gatekeeperCleared)
@@ -189,8 +186,7 @@ namespace CampusRPG.UI
         {
             ResolveReferences();
             pendingInitialPresentation = HasChapterSaveReady();
-            isVisible = false;
-            visibleTimer = 0f;
+            Hide();
         }
 
         private void OnDestroy()
@@ -271,6 +267,7 @@ namespace CampusRPG.UI
         {
             if (!plan.IsVisible)
             {
+                Hide();
                 return;
             }
 
@@ -278,6 +275,14 @@ namespace CampusRPG.UI
             currentBody = plan.Body;
             visibleTimer = Mathf.Max(0.1f, visibleDurationSeconds);
             isVisible = true;
+        }
+
+        private void Hide()
+        {
+            isVisible = false;
+            visibleTimer = 0f;
+            currentTitle = string.Empty;
+            currentBody = string.Empty;
         }
 
         private void EnsureStyles()

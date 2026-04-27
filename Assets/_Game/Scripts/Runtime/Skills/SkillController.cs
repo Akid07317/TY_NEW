@@ -5,6 +5,25 @@ using UnityEngine;
 
 namespace CampusRPG.Skills
 {
+    public enum SkillBeginCastBlockReason
+    {
+        None = 0,
+        MissingSkill = 1,
+        MissingManaComponent = 2,
+        Cooldown = 3,
+        NotEnoughMana = 4,
+        OtherPendingCast = 5,
+    }
+
+    public enum SkillSlotRuntimeStatus
+    {
+        MissingSkill = 0,
+        Pending = 1,
+        Cooldown = 2,
+        Blocked = 3,
+        Ready = 4,
+    }
+
     [DisallowMultipleComponent]
     [RequireComponent(typeof(ManaComponent))]
     public sealed class SkillController : MonoBehaviour
@@ -19,8 +38,20 @@ namespace CampusRPG.Skills
         [SerializeField] private float spawnedEffectLifetimeSeconds = 1.5f;
 
         private readonly float[] cooldownRemaining = new float[2];
+        private int pendingSlotIndex = -1;
+        private SkillDefinitionSO pendingSkill;
 
         public Transform CurrentLockedTarget => lockOnTargetSelector != null ? lockOnTargetSelector.CurrentTarget : null;
+
+        public bool HasPendingCast => pendingSlotIndex >= 0 && pendingSkill != null;
+
+        public int PendingSlotIndex => HasPendingCast ? pendingSlotIndex : -1;
+
+        public SkillDefinitionSO PendingSkill => HasPendingCast ? pendingSkill : null;
+
+        public float CurrentMana => mana != null ? mana.CurrentValue : 0f;
+
+        public float MaxMana => mana != null ? mana.MaxValue : 0f;
 
         private void Awake()
         {
@@ -60,24 +91,119 @@ namespace CampusRPG.Skills
 
         public bool TryBeginCast(int slotIndex, out SkillDefinitionSO skillDefinition)
         {
+            if (!CanBeginCast(slotIndex, out skillDefinition))
+            {
+                skillDefinition = null;
+                return false;
+            }
+
+            if (!TryRegisterPendingCast(slotIndex, skillDefinition))
+            {
+                skillDefinition = null;
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool CanBeginCast(int slotIndex, out SkillDefinitionSO skillDefinition)
+        {
+            return GetBeginCastBlockReason(slotIndex, out skillDefinition) == SkillBeginCastBlockReason.None;
+        }
+
+        public SkillBeginCastBlockReason GetBeginCastBlockReason(int slotIndex, out SkillDefinitionSO skillDefinition)
+        {
             skillDefinition = GetSkill(slotIndex);
 
-            if (skillDefinition == null || mana == null)
+            if (skillDefinition == null)
             {
-                return false;
+                return SkillBeginCastBlockReason.MissingSkill;
+            }
+
+            if (mana == null)
+            {
+                return SkillBeginCastBlockReason.MissingManaComponent;
             }
 
             if (GetRemainingCooldown(slotIndex) > 0f)
             {
-                return false;
+                return SkillBeginCastBlockReason.Cooldown;
             }
 
-            if (!mana.TrySpend(skillDefinition.ManaCost))
+            if (!CanAfford(skillDefinition))
+            {
+                return SkillBeginCastBlockReason.NotEnoughMana;
+            }
+
+            if (HasPendingCast && (pendingSlotIndex != slotIndex || pendingSkill != skillDefinition))
+            {
+                return SkillBeginCastBlockReason.OtherPendingCast;
+            }
+
+            return SkillBeginCastBlockReason.None;
+        }
+
+        public SkillSlotRuntimeStatus GetSlotRuntimeStatus(
+            int slotIndex,
+            out SkillDefinitionSO skillDefinition,
+            out SkillBeginCastBlockReason blockReason)
+        {
+            blockReason = GetBeginCastBlockReason(slotIndex, out skillDefinition);
+
+            if (skillDefinition == null)
+            {
+                return SkillSlotRuntimeStatus.MissingSkill;
+            }
+
+            if (HasPendingCast && pendingSlotIndex == slotIndex && pendingSkill == skillDefinition)
+            {
+                return SkillSlotRuntimeStatus.Pending;
+            }
+
+            if (IsOnCooldown(slotIndex))
+            {
+                return SkillSlotRuntimeStatus.Cooldown;
+            }
+
+            if (blockReason != SkillBeginCastBlockReason.None)
+            {
+                return SkillSlotRuntimeStatus.Blocked;
+            }
+
+            return SkillSlotRuntimeStatus.Ready;
+        }
+
+        public bool TryCommitCast(int slotIndex, SkillDefinitionSO skillDefinition)
+        {
+            if (!CanCommitCast(slotIndex, skillDefinition))
             {
                 return false;
             }
 
-            cooldownRemaining[slotIndex] = skillDefinition.CooldownSeconds;
+            if (!mana.TrySpend(Mathf.Max(0f, skillDefinition.ManaCost)))
+            {
+                return false;
+            }
+
+            cooldownRemaining[slotIndex] = Mathf.Max(0f, skillDefinition.CooldownSeconds);
+            ClearPendingCast();
+            CommitCast(skillDefinition);
+            return true;
+        }
+
+        public bool CancelPendingCast(int slotIndex, SkillDefinitionSO skillDefinition = null)
+        {
+            if (!HasPendingCast || pendingSlotIndex != slotIndex)
+            {
+                return false;
+            }
+
+            if (skillDefinition != null && pendingSkill != skillDefinition)
+            {
+                return false;
+            }
+
+            ClearPendingCast();
             return true;
         }
 
@@ -86,6 +212,41 @@ namespace CampusRPG.Skills
             return slotIndex >= 0 && slotIndex < cooldownRemaining.Length
                 ? cooldownRemaining[slotIndex]
                 : 0f;
+        }
+
+        public bool IsOnCooldown(int slotIndex)
+        {
+            return GetRemainingCooldown(slotIndex) > 0f;
+        }
+
+        public float GetCooldownProgressNormalized(int slotIndex)
+        {
+            SkillDefinitionSO skill = GetSkill(slotIndex);
+
+            if (skill == null)
+            {
+                return 0f;
+            }
+
+            float duration = Mathf.Max(0f, skill.CooldownSeconds);
+
+            if (duration <= Mathf.Epsilon)
+            {
+                return 1f;
+            }
+
+            float remaining = Mathf.Clamp(GetRemainingCooldown(slotIndex), 0f, duration);
+            return 1f - (remaining / duration);
+        }
+
+        public void ResetRuntimeState()
+        {
+            for (int i = 0; i < cooldownRemaining.Length; i++)
+            {
+                cooldownRemaining[i] = 0f;
+            }
+
+            ClearPendingCast();
         }
 
         public SkillDefinitionSO GetSkill(int slotIndex)
@@ -139,6 +300,61 @@ namespace CampusRPG.Skills
                 GameObject effectInstance = Instantiate(skillDefinition.EffectPrefab, impactPoint, effectRotation);
                 Destroy(effectInstance, spawnedEffectLifetimeSeconds);
             }
+        }
+
+        private bool CanCommitCast(int slotIndex, SkillDefinitionSO skillDefinition)
+        {
+            if (skillDefinition == null || mana == null)
+            {
+                return false;
+            }
+
+            if (slotIndex < 0 || slotIndex >= cooldownRemaining.Length)
+            {
+                return false;
+            }
+
+            if (GetSkill(slotIndex) != skillDefinition || GetRemainingCooldown(slotIndex) > 0f)
+            {
+                return false;
+            }
+
+            if (!HasPendingCast || pendingSlotIndex != slotIndex || pendingSkill != skillDefinition)
+            {
+                return false;
+            }
+
+            return CanAfford(skillDefinition);
+        }
+
+        private bool TryRegisterPendingCast(int slotIndex, SkillDefinitionSO skillDefinition)
+        {
+            if (skillDefinition == null)
+            {
+                return false;
+            }
+
+            if (!HasPendingCast)
+            {
+                pendingSlotIndex = slotIndex;
+                pendingSkill = skillDefinition;
+                return true;
+            }
+
+            return pendingSlotIndex == slotIndex && pendingSkill == skillDefinition;
+        }
+
+        private void ClearPendingCast()
+        {
+            pendingSlotIndex = -1;
+            pendingSkill = null;
+        }
+
+        private bool CanAfford(SkillDefinitionSO skillDefinition)
+        {
+            return mana != null
+                && skillDefinition != null
+                && mana.CurrentValue >= Mathf.Max(0f, skillDefinition.ManaCost);
         }
     }
 }

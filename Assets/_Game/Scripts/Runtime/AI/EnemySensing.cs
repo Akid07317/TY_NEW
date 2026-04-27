@@ -1,4 +1,5 @@
 using CampusRPG.Character;
+using CampusRPG.Combat;
 using UnityEngine;
 
 namespace CampusRPG.AI
@@ -20,14 +21,16 @@ namespace CampusRPG.AI
                     continue;
                 }
 
-                PlayerCharacter playerCharacter = colliders[i].GetComponentInParent<PlayerCharacter>();
-
-                if (playerCharacter == null)
+                if (!TryResolveLivingPlayerTarget(colliders[i], out Transform candidate))
                 {
                     continue;
                 }
 
-                Transform candidate = playerCharacter.transform;
+                if (!EnemyAttackLineOfSight.HasClearShot(transform.root, origin, candidate))
+                {
+                    continue;
+                }
+
                 float sqrDistance = (candidate.position - origin).sqrMagnitude;
 
                 if (sqrDistance >= bestSqrDistance)
@@ -40,6 +43,33 @@ namespace CampusRPG.AI
             }
 
             return bestTarget;
+        }
+
+        private static bool TryResolveLivingPlayerTarget(Collider collider, out Transform candidate)
+        {
+            candidate = null;
+
+            if (collider == null)
+            {
+                return false;
+            }
+
+            PlayerCharacter playerCharacter = collider.GetComponentInParent<PlayerCharacter>();
+
+            if (playerCharacter == null)
+            {
+                return false;
+            }
+
+            HealthComponent health = playerCharacter.GetComponentInParent<HealthComponent>();
+
+            if (health != null && health.IsDead)
+            {
+                return false;
+            }
+
+            candidate = playerCharacter.transform;
+            return candidate != null;
         }
     }
 }

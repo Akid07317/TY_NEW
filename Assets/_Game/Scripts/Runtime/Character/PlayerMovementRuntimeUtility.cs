@@ -4,6 +4,8 @@ namespace CampusRPG.Character
 {
     public static class PlayerMovementRuntimeUtility
     {
+        private const float FlatCameraAxisMinSqrMagnitude = 0.0001f;
+
         public static Vector3 BuildCameraRelativeMoveDirection(Vector2 input, Transform cameraTransform)
         {
             if (input.sqrMagnitude <= Mathf.Epsilon)
@@ -16,12 +18,34 @@ namespace CampusRPG.Character
                 return new Vector3(input.x, 0f, input.y).normalized;
             }
 
-            Vector3 forward = cameraTransform.forward;
             Vector3 right = cameraTransform.right;
-            forward.y = 0f;
             right.y = 0f;
-            forward.Normalize();
-            right.Normalize();
+
+            if (right.sqrMagnitude <= FlatCameraAxisMinSqrMagnitude)
+            {
+                right = Vector3.right;
+            }
+            else
+            {
+                right.Normalize();
+            }
+
+            Vector3 forward = cameraTransform.forward;
+            forward.y = 0f;
+
+            if (forward.sqrMagnitude <= FlatCameraAxisMinSqrMagnitude)
+            {
+                forward = Vector3.Cross(right, Vector3.up);
+            }
+
+            if (forward.sqrMagnitude <= FlatCameraAxisMinSqrMagnitude)
+            {
+                forward = Vector3.forward;
+            }
+            else
+            {
+                forward.Normalize();
+            }
 
             Vector3 moveDirection = forward * input.y + right * input.x;
             return moveDirection.sqrMagnitude <= Mathf.Epsilon

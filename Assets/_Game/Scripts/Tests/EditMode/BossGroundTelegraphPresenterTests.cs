@@ -148,6 +148,63 @@ namespace CampusRPG.Tests
         }
 
         [Test]
+        public void BossGroundTelegraphPresenter_UsesLaneForChaseRollResponse()
+        {
+            EnemyArchetypeSO bossArchetype = ScriptableObject.CreateInstance<EnemyArchetypeSO>();
+            AttackDefinitionSO attack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+            GameObject bossObject = new GameObject("Boss_Gatekeeper");
+            GameObject targetObject = new GameObject("Player_Target");
+            GameObject presenterObject = new GameObject("BossGroundTelegraphPresenter");
+
+            try
+            {
+                SetPrivateField(bossArchetype, "archetypeType", EnemyArchetypeType.Boss);
+                SetPrivateField(bossArchetype, "attackDistance", 1.5f);
+                SetPrivateField(bossArchetype, "attacks", new[] { attack });
+                SetPrivateField(attack, "range", 4.2f);
+                SetPrivateField(attack, "radius", 0.6f);
+                SetPrivateField(attack, "enemyTargetResponse", EnemyTargetResponseType.ChaseRoll);
+
+                bossObject.transform.position = Vector3.zero;
+                targetObject.transform.position = new Vector3(0f, 0f, 6f);
+
+                HealthComponent health = bossObject.AddComponent<HealthComponent>();
+                health.SetMax(180f, true);
+
+                EnemyAttackController controller = bossObject.AddComponent<EnemyAttackController>();
+                EnemyStateMachine stateMachine = bossObject.AddComponent<EnemyStateMachine>();
+                EnemyBrain bossBrain = bossObject.AddComponent<EnemyBrain>();
+                SetPrivateField(bossBrain, "archetype", bossArchetype);
+                SetPrivateField(bossBrain, "health", health);
+                SetPrivateField(bossBrain, "attackController", controller);
+                SetPrivateField(bossBrain, "stateMachine", stateMachine);
+                SetPrivateField(bossBrain, "currentTarget", targetObject.transform);
+
+                BossGroundTelegraphPresenter presenter = presenterObject.AddComponent<BossGroundTelegraphPresenter>();
+                SetPrivateField(presenter, "bossEnemy", bossBrain);
+                SetPrivateField(presenter, "groundOffset", 0.1f);
+
+                SetPrivateField(stateMachine, "currentStateName", nameof(EnemyAttackState));
+                InvokeMethod(presenter, "Tick", 0f);
+                Assert.IsTrue(presenter.IsVisible);
+                Assert.AreEqual(BossGroundTelegraphPresenter.TelegraphMode.Attack, presenter.CurrentMode);
+                Assert.AreEqual(BossGroundTelegraphPresenter.TelegraphShape.AttackLane, presenter.CurrentShape);
+                Assert.AreEqual(0.6f, presenter.CurrentRadius, 0.001f);
+                Assert.AreEqual(4.2f, presenter.CurrentLength, 0.001f);
+                Assert.AreEqual(new Vector3(0f, 0.1f, 2.1f), presenter.CurrentPosition);
+                AssertVector3Approximately(Vector3.forward, presenter.CurrentDirection);
+            }
+            finally
+            {
+                Object.DestroyImmediate(presenterObject);
+                Object.DestroyImmediate(targetObject);
+                Object.DestroyImmediate(bossObject);
+                Object.DestroyImmediate(attack);
+                Object.DestroyImmediate(bossArchetype);
+            }
+        }
+
+        [Test]
         public void BossGroundTelegraphPresenter_UsesStylePrefabAndMaterials()
         {
             EnemyArchetypeSO bossArchetype = ScriptableObject.CreateInstance<EnemyArchetypeSO>();

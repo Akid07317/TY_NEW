@@ -10,6 +10,7 @@
 - `Assets/Kevin Iglesias`、`Assets/DoubleL`、`Assets/ithappy`、`Assets/JC_LP_MedievalCharacters_LITE` 这类目录只允许作为本地 local preview 候选源，不能再被当作正式默认输入源。
 - 敌人当前仍固定走 `CombatProxyVisualRoot` 代理外观基线；在补齐独立敌人 Animator / Avatar / 动画链之前，不启用 imported enemy 默认链。
 - 第三方原始资源目录不应直接提交到公开仓库；如果后续真要让某套角色或动作成为正式默认资源，应该先把可提交的净化结果落进 `_Game`，再由正式 builder 只读 `_Game`。
+- `ReleaseCandidatePreflightTests` 会检查发布场景依赖，正式场景不能直接依赖本清单中的 local-preview-only 目录或 `_Game/Animations/Characters/CombatTest/LocalPreview/` 生成物。
 
 ## 2. 当前目录清单
 
@@ -34,6 +35,9 @@
 - `Assets/_Game/Scripts/Editor/CombatTestAssetGenerator.cs`
   正式默认职责是生成 proxy / placeholder / approved `_Game` 动画资产。若要重建 imported player 动画，只能走显式的 local preview 菜单。
 
+- `Assets/_Game/Scripts/Tests/EditMode/ReleaseCandidatePreflightTests.cs`
+  发布候选守门。除了项目身份和 Build Settings，它还会检查正式场景依赖，防止 local preview / 第三方 raw asset 目录被误接进默认发布链。
+
 - `Assets/_Game/Scripts/Editor/CombatTestSceneBuilder.cs`
   标准 `Build` / `Repair` 路径应始终恢复玩家 proxy baseline；local preview 只允许走单独的显式菜单。
 
@@ -50,7 +54,7 @@
 4. 如需预览导入角色，再执行 `CampusRPG/Setup/Local Preview/Apply Imported Player Visuals To CombatTest Player Prefab`。
    当前会优先尝试 `Assets/JC_LP_MedievalCharacters_LITE/Prefabs/SM_MedievalMaleLite_01.prefab`；若不存在，再回退到 `Assets/Kevin Iglesias/` 下的兼容 Humanoid 角色。
    如果首选角色材质仍是 HDRP / 不受支持 shader，本地预览会自动在 `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/Materials/Player/` 下生成 built-in 兼容材质，避免玩家预览变成粉紫色。
-   如果本机存在 `Assets/Free medieval weapons/Prefabs/Sword_DH.prefab`，这一步还会把本地预览武器挂到 imported 右手骨，并自动隐藏 proxy 剑体，只保留前向标记。
+   如果本机存在 `Assets/Free medieval weapons/Prefabs/Sword_OH.prefab`，这一步会优先把这把单手剑挂到 imported 右手骨；若缺失才回退到其他本地武器候选，并自动隐藏 proxy 剑体，只保留前向标记。
 5. 如果你要给敌人单独试 imported humanoid Avatar 链，手动执行 `CampusRPG/Setup/Local Preview/Apply Imported Enemy Avatar Chain To CombatTest Enemy Prefabs`。
    这条链会按 skinned mesh 的最低点自动贴地，避免 enemy 预览模型埋进地面；同时攻击状态每次重新进入时都会从头重播 attack clip，防止看起来像没有攻击动画。
 6. 这一步会在 `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/` 下生成本地 AnimatorController；该目录只服务 local preview，不应提交。
@@ -82,3 +86,44 @@
 
 - 当前正式默认基线应恢复为“proxy visuals + proxy / approved `_Game` animations”。
 - 第三方素材目录现在只应作为 local preview 候选源存在，不能再被描述成正式默认来源。
+
+## 7. 地图灰盒与 CC0 候选池
+
+本节只服务第一章灰盒推进，目标不是立刻引入大包，而是先把“哪些候选公开仓库可安全考虑、哪些只能继续停留在本地候选”说清楚，避免后面临时找素材时把提交边界踩乱。
+
+### 7.1 当前优先级
+
+| 优先级 | 候选源 | 许可证判断 | 适合用途 | 当前建议 |
+|---|---|---|---|---|
+| `P1` | `Kenney Modular Dungeon Kit` | `CC0` | 第一章室内战斗灰盒、走廊、房间分块、门口节奏验证 | 尚未导入；若下一轮要补 Chapter01 / CombatTest 灰盒，这是最适合优先尝试的公开仓库安全候选 |
+| `P1` | `Quaternius LowPoly Modular Dungeon Pack` | `CC0` | 比 Kenney 稍完整的低模地下空间、柱子、墙体、转角、平台 | 尚未导入；适合在 Kenney 不够用时作为第二候选，不建议和 Kenney 混着先上 |
+| `P2` | `Assets/Polytope Studio/Lowpoly_Weapons` | 当前仅能确认是本地候选，不视为公开仓库安全默认源 | 武器摆件、环境小道具的视觉参考，不用于章节默认灰盒基线 | 保持 local candidate，不进入 `_Game` 正式默认链 |
+| `P3` | `Assets/Free medieval weapons/` | 当前仅作本地预览武器来源 | 玩家/敌人近战武器本地预览 | 继续只用于 local preview，不参与地图灰盒 |
+| `P3` | `Assets/MYFG-Weapon Pack Lite/` | 当前仅能确认是本地候选，不视为公开仓库安全默认源 | 武器候选、陈设参考 | 当前不接入 `_Game`，除非后续单独核清许可证并产出净化结果 |
+
+### 7.2 采用顺序
+
+后续如果要推进地图灰盒，默认按下面顺序：
+
+1. 先用 `_Game` 现有 primitive / proxy 模块把入口、主战斗空间、压迫段、Boss 前整备区搭出来。
+2. 只有当 `_Game` 原生灰盒已经不够表达路线、遮挡和战斗视线时，才考虑导入 `Kenney Modular Dungeon Kit`。
+3. `Kenney` 不够用时，再考虑 `Quaternius LowPoly Modular Dungeon Pack`，且一次只启用一套主模块风格，避免第一章视觉语言过早混杂。
+4. `Polytope Studio`、`Free medieval weapons`、`MYFG-Weapon Pack Lite` 继续只当本地参考或 local preview 候选，不默认进入章节灰盒主链。
+
+### 7.3 第一章灰盒最小落地建议
+
+如果下一轮要做 P1 地图升级，建议只先补 4 类模块，不要一口气扩成美术替换工程：
+
+- `入口读场块`：门框、短走廊、一个能看见首个战斗区的开口。
+- `普通混战块`：中等开阔房间，至少给玩家留一条侧向回避线。
+- `狭窄压迫块`：走廊或窄门，专门用来测试近战兵前压和镜头贴墙。
+- `Boss 前整备块`：短安全段 + 过门点，用来承接检查点、补给和 Boss 房进门视线。
+
+### 7.4 提交边界补充
+
+- 若后续真的导入 `Kenney` 或 `Quaternius`，必须先在本文件补充：
+  - 资源名称
+  - 许可证结论
+  - 仓库内是否允许直接提交 raw asset
+  - 若不直接提交，`_Game` 内的净化输出落点
+- 在这些信息补齐前，不要把任何新导入的第三方地图 raw asset 直接变成 `CombatTest` 或 `Chapter01` 的默认硬依赖。

@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 714aac83943c74b3faabadc19252ec0d, type: 3}
+  m_Name: SO_Attack_SwordArt_CrossStep
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Combat.AttackDefinitionSO
+  attackId: SwordArt_CrossStep
+  displayName: Cross Step
+  animationStateName: SwordArt_CrossStep
+  damageMultiplier: 1.7
+  startupSeconds: 0.09
+  activeSeconds: 0.1
+  recoverySeconds: 0.27
+  animationDurationSeconds: 0.5428
+  hitStopSeconds: 0.06
+  breaksGuard: 0
+  blockStunSeconds: 0
+  guardBreakHitStunSeconds: 0.12
+  forwardMovement: 0.86
+  movementSpeedScale: 0.84
+  range: 2.25
+  radius: 0.72
+  hitboxShape: 2
+  hitboxLocalCenter: {x: 0, y: 0, z: 1.125}
+  hitboxHalfExtents: {x: 0.828, y: 0.90000004, z: 0.90000004}
+  hitboxRadius: 0.72
+  hitboxActivationMode: 0
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 0
+  projectileLifetimeSeconds: 0
+  projectileSpawnOffset: 0
+  projectileTrajectoryMode: 0
+  projectileArcHeight: 0
+  enemyTargetResponse: 0

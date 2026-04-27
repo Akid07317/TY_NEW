@@ -1,0 +1,208 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-build-release <validate|mac|windows> [--use-temp-clone] [--clone-root <path>] [--wall-timeout <seconds>] [--log <path>]
+
+Runs the TY_NEW release-candidate build editor methods with an outer wall-clock
+timeout. Use validate before real package builds when you only need to check
+Build Settings and output paths.
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+PROJECT_VERSION_FILE="$PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
+PROJECT_NAME=$(basename "$PROJECT_ROOT")
+PROJECT_ROOT_TO_RUN="$PROJECT_ROOT"
+CLONE_ROOT="${TMPDIR:-/tmp}"
+USE_TEMP_CLONE=0
+CAN_INSPECT_PROCESSES=1
+WALL_TIMEOUT=900
+UNITY_PID=""
+STAMP=$(date +%Y%m%d_%H%M%S)
+LOG_FILE=""
+
+if [ $# -lt 1 ]; then
+  usage
+fi
+
+ACTION=$1
+shift
+
+case "$ACTION" in
+  validate)
+    EXECUTE_METHOD="CampusRPG.Editor.ReleaseCandidateBuildUtility.ValidateReleaseCandidateBuildInputs"
+    DEFAULT_TIMEOUT=240
+    ;;
+  mac)
+    EXECUTE_METHOD="CampusRPG.Editor.ReleaseCandidateBuildUtility.BuildMacOSReleaseCandidate"
+    DEFAULT_TIMEOUT=1800
+    ;;
+  windows)
+    EXECUTE_METHOD="CampusRPG.Editor.ReleaseCandidateBuildUtility.BuildWindowsReleaseCandidate"
+    DEFAULT_TIMEOUT=1800
+    ;;
+  -h|--help)
+    usage
+    ;;
+  *)
+    echo "Unknown build action: $ACTION" >&2
+    usage
+    ;;
+esac
+
+WALL_TIMEOUT=$DEFAULT_TIMEOUT
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --use-temp-clone)
+      USE_TEMP_CLONE=1
+      shift
+      ;;
+    --clone-root)
+      [ $# -ge 2 ] || usage
+      CLONE_ROOT=$2
+      shift 2
+      ;;
+    --wall-timeout)
+      [ $# -ge 2 ] || usage
+      WALL_TIMEOUT=$2
+      shift 2
+      ;;
+    --log)
+      [ $# -ge 2 ] || usage
+      LOG_FILE=$2
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+if [ ! -f "$PROJECT_VERSION_FILE" ]; then
+  echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
+  exit 1
+fi
+
+if [ -z "$LOG_FILE" ]; then
+  LOG_FILE="/tmp/${PROJECT_NAME}_release_${ACTION}_${STAMP}.log"
+fi
+
+create_temp_clone() {
+  mkdir -p "$CLONE_ROOT"
+  CLONE_PATH=$(mktemp -d "$CLONE_ROOT/${PROJECT_NAME}_build_clone.XXXXXX")
+
+  if ! command -v rsync >/dev/null 2>&1; then
+    echo "rsync is required to create a temporary clone for release builds." >&2
+    exit 1
+  fi
+
+  rsync -a \
+    --exclude '.git/' \
+    --exclude 'Library/' \
+    --exclude 'Logs/' \
+    --exclude 'Temp/' \
+    --exclude 'obj/' \
+    --exclude 'Build/' \
+    --exclude 'Builds/' \
+    --exclude '.DS_Store' \
+    "$PROJECT_ROOT/" "$CLONE_PATH/"
+
+  PROJECT_ROOT_TO_RUN="$CLONE_PATH"
+}
+
+cleanup_child() {
+  if [ -n "$UNITY_PID" ] && kill -0 "$UNITY_PID" >/dev/null 2>&1; then
+    kill "$UNITY_PID" >/dev/null 2>&1 || true
+    wait "$UNITY_PID" >/dev/null 2>&1 || true
+  fi
+}
+
+trap cleanup_child INT TERM
+
+if ! ps -axo comm= >/dev/null 2>&1; then
+  CAN_INSPECT_PROCESSES=0
+  USE_TEMP_CLONE=1
+  echo "Process inspection is unavailable in this shell; using a temporary clone for release build automation."
+fi
+
+if [ "$CAN_INSPECT_PROCESSES" -eq 1 ] && ps -axo comm= 2>/dev/null | grep -Fx "Unity Hub" >/dev/null 2>&1; then
+  echo "Unity Hub is running. Quit Unity Hub before running release build automation on macOS." >&2
+  exit 1
+fi
+
+if [ "$USE_TEMP_CLONE" -eq 1 ]; then
+  create_temp_clone
+  echo "Using temporary clone for release build automation: $PROJECT_ROOT_TO_RUN"
+elif pgrep -f "Contents/MacOS/Unity .* -projectPath $PROJECT_ROOT" >/dev/null 2>&1; then
+  create_temp_clone
+  echo "Detected another Unity Editor instance for $PROJECT_ROOT; using temporary clone: $PROJECT_ROOT_TO_RUN"
+fi
+
+UNITY_VERSION=$(sed -n 's/^m_EditorVersion: //p' "$PROJECT_VERSION_FILE" | head -n 1)
+UNITY_EDITOR="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/MacOS/Unity"
+
+if [ ! -x "$UNITY_EDITOR" ]; then
+  echo "Unity editor not found: $UNITY_EDITOR" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$LOG_FILE")"
+: > "$LOG_FILE"
+
+echo "Running release build action: $ACTION"
+echo "Project: $PROJECT_ROOT_TO_RUN"
+echo "Log: $LOG_FILE"
+echo "Timeout: ${WALL_TIMEOUT}s"
+
+"$UNITY_EDITOR" \
+  -batchmode \
+  -quit \
+  -projectPath "$PROJECT_ROOT_TO_RUN" \
+  -executeMethod "$EXECUTE_METHOD" \
+  -logFile "$LOG_FILE" &
+
+UNITY_PID=$!
+ELAPSED=0
+
+while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
+  if [ "$ELAPSED" -ge "$WALL_TIMEOUT" ]; then
+    echo "Unity release build action timed out after ${WALL_TIMEOUT}s." >&2
+    echo "Log: $LOG_FILE" >&2
+    cleanup_child
+    exit 124
+  fi
+
+  sleep 5
+  ELAPSED=$((ELAPSED + 5))
+done
+
+set +e
+wait "$UNITY_PID"
+EXIT_CODE=$?
+set -e
+UNITY_PID=""
+
+if [ "$EXIT_CODE" -ne 0 ]; then
+  echo "Unity release build action failed with exit code $EXIT_CODE." >&2
+  echo "Log: $LOG_FILE" >&2
+  tail -n 80 "$LOG_FILE" >&2 || true
+  exit "$EXIT_CODE"
+fi
+
+cat <<EOF
+TY_NEW release build action completed: $ACTION
+Project used: $PROJECT_ROOT_TO_RUN
+Log: $LOG_FILE
+
+Expected package outputs when a real build action is used:
+- Builds/ReleaseCandidate/Mac/TY_NEW.app
+- Builds/ReleaseCandidate/Windows/TY_NEW.exe
+EOF

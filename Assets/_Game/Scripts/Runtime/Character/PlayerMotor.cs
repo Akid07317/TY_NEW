@@ -166,6 +166,16 @@ namespace CampusRPG.Character
             return true;
         }
 
+        public void ApplyActionVerticalVelocity(float velocity, bool onlyIfHigher = true)
+        {
+            if (onlyIfHigher && verticalVelocity > velocity)
+            {
+                return;
+            }
+
+            verticalVelocity = velocity;
+        }
+
         public bool BeginMantle(Vector3 targetPosition, float durationSeconds)
         {
             if (durationSeconds <= 0f)
@@ -192,7 +202,12 @@ namespace CampusRPG.Character
             return true;
         }
 
-        public void Tick(Vector2 moveInput, bool jumpPressed, Transform cameraTransform, bool movementAllowed = true)
+        public void Tick(
+            Vector2 moveInput,
+            bool jumpPressed,
+            Transform cameraTransform,
+            bool movementAllowed = true,
+            float movementSpeedScale = 1f)
         {
             if (characterController == null)
             {
@@ -260,7 +275,8 @@ namespace CampusRPG.Character
                         lockOnStrafeSpeedScale,
                         lockOnBackwardSpeedScale)
                     : 1f;
-                Vector3 desiredPlanarVelocity = moveDirection * moveSpeed * speedScale;
+                float actionSpeedScale = Mathf.Clamp(movementSpeedScale, 0f, 1.25f);
+                Vector3 desiredPlanarVelocity = moveDirection * moveSpeed * speedScale * actionSpeedScale;
                 float acceleration = desiredPlanarVelocity.sqrMagnitude > Mathf.Epsilon ? groundAcceleration : groundDeceleration;
                 planarVelocity = Vector3.MoveTowards(planarVelocity, desiredPlanarVelocity, acceleration * Time.deltaTime);
                 animationMoveAxes = PlayerMovementRuntimeUtility.ResolveAnimationMoveAxes(transform, moveInput, moveDirection, isLockOnActive);

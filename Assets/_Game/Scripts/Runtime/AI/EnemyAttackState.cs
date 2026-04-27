@@ -15,11 +15,16 @@ namespace CampusRPG.AI
         private float recoveryTimer;
         private bool attackExecuted;
         private AttackDefinitionSO pendingAttack;
+        private EnemyAttackSelection pendingSelection;
+        private Vector3 committedAttackDirection;
+        private bool hasCommittedAttackDirection;
 
         public EnemyAttackState(EnemyBrain owner, EnemyStateMachine stateMachine) : base(owner)
         {
             this.stateMachine = stateMachine;
         }
+
+        public AttackDefinitionSO CurrentAttackDefinition => pendingAttack;
 
         public EnemyAttackPresentationPhase PresentationPhase
         {
@@ -82,10 +87,13 @@ namespace CampusRPG.AI
 
         public override void Enter()
         {
-            pendingAttack = Owner.AttackController != null && Owner.Archetype != null
-                ? Owner.AttackController.PreviewAttackForTarget(Owner.CurrentTarget, Owner.Archetype)
-                : null;
+            pendingSelection = Owner.AttackController != null && Owner.Archetype != null
+                ? Owner.AttackController.PreviewAttackSelectionForTarget(Owner.CurrentTarget, Owner.Archetype)
+                : default;
+            pendingAttack = pendingSelection.Attack;
             attackExecuted = false;
+            hasCommittedAttackDirection = false;
+            committedAttackDirection = Vector3.zero;
             recoveryTimer = 0f;
             attackLockTimer = Mathf.Max(0.08f, pendingAttack != null ? pendingAttack.StartupSeconds : 0.18f);
             attackStartupDuration = attackLockTimer;
@@ -119,6 +127,8 @@ namespace CampusRPG.AI
                     {
                         return;
                     }
+
+                    CommitAttackDirection();
                 }
 
                 if (TryAdvanceIntoAttack(ref remainingDelta))
@@ -126,12 +136,22 @@ namespace CampusRPG.AI
                     return;
                 }
 
+                CommitAttackDirection();
+
                 bool attackSucceeded = Owner.AttackController != null && Owner.Archetype != null
-                    ? Owner.AttackController.TryAttack(Owner.CurrentTarget, Owner.Archetype)
+                    ? Owner.AttackController.TryAttack(Owner.CurrentTarget, Owner.Archetype, pendingSelection)
                     : false;
 
                 if (!attackSucceeded)
                 {
+                    if (ShouldTreatFailedAttackAsWhiff())
+                    {
+                        Owner.AttackController?.RegisterCommittedMiss(Owner.Archetype, pendingSelection);
+                        attackExecuted = true;
+                        BeginRecovery(ResolveRecoveryDuration());
+                        return;
+                    }
+
                     SwitchAfterFailedAttack();
                     return;
                 }
@@ -144,13 +164,7 @@ namespace CampusRPG.AI
                     return;
                 }
 
-                recoveryTimer = ResolveRecoveryDuration();
-                attackRecoveryDuration = recoveryTimer;
-
-                if (recoveryTimer <= 0f)
-                {
-                    stateMachine.SwitchToChase();
-                }
+                BeginRecovery(ResolveRecoveryDuration());
 
                 return;
             }
@@ -163,6 +177,17 @@ namespace CampusRPG.AI
             }
 
             stateMachine.SwitchToChase();
+        }
+
+        private void BeginRecovery(float duration)
+        {
+            recoveryTimer = duration;
+            attackRecoveryDuration = recoveryTimer;
+
+            if (recoveryTimer <= 0f)
+            {
+                stateMachine.SwitchToChase();
+            }
         }
 
         private bool ShouldHoldRecovery()
@@ -232,10 +257,44 @@ namespace CampusRPG.AI
 
             if (distanceStep > 0f)
             {
-                Owner.Motor?.AdvanceTowardsTarget(Owner.CurrentTarget, distanceStep);
+                CommitAttackDirection();
+                Owner.Motor?.AdvanceAlongDirection(committedAttackDirection, distanceStep);
             }
 
             return attackAdvanceElapsed < attackAdvanceDuration;
+        }
+
+        private void CommitAttackDirection()
+        {
+            if (hasCommittedAttackDirection)
+            {
+                return;
+            }
+
+            Vector3 direction = Owner.CurrentTarget != null
+                ? Owner.CurrentTarget.position - Owner.transform.position
+                : Owner.transform.forward;
+            direction.y = 0f;
+
+            if (direction.sqrMagnitude <= Mathf.Epsilon)
+            {
+                direction = Owner.transform.forward;
+                direction.y = 0f;
+            }
+
+            if (direction.sqrMagnitude <= Mathf.Epsilon)
+            {
+                direction = Vector3.forward;
+            }
+
+            committedAttackDirection = direction.normalized;
+            Owner.transform.rotation = Quaternion.LookRotation(committedAttackDirection, Vector3.up);
+            hasCommittedAttackDirection = true;
+        }
+
+        private bool ShouldTreatFailedAttackAsWhiff()
+        {
+            return pendingAttack != null && pendingAttack.ProjectilePrefab == null;
         }
 
         private float ResolveAttackAdvanceDuration()

@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 714aac83943c74b3faabadc19252ec0d, type: 3}
+  m_Name: SO_Attack_Enemy_Gatekeeper_RollCatcher
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Combat.AttackDefinitionSO
+  attackId: Enemy_Gatekeeper_RollCatcher
+  displayName: Pursuit Slam
+  animationStateName: Enemy_Gatekeeper_RollCatcher
+  damageMultiplier: 1.12
+  startupSeconds: 0.28
+  activeSeconds: 0.12
+  recoverySeconds: 0.44
+  animationDurationSeconds: 0
+  hitStopSeconds: 0.08
+  breaksGuard: 0
+  blockStunSeconds: 0.08
+  guardBreakHitStunSeconds: 0.12
+  forwardMovement: 1.35
+  movementSpeedScale: 0.88
+  range: 4.25
+  radius: 0.65
+  hitboxShape: 2
+  hitboxLocalCenter: {x: 0, y: 0, z: 2.125}
+  hitboxHalfExtents: {x: 0.74749994, y: 0.8125, z: 1.7}
+  hitboxRadius: 0.65
+  hitboxActivationMode: 0
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 0
+  projectileLifetimeSeconds: 0
+  projectileSpawnOffset: 0
+  projectileTrajectoryMode: 0
+  projectileArcHeight: 0
+  enemyTargetResponse: 2

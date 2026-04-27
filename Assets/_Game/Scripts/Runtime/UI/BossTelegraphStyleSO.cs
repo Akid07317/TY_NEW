@@ -11,6 +11,8 @@ namespace CampusRPG.UI
         [SerializeField] private Color straightProjectileCueAccentColor = new Color(0.48f, 0.88f, 0.92f);
         [SerializeField] private Color arcProjectileCueAccentColor = new Color(1f, 0.58f, 0.32f);
         [SerializeField] private Color rangedCueAccentColor = new Color(0.78f, 0.88f, 0.56f);
+        [SerializeField] private Color antiAirCueAccentColor = new Color(0.42f, 0.72f, 1f);
+        [SerializeField] private Color chaseRollCueAccentColor = new Color(1f, 0.42f, 0.24f);
 
         [Header("Threat Pulse")]
         [SerializeField] private Color encounterPulseColor = new Color(0.95f, 0.54f, 0.14f, 0.22f);
@@ -38,6 +40,10 @@ namespace CampusRPG.UI
         public Color ArcProjectileCueAccentColor => arcProjectileCueAccentColor;
 
         public Color RangedCueAccentColor => rangedCueAccentColor;
+
+        public Color AntiAirCueAccentColor => antiAirCueAccentColor;
+
+        public Color ChaseRollCueAccentColor => chaseRollCueAccentColor;
 
         public Color EncounterPulseColor => encounterPulseColor;
 

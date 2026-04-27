@@ -100,13 +100,18 @@ namespace CampusRPG.AI
                 return;
             }
 
+            if (currentTarget != null && !HasLivingTarget(currentTarget))
+            {
+                ClearTarget();
+            }
+
             attackController?.Tick(Time.deltaTime);
             stateMachine?.Tick(Time.deltaTime);
         }
 
         public void SetTarget(Transform target)
         {
-            currentTarget = target;
+            currentTarget = HasLivingTarget(target) ? target : null;
         }
 
         public void ClearTarget()
@@ -149,6 +154,17 @@ namespace CampusRPG.AI
         private void HandleDeath()
         {
             stateMachine?.SwitchToDeath();
+        }
+
+        private static bool HasLivingTarget(Transform target)
+        {
+            if (target == null || !target.gameObject.activeInHierarchy)
+            {
+                return false;
+            }
+
+            HealthComponent targetHealth = target.GetComponentInParent<HealthComponent>();
+            return targetHealth == null || !targetHealth.IsDead;
         }
     }
 }

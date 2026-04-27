@@ -1,0 +1,109 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-v2-gate [--startup-timeout <seconds>] [--results-dir <path>] [--skip-full]
+
+Runs the TY_NEW V2 ambitious-roadmap validation gates through unity-run-tests.
+This script does not execute raw Unity -batchmode/-executeMethod commands.
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+RUN_TESTS="$PROJECT_ROOT/Tools/unity-cli/unity-run-tests"
+STARTUP_TIMEOUT=45
+RESULTS_DIR="/tmp"
+RUN_FULL=1
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --startup-timeout)
+      [ $# -ge 2 ] || usage
+      STARTUP_TIMEOUT=$2
+      shift 2
+      ;;
+    --results-dir)
+      [ $# -ge 2 ] || usage
+      RESULTS_DIR=$2
+      shift 2
+      ;;
+    --skip-full)
+      RUN_FULL=0
+      shift
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+mkdir -p "$RESULTS_DIR"
+
+STAMP=$(date +%Y%m%d_%H%M%S)
+
+run_gate() {
+  MODE=$1
+  NAME=$2
+  FILTER=$3
+  RESULTS_FILE="$RESULTS_DIR/TY_NEW_v2_${NAME}_${STAMP}.xml"
+  LOG_FILE="$RESULTS_DIR/TY_NEW_v2_${NAME}_${STAMP}.log"
+
+  echo "==> $NAME ($MODE)"
+
+  if [ -n "$FILTER" ]; then
+    "$RUN_TESTS" "$MODE" \
+      --group-filter "$FILTER" \
+      --use-temp-clone \
+      --startup-timeout "$STARTUP_TIMEOUT" \
+      --results "$RESULTS_FILE" \
+      --log "$LOG_FILE"
+  else
+    "$RUN_TESTS" "$MODE" \
+      --use-temp-clone \
+      --startup-timeout "$STARTUP_TIMEOUT" \
+      --results "$RESULTS_FILE" \
+      --log "$LOG_FILE"
+  fi
+}
+
+RELEASE_PREFLIGHT='^(CampusRPG\.Tests\.EditMode\.(ReleaseCandidatePreflightTests|BuildSettingsSceneOrderTests))$'
+P07_ACTION_EXPRESSION='^(CampusRPG\.Tests\.(PlayerStateMachineLifecycleTests|PlayerCombatControllerTests)|CampusRPG\.Tests\.EditMode\.(PlayerCombatAnimationRelayTests|PlayerCombatRuntimeUtilityTests|PlayerMovementRuntimeUtilityTests|CombatTestAnimationAssetWiringTests|CombatTestSwordArtAssetWiringTests|SwordArtResolverTests|CombatDebugHudActionFeedbackUtilityTests|ActionCameraFeedbackUtilityTests|ProceduralAudioUtilityTests))$'
+P15_MAP_EXPRESSION='^(CampusRPG\.Tests\.EditMode\.(Chapter01ProgressionSceneWiringTests|Chapter01ProgressionSceneFlowTests|BuildSettingsSceneOrderTests|CameraObstacleResolverTests)|CampusRPG\.Tests\.(KeyItemAcquisitionViewTests|ChapterCompleteViewTests))$'
+P25_SWORD_ART_EXPRESSION='^(CampusRPG\.Tests\.(PlayerStateMachineLifecycleTests|PlayerCombatControllerTests)|CampusRPG\.Tests\.EditMode\.(SwordArtResolverTests|CombatTestSwordArtAssetWiringTests|CombatTestAnimationAssetWiringTests|SwordArtHudUtilityTests|CombatDebugHudActionFeedbackUtilityTests|ActionCameraFeedbackUtilityTests|ProceduralAudioUtilityTests))$'
+P55_FEEDBACK_EXPRESSION='^(CampusRPG\.Tests\.(BossAttackCuePresenterTests|BossGroundTelegraphPresenterTests|BossImpactMarkerPresenterTests)|CampusRPG\.Tests\.EditMode\.(CombatDebugHudActionFeedbackUtilityTests|CombatDebugHudSkillStatusUtilityTests|SwordArtHudUtilityTests|ActionCameraFeedbackUtilityTests|ProceduralAudioUtilityTests|PlayerCombatAnimationRelayTests|ThirdPersonCameraControllerRuntimeStateTests|CameraObstacleResolverTests))$'
+P65_ENEMY_RESPONSE_EDITMODE='^(CampusRPG\.Tests\.(BossAttackCuePresenterTests|BossGroundTelegraphPresenterTests|BossImpactMarkerPresenterTests)|CampusRPG\.Tests\.EditMode\.(CombatTestEnemyAssetWiringTests|EnemyCombatAnimationPlanUtilityTests|BossTestSceneWiringTests|BuildSettingsSceneOrderTests|ActionCameraFeedbackUtilityTests|ProceduralAudioUtilityTests))$'
+P65_ENEMY_RESPONSE_PLAYMODE='^(CampusRPG\.Tests\.PlayMode\.(EnemyAttackControllerTests|BossTestRuntimeFlowPlayModeTests))$'
+RUNTIME_SMOKE='^(CampusRPG\.Tests\.PlayMode\.(SmokeBootPlayModeTests|Chapter01RuntimeFlowPlayModeTests|BossTestRuntimeFlowPlayModeTests))$'
+
+run_gate EditMode release_preflight "$RELEASE_PREFLIGHT"
+run_gate EditMode p07_action_expression "$P07_ACTION_EXPRESSION"
+run_gate EditMode p15_map_expression "$P15_MAP_EXPRESSION"
+run_gate EditMode p25_sword_art_expression "$P25_SWORD_ART_EXPRESSION"
+run_gate EditMode p55_feedback_expression "$P55_FEEDBACK_EXPRESSION"
+run_gate EditMode p65_enemy_response "$P65_ENEMY_RESPONSE_EDITMODE"
+run_gate PlayMode p65_enemy_response_runtime "$P65_ENEMY_RESPONSE_PLAYMODE"
+run_gate PlayMode runtime_smoke "$RUNTIME_SMOKE"
+
+if [ "$RUN_FULL" -eq 1 ]; then
+  run_gate EditMode full_editmode ""
+  run_gate PlayMode full_playmode ""
+fi
+
+cat <<EOF
+TY_NEW V2 gate completed.
+Results/logs are under: $RESULTS_DIR
+
+This gate covers:
+- P0.7 action expression
+- P1.5 map expression
+- P2.5 SwordArt expression
+- P5.5 feedback expression
+- P6.5 enemy response
+- Runtime smoke
+EOF

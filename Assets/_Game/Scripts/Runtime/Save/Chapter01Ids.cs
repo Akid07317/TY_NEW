@@ -30,6 +30,7 @@ namespace CampusRPG.Save
         public static class KeyItems
         {
             public const string GateSigil = "KeyItem_GateSigil";
+            public const string SideRouteCache = "KeyItem_SideRouteCache";
             public const string RitualCore = "KeyItem_RitualCore";
         }
     }

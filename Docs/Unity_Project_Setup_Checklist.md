@@ -114,20 +114,22 @@
 
 ### Build Settings 顺序建议
 
-当前临时建议先把可玩主章节放到第一位：
+当前发布候选顺序以正式入口为第一位：
 
-1. `Chapter01_Combined.unity`
-2. `Bootstrap.unity`
-3. `MainMenu.unity`
+1. `MainMenu.unity`
+2. `Chapter01_Combined.unity`
+3. `Bootstrap.unity`
 4. `CombatTest.unity`
 5. `BossTest.unity`
+
+发布候选构建入口统一走 `CampusRPG/Build/Validate Release Candidate Build Inputs`、`CampusRPG/Build/Build macOS Release Candidate` 或 `CampusRPG/Build/Build Windows Release Candidate`。终端自动化入口统一走 `Tools/unity-cli/ty-new-build-release validate|mac|windows --use-temp-clone`，确保 `-executeMethod` 外层有墙钟上限、独立 log 和临时克隆保护。输出固定在 `.gitignore` 已忽略的 `Builds/ReleaseCandidate/` 下。
 
 ### 当前模板内容处理建议
 
 - `Assets/OutdoorsScene.unity` 仅作参考模板，不要继续在其上堆正式内容
 - 正式生产统一迁入 `Assets/_Game/Scenes/`
 - 当前这 5 个正式 Scene 是从模板场景复制出的占位基础版，后续应在 Unity 内分别整理内容与 Lighting
-- `Bootstrap.unity` 与 `MainMenu.unity` 当前仍是旧模板占位壳，没有形成真正的启动/菜单闭环；在它们补成可用前，`Build And Run` 默认应直接进入 `Chapter01_Combined.unity`，避免玩家启动后只看到背景色
+- `MainMenu.unity` 是当前发布候选第一入口；`Chapter01_Combined.unity` 保持第二场景，供继续第一章和运行时 smoke 直接加载
 - `Chapter01_Combined.unity` 当前灰盒已包含 `Area03` 室内锁门清怪段，并用清场结果放出 `GateSigil`
 - `Chapter01_Combined.unity` 现已在 `ChapterFlow` 上接入 `AreaEntryView`，会在玩家进入入口、庭院、校舍内部与 Boss 区时给出一次短时到达提示，帮助玩家快速确认自己到了哪一段
 - `Chapter01_Combined.unity` 现已在 `ChapterFlow` 上接入 `CheckpointActivationView`，会在玩家踩到 `CP01/CP02/CP03` 时给出短提示，明确告知复活点已经前移

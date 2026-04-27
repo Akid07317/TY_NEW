@@ -120,6 +120,68 @@ namespace CampusRPG.UI
         }
     }
 
+    public readonly struct ChapterObjectiveLayout
+    {
+        public ChapterObjectiveLayout(Rect panelRect, Rect titleRect, Rect headingRect, Rect bodyRect)
+        {
+            PanelRect = panelRect;
+            TitleRect = titleRect;
+            HeadingRect = headingRect;
+            BodyRect = bodyRect;
+        }
+
+        public Rect PanelRect { get; }
+
+        public Rect TitleRect { get; }
+
+        public Rect HeadingRect { get; }
+
+        public Rect BodyRect { get; }
+    }
+
+    public static class ChapterObjectiveLayoutUtility
+    {
+        private const float HorizontalMargin = 18f;
+        private const float VerticalMargin = 12f;
+        private const float TopOffset = 18f;
+        private const float MaxWidth = 360f;
+        private const float MinWidth = 240f;
+        private const float Height = 118f;
+        private const float PaddingX = 18f;
+        private const float TopPadding = 12f;
+        private const float BottomPadding = 10f;
+
+        public static ChapterObjectiveLayout Build(float screenWidth, float screenHeight)
+        {
+            float availableWidth = Mathf.Max(1f, screenWidth - HorizontalMargin * 2f);
+            float minimumWidth = Mathf.Min(MinWidth, availableWidth);
+            float width = Mathf.Clamp(availableWidth, minimumWidth, MaxWidth);
+
+            float availableHeight = Mathf.Max(1f, screenHeight - VerticalMargin * 2f);
+            float height = Mathf.Min(Height, availableHeight);
+            float maxTop = Mathf.Max(VerticalMargin, screenHeight - height - VerticalMargin);
+            float top = Mathf.Clamp(TopOffset, VerticalMargin, maxTop);
+            float maxLeft = Mathf.Max(0f, screenWidth - width - HorizontalMargin);
+            float left = Mathf.Clamp(HorizontalMargin, 0f, maxLeft);
+            Rect panelRect = new Rect(left, top, width, height);
+
+            float textX = panelRect.x + PaddingX;
+            float textWidth = Mathf.Max(1f, panelRect.width - PaddingX * 2f);
+            float titleHeight = Mathf.Min(20f, Mathf.Max(12f, height * 0.17f));
+            float headingHeight = Mathf.Min(28f, Mathf.Max(20f, height * 0.24f));
+            float titleY = panelRect.y + TopPadding;
+            float headingY = titleY + titleHeight + 2f;
+            float bodyY = headingY + headingHeight + 4f;
+            float bodyHeight = Mathf.Max(1f, panelRect.yMax - BottomPadding - bodyY);
+
+            return new ChapterObjectiveLayout(
+                panelRect,
+                new Rect(textX, titleY, textWidth, titleHeight),
+                new Rect(textX, headingY, textWidth, headingHeight),
+                new Rect(textX, bodyY, textWidth, bodyHeight));
+        }
+    }
+
     [DisallowMultipleComponent]
     public sealed class ChapterObjectiveView : MonoBehaviour
     {
@@ -188,16 +250,12 @@ namespace CampusRPG.UI
 
             EnsureStyles();
 
-            const float panelWidth = 360f;
-            const float panelHeight = 118f;
-            Rect panelRect = new Rect(18f, 18f, panelWidth, panelHeight);
+            ChapterObjectiveLayout layout = ChapterObjectiveLayoutUtility.Build(Screen.width, Screen.height);
 
-            GUI.Box(panelRect, GUIContent.none, panelStyle);
-
-            float textX = panelRect.x + 18f;
-            GUI.Label(new Rect(textX, panelRect.y + 12f, panelRect.width - 36f, 20f), panelTitle, titleStyle);
-            GUI.Label(new Rect(textX, panelRect.y + 34f, panelRect.width - 36f, 28f), currentPlan.Heading, headingStyle);
-            GUI.Label(new Rect(textX, panelRect.y + 66f, panelRect.width - 36f, 42f), currentPlan.Body, bodyStyle);
+            GUI.Box(layout.PanelRect, GUIContent.none, panelStyle);
+            GUI.Label(layout.TitleRect, panelTitle, titleStyle);
+            GUI.Label(layout.HeadingRect, currentPlan.Heading, headingStyle);
+            GUI.Label(layout.BodyRect, currentPlan.Body, bodyStyle);
         }
 
         private void HandleProgressChanged()

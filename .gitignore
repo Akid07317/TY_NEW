@@ -52,3 +52,14 @@ Exports/
 # Local preview generated assets
 Assets/_Game/Animations/Characters/CombatTest/LocalPreview/
 Assets/_Game/Animations/Characters/CombatTest/LocalPreview.meta
+
+# Local-only third-party preview/import sources
+Assets/Free medieval weapons/
+Assets/Free medieval weapons.meta
+Assets/MYFG-Weapon Pack Lite/
+Assets/MYFG-Weapon Pack Lite.meta
+Assets/Polytope Studio/
+Assets/Polytope Studio.meta
+Assets/LocalPreviewTools/
+Assets/LocalPreviewTools.meta
+cod_omnimovement_unity_starter_/

@@ -115,12 +115,17 @@ namespace CampusRPG.UI
 
         private static BossImpactMarkerPresenter.MarkerShape ResolveShape(AttackDefinitionSO attack)
         {
-            if (attack == null || attack.ProjectilePrefab == null)
+            if (attack == null)
             {
                 return BossImpactMarkerPresenter.MarkerShape.ImpactCircle;
             }
 
-            return attack.ProjectileTrajectoryMode == ProjectileTrajectoryMode.Straight
+            if (attack.EnemyTargetResponse == EnemyTargetResponseType.ChaseRoll)
+            {
+                return BossImpactMarkerPresenter.MarkerShape.AttackLane;
+            }
+
+            return attack.ProjectilePrefab != null && attack.ProjectileTrajectoryMode == ProjectileTrajectoryMode.Straight
                 ? BossImpactMarkerPresenter.MarkerShape.AttackLane
                 : BossImpactMarkerPresenter.MarkerShape.ImpactCircle;
         }

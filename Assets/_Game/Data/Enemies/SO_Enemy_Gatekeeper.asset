@@ -29,4 +29,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 86cfe03d0c78f4e48bf143e9c828bb8b, type: 2}
   - {fileID: 11400000, guid: 66f69e2d5b5a4c53a8e32ae4137f0711, type: 2}
   - {fileID: 11400000, guid: 8d6e498673d44d37b7170c7d019d5b71, type: 2}
+  - {fileID: 11400000, guid: 99716177c6aae44a6af7d0957ed9c899, type: 2}
+  - {fileID: 11400000, guid: 026c3a6e9a70545b29289e0e29d590d7, type: 2}
   dropTableId: BossGatekeeper

@@ -15,6 +15,14 @@ namespace CampusRPG.Combat
         AnimationEvent = 1
     }
 
+    public enum EnemyTargetResponseType
+    {
+        None = 0,
+        AntiAir = 1,
+        ChaseRoll = 2,
+        GuardBreak = 3
+    }
+
     [CreateAssetMenu(fileName = "SO_AttackDefinition", menuName = "CampusRPG/Combat/Attack Definition")]
     public sealed class AttackDefinitionSO : ScriptableObject
     {
@@ -27,7 +35,11 @@ namespace CampusRPG.Combat
         [SerializeField] private float recoverySeconds = 0.25f;
         [SerializeField] private float animationDurationSeconds;
         [SerializeField] private float hitStopSeconds = 0.05f;
+        [SerializeField] private bool breaksGuard;
+        [SerializeField] private float blockStunSeconds;
+        [SerializeField] private float guardBreakHitStunSeconds = 0.12f;
         [SerializeField] private float forwardMovement = 0.5f;
+        [SerializeField] private float movementSpeedScale = 0.65f;
         [SerializeField] private float range = 2f;
         [SerializeField] private float radius = 0.5f;
         [SerializeField] private AttackHitboxShape hitboxShape = AttackHitboxShape.LegacyForwardSphere;
@@ -41,6 +53,7 @@ namespace CampusRPG.Combat
         [SerializeField] private float projectileSpawnOffset = 0.35f;
         [SerializeField] private ProjectileTrajectoryMode projectileTrajectoryMode = ProjectileTrajectoryMode.PrefabDefault;
         [SerializeField] private float projectileArcHeight;
+        [SerializeField] private EnemyTargetResponseType enemyTargetResponse;
 
         public string AttackId => attackId;
 
@@ -60,7 +73,15 @@ namespace CampusRPG.Combat
 
         public float HitStopSeconds => hitStopSeconds;
 
+        public bool BreaksGuard => breaksGuard;
+
+        public float BlockStunSeconds => Mathf.Max(0f, blockStunSeconds);
+
+        public float GuardBreakHitStunSeconds => Mathf.Max(0f, guardBreakHitStunSeconds);
+
         public float ForwardMovement => forwardMovement;
+
+        public float MovementSpeedScale => movementSpeedScale > 0f ? Mathf.Clamp(movementSpeedScale, 0.1f, 1.25f) : 1f;
 
         public float Range => range;
 
@@ -87,5 +108,7 @@ namespace CampusRPG.Combat
         public ProjectileTrajectoryMode ProjectileTrajectoryMode => projectileTrajectoryMode;
 
         public float ProjectileArcHeight => projectileArcHeight;
+
+        public EnemyTargetResponseType EnemyTargetResponse => enemyTargetResponse;
     }
 }

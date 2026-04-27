@@ -16,6 +16,11 @@ namespace CampusRPG.Tests
             Assert.AreEqual("Gate Sigil Recovered", gateSigilPlan.Title);
             Assert.AreEqual("The boss gate is open. Push forward into the gatekeeper arena.", gateSigilPlan.Body);
 
+            KeyItemAcquisitionPlan sideRouteCachePlan = KeyItemAcquisitionPlanner.Build(Chapter01Ids.KeyItems.SideRouteCache);
+            Assert.IsTrue(sideRouteCachePlan.IsVisible);
+            Assert.AreEqual("Side Route Cache Recovered", sideRouteCachePlan.Title);
+            Assert.AreEqual("Optional cache secured. Use the shortcut return or push toward the boss gate.", sideRouteCachePlan.Body);
+
             KeyItemAcquisitionPlan ritualCorePlan = KeyItemAcquisitionPlanner.Build(Chapter01Ids.KeyItems.RitualCore);
             Assert.IsTrue(ritualCorePlan.IsVisible);
             Assert.AreEqual("Ritual Core Recovered", ritualCorePlan.Title);

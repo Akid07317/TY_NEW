@@ -1,6 +1,8 @@
+using System.Reflection;
 using CampusRPG.Save;
 using CampusRPG.UI;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace CampusRPG.Tests.EditMode
 {
@@ -52,7 +54,7 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
-        public void ResumePlanner_WithCompletedSave_ShowsEndingReminder()
+        public void ResumePlanner_WithCompletedSave_IsHiddenToAvoidDuplicatingChapterCompleteCard()
         {
             ChapterSaveData saveData = new ChapterSaveData
             {
@@ -64,9 +66,47 @@ namespace CampusRPG.Tests.EditMode
 
             ChapterResumeContextPlan plan = ChapterResumeContextPlanner.Build(saveData);
 
-            Assert.IsTrue(plan.IsVisible);
-            Assert.AreEqual("Resume: Chapter Complete", plan.Title);
-            Assert.AreEqual("The Ritual Core is already secured. Walk forward to review the ending card.", plan.Body);
+            Assert.IsFalse(plan.IsVisible);
+            Assert.AreEqual(string.Empty, plan.Title);
+            Assert.AreEqual(string.Empty, plan.Body);
+        }
+
+        [Test]
+        public void ResumeContextView_HiddenPlanClearsStaleResumePresentation()
+        {
+            GameObject viewObject = new GameObject("ChapterResumeContextView");
+
+            try
+            {
+                ChapterResumeContextView view = viewObject.AddComponent<ChapterResumeContextView>();
+                ChapterResumeContextPlan visiblePlan = new ChapterResumeContextPlan(
+                    "Resume: CP03 / School Interior",
+                    "The boss route is open.",
+                    true);
+
+                InvokePrivateMethod(view, "Show", visiblePlan);
+
+                Assert.IsTrue(view.IsVisible);
+                Assert.AreEqual("Resume: CP03 / School Interior", view.CurrentTitle);
+                Assert.AreEqual("The boss route is open.", view.CurrentBody);
+
+                InvokePrivateMethod(view, "Show", ChapterResumeContextPlan.Hidden);
+
+                Assert.IsFalse(view.IsVisible);
+                Assert.AreEqual(string.Empty, view.CurrentTitle);
+                Assert.AreEqual(string.Empty, view.CurrentBody);
+            }
+            finally
+            {
+                Object.DestroyImmediate(viewObject);
+            }
+        }
+
+        private static void InvokePrivateMethod(object instance, string methodName, params object[] arguments)
+        {
+            MethodInfo method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(method, methodName);
+            method.Invoke(instance, arguments);
         }
     }
 }

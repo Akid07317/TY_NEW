@@ -17,6 +17,8 @@ MonoBehaviour:
   manaCost: 20
   cooldownSeconds: 6
   castDurationSeconds: 0.18
+  allowsMovementDuringCast: 1
+  movementSpeedScale: 0.55
   range: 9
   damageMultiplier: 1.6
   impactRadius: 0.75

@@ -8,6 +8,29 @@ namespace CampusRPG.Tests.EditMode
     public sealed class PlayerMovementRuntimeUtilityTests
     {
         [Test]
+        public void BuildCameraRelativeMoveDirection_UsesCameraRight_WhenCameraIsTopDown()
+        {
+            GameObject cameraObject = new GameObject("Camera");
+
+            try
+            {
+                cameraObject.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+
+                Vector3 direction = PlayerMovementRuntimeUtility.BuildCameraRelativeMoveDirection(
+                    Vector2.up,
+                    cameraObject.transform);
+
+                Assert.AreEqual(0f, direction.x, 0.001f);
+                Assert.AreEqual(0f, direction.y, 0.001f);
+                Assert.Greater(direction.z, 0.99f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(cameraObject);
+            }
+        }
+
+        [Test]
         public void ResolveLockOnMoveSpeedScale_ReturnsBackwardScale_WhenMovingBackward()
         {
             GameObject actor = new GameObject("Actor");

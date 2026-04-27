@@ -16,9 +16,20 @@ MonoBehaviour:
   counterWindowSeconds: 0.8
   dodgeFollowUpWindowSeconds: 0.8
   dodgeDurationSeconds: 0.25
+  dodgeInvulnerableStartupSeconds: 0.04
   dodgeInvulnerableSeconds: 0.2
   dodgeDistance: 2.8
   dodgeBackwardDistanceScale: 0.88
+  combatRollDurationSeconds: 0.42
+  combatRollInvulnerableStartupSeconds: 0.08
+  combatRollInvulnerableSeconds: 0.18
+  combatRollDistance: 3.6
+  airDodgeDurationSeconds: 0.28
+  airDodgeInvulnerableStartupSeconds: 0.03
+  airDodgeInvulnerableSeconds: 0.16
+  airDodgeDistance: 2.35
+  airDodgeVerticalVelocity: 3.2
+  guardStartupSeconds: 0.08
   guardCounterGaugeGain: 20
   dodgeAgilityGaugeGain: 25
   defaultHitStopSeconds: 0.05

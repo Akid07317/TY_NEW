@@ -1,0 +1,99 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-final-gate [--startup-timeout <seconds>] [--results-dir <path>] [--skip-full]
+
+Runs the TY_NEW release-candidate validation gates through unity-run-tests.
+This script does not execute raw Unity -batchmode/-executeMethod commands.
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+RUN_TESTS="$PROJECT_ROOT/Tools/unity-cli/unity-run-tests"
+STARTUP_TIMEOUT=45
+RESULTS_DIR="/tmp"
+RUN_FULL=1
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --startup-timeout)
+      [ $# -ge 2 ] || usage
+      STARTUP_TIMEOUT=$2
+      shift 2
+      ;;
+    --results-dir)
+      [ $# -ge 2 ] || usage
+      RESULTS_DIR=$2
+      shift 2
+      ;;
+    --skip-full)
+      RUN_FULL=0
+      shift
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+mkdir -p "$RESULTS_DIR"
+
+STAMP=$(date +%Y%m%d_%H%M%S)
+
+run_gate() {
+  MODE=$1
+  NAME=$2
+  FILTER=$3
+  RESULTS_FILE="$RESULTS_DIR/TY_NEW_${NAME}_${STAMP}.xml"
+  LOG_FILE="$RESULTS_DIR/TY_NEW_${NAME}_${STAMP}.log"
+
+  echo "==> $NAME ($MODE)"
+
+  if [ -n "$FILTER" ]; then
+    "$RUN_TESTS" "$MODE" \
+      --group-filter "$FILTER" \
+      --use-temp-clone \
+      --startup-timeout "$STARTUP_TIMEOUT" \
+      --results "$RESULTS_FILE" \
+      --log "$LOG_FILE"
+  else
+    "$RUN_TESTS" "$MODE" \
+      --use-temp-clone \
+      --startup-timeout "$STARTUP_TIMEOUT" \
+      --results "$RESULTS_FILE" \
+      --log "$LOG_FILE"
+  fi
+}
+
+RELEASE_PREFLIGHT='^(CampusRPG\.Tests\.EditMode\.(ReleaseCandidatePreflightTests|BuildSettingsSceneOrderTests))$'
+P06_COMBAT='^(CampusRPG\.Tests\.(PlayerStateMachineLifecycleTests|PlayerCombatControllerTests)|CampusRPG\.Tests\.EditMode\.(DamageableReactionUtilityTests|PlayerCombatAnimationRelayTests|ThirdPersonCameraControllerRuntimeStateTests|CombatTestEnemyAssetWiringTests|CombatTestAnimationAssetWiringTests|CombatTestSwordArtAssetWiringTests|CameraObstacleResolverTests|PlayerCombatRuntimeUtilityTests))$'
+CHAPTER_BOSS='^(CampusRPG\.Tests\.EditMode\.(BossTestSceneWiringTests|BuildSettingsSceneOrderTests|Chapter01ProgressionSceneWiringTests|Chapter01ProgressionSceneFlowTests|Chapter01BossPresentationSceneWiringTests|BossPresentationRigTests|BossArenaStatusPresenterTests|BossCombatHintViewTests|ChapterCompleteViewTests|KeyItemBeaconViewTests))$'
+RUNTIME_SMOKE='^(CampusRPG\.Tests\.PlayMode\.(SmokeBootPlayModeTests|Chapter01RuntimeFlowPlayModeTests|BossTestRuntimeFlowPlayModeTests))$'
+
+run_gate EditMode release_preflight "$RELEASE_PREFLIGHT"
+run_gate EditMode p06_combat "$P06_COMBAT"
+run_gate EditMode chapter_boss "$CHAPTER_BOSS"
+run_gate PlayMode runtime_smoke "$RUNTIME_SMOKE"
+
+if [ "$RUN_FULL" -eq 1 ]; then
+  run_gate EditMode full_editmode ""
+  run_gate PlayMode full_playmode ""
+fi
+
+cat <<EOF
+TY_NEW final gate completed.
+Results/logs are under: $RESULTS_DIR
+
+Build dry-run is covered by ReleaseCandidatePreflightTests.
+Use the safe release build wrapper for package validation/builds:
+- Tools/unity-cli/ty-new-build-release validate --use-temp-clone
+- Tools/unity-cli/ty-new-build-release mac --use-temp-clone
+- Tools/unity-cli/ty-new-build-release windows --use-temp-clone
+EOF

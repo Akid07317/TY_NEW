@@ -17,9 +17,11 @@ namespace CampusRPG.Character
             this.skillSlotIndex = skillSlotIndex;
         }
 
-        public override bool AllowsMovement => false;
+        public override bool AllowsMovement => skillDefinition != null && skillDefinition.AllowsMovementDuringCast;
 
         public override bool AllowsJump => false;
+
+        public override float MovementSpeedScale => skillDefinition != null ? skillDefinition.MovementSpeedScale : 0f;
 
         public override void Enter()
         {
@@ -53,11 +55,19 @@ namespace CampusRPG.Character
         {
             if (!hasCommitted)
             {
-                Owner.SkillController?.CommitCast(skillDefinition);
+                Owner.SkillController?.TryCommitCast(skillSlotIndex, skillDefinition);
                 hasCommitted = true;
             }
 
             stateMachine.SwitchToLocomotion();
+        }
+
+        public override void Exit()
+        {
+            if (!hasCommitted)
+            {
+                Owner.SkillController?.CancelPendingCast(skillSlotIndex, skillDefinition);
+            }
         }
     }
 }

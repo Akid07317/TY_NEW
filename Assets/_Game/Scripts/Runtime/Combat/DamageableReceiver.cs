@@ -9,7 +9,7 @@ namespace CampusRPG.Combat
         [SerializeField] private HealthComponent health;
         [SerializeField] private PlayerCharacter playerCharacter;
         [SerializeField] private EnemyBrain enemyBrain;
-        [SerializeField] private float playerHitStunSeconds = 0.2f;
+        [SerializeField] private float playerHitStunSeconds = 0.08f;
 
         private void Awake()
         {
@@ -31,19 +31,29 @@ namespace CampusRPG.Combat
 
         public void ReceiveDamage(float amount, Vector3 hitPoint, GameObject source)
         {
+            ReceiveDamage(amount, hitPoint, source, null);
+        }
+
+        public void ReceiveDamage(float amount, Vector3 hitPoint, GameObject source, AttackDefinitionSO incomingAttack)
+        {
             if (health == null || health.IsDead)
             {
                 return;
             }
 
-            DamageDefenseOutcome defenseOutcome = DamageableReactionUtility.ResolveDefenseOutcome(playerCharacter);
+            DamageDefenseOutcome defenseOutcome = DamageableReactionUtility.ResolveDefenseOutcome(
+                playerCharacter,
+                incomingAttack);
 
-            if (defenseOutcome != DamageDefenseOutcome.None)
+            if (defenseOutcome == DamageDefenseOutcome.SuccessfulDodge)
             {
-                if (defenseOutcome == DamageDefenseOutcome.SuccessfulBlock)
-                {
-                    playerCharacter.CombatController?.NotifySuccessfulBlock();
-                }
+                return;
+            }
+
+            if (defenseOutcome == DamageDefenseOutcome.SuccessfulBlock)
+            {
+                playerCharacter.StateMachine?.ApplyBlockStun(incomingAttack != null ? incomingAttack.BlockStunSeconds : 0f);
+                playerCharacter.CombatController?.NotifySuccessfulBlock();
 
                 return;
             }
@@ -59,11 +69,18 @@ namespace CampusRPG.Combat
                 playerCharacter,
                 enemyBrain,
                 source,
-                playerHitStunSeconds);
+                DamageableReactionUtility.ResolvePlayerHitStunSeconds(
+                    playerHitStunSeconds,
+                    defenseOutcome,
+                    incomingAttack));
 
             if (reactionPlan.PlayerHitStunSeconds > 0f)
             {
-                playerCharacter.StateMachine?.SwitchToHit(reactionPlan.PlayerHitStunSeconds);
+                PlayerHitReactionType reactionType = defenseOutcome == DamageDefenseOutcome.GuardBroken
+                    ? PlayerHitReactionType.GuardBreak
+                    : PlayerHitReactionType.Standard;
+
+                playerCharacter.StateMachine?.SwitchToHit(reactionPlan.PlayerHitStunSeconds, reactionType);
             }
 
             if (enemyBrain != null && reactionPlan.EnemyTarget != null)

@@ -84,6 +84,11 @@ namespace CampusRPG.Camera
             SetCurrentTarget(null);
         }
 
+        public void ResetRuntimeState()
+        {
+            SetCurrentTarget(null);
+        }
+
         private Transform FindBestTarget()
         {
             return LockOnTargetSearchUtility.FindBestTarget(

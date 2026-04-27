@@ -18,6 +18,8 @@ namespace CampusRPG.Skills
         [SerializeField] private float manaCost = 20f;
         [SerializeField] private float cooldownSeconds = 6f;
         [SerializeField] private float castDurationSeconds = 0.25f;
+        [SerializeField] private bool allowsMovementDuringCast;
+        [SerializeField] private float movementSpeedScale = 0.5f;
         [SerializeField] private float range = 8f;
         [SerializeField] private float damageMultiplier = 1.6f;
         [SerializeField] private float impactRadius = 1f;
@@ -39,6 +41,10 @@ namespace CampusRPG.Skills
         public float CooldownSeconds => cooldownSeconds;
 
         public float CastDurationSeconds => castDurationSeconds;
+
+        public bool AllowsMovementDuringCast => allowsMovementDuringCast;
+
+        public float MovementSpeedScale => movementSpeedScale > 0f ? Mathf.Clamp(movementSpeedScale, 0.1f, 1.25f) : 1f;
 
         public float Range => range;
 

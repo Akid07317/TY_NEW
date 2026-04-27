@@ -21,13 +21,17 @@ MonoBehaviour:
   recoverySeconds: 0.22
   animationDurationSeconds: 0.472
   hitStopSeconds: 0.05
+  breaksGuard: 0
+  blockStunSeconds: 0
+  guardBreakHitStunSeconds: 0.12
   forwardMovement: 0.5
-  range: 1.6
-  radius: 0.45
+  movementSpeedScale: 0.78
+  range: 1.75
+  radius: 0.52
   hitboxShape: 2
-  hitboxLocalCenter: {x: 0, y: 0, z: 0.8}
-  hitboxHalfExtents: {x: 0.5175, y: 0.5625, z: 0.64000005}
-  hitboxRadius: 0.45
+  hitboxLocalCenter: {x: 0, y: 0, z: 0.875}
+  hitboxHalfExtents: {x: 0.598, y: 0.65, z: 0.7}
+  hitboxRadius: 0.52
   hitboxActivationMode: 0
   projectilePrefab: {fileID: 0}
   projectileSpeed: 0
@@ -35,3 +39,4 @@ MonoBehaviour:
   projectileSpawnOffset: 0
   projectileTrajectoryMode: 0
   projectileArcHeight: 0
+  enemyTargetResponse: 0

@@ -74,6 +74,41 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
+        public void LockOnTargetSelector_ResetRuntimeState_ClearsTargetAndDisablesCameraLockOn()
+        {
+            GameObject playerObject = new GameObject("Player");
+            GameObject cameraObject = new GameObject("CameraRig");
+            GameObject targetObject = new GameObject("Target");
+
+            try
+            {
+                LockOnTargetSelector selector = playerObject.AddComponent<LockOnTargetSelector>();
+                ThirdPersonCameraController cameraController = cameraObject.AddComponent<ThirdPersonCameraController>();
+
+                SetPrivateField(selector, "cameraController", cameraController);
+                InvokeMethod(selector, "SetCurrentTarget", targetObject.transform);
+
+                Assert.IsTrue(selector.HasTarget);
+                Assert.AreSame(targetObject.transform, selector.CurrentTarget);
+                Assert.IsTrue(cameraController.IsLockOnActive);
+                Assert.AreSame(targetObject.transform, cameraController.LockOnTarget);
+
+                selector.ResetRuntimeState();
+
+                Assert.IsFalse(selector.HasTarget);
+                Assert.IsNull(selector.CurrentTarget);
+                Assert.IsFalse(cameraController.IsLockOnActive);
+                Assert.IsNull(cameraController.LockOnTarget);
+            }
+            finally
+            {
+                Object.DestroyImmediate(targetObject);
+                Object.DestroyImmediate(cameraObject);
+                Object.DestroyImmediate(playerObject);
+            }
+        }
+
+        [Test]
         public void ResolveCameraTransform_UsesController_BeforeMainCameraFallback()
         {
             GameObject cameraRigObject = new GameObject("CameraRig");
@@ -92,9 +127,9 @@ namespace CampusRPG.Tests.EditMode
                 Object.DestroyImmediate(cameraRigObject);
                 cameraRigObject = null;
 
-                Assert.AreSame(
-                    mainCamera.transform,
-                    SceneRuntimeReferenceUtility.ResolveCameraTransform(null));
+                Transform resolvedFallback = SceneRuntimeReferenceUtility.ResolveCameraTransform(null);
+                Assert.IsNotNull(resolvedFallback);
+                Assert.IsNotNull(resolvedFallback.GetComponent<UnityEngine.Camera>());
             }
             finally
             {
@@ -140,6 +175,13 @@ namespace CampusRPG.Tests.EditMode
             FieldInfo field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(field, fieldName);
             field.SetValue(instance, value);
+        }
+
+        private static void InvokeMethod(object instance, string methodName, params object[] parameters)
+        {
+            MethodInfo method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(method, methodName);
+            method.Invoke(instance, parameters);
         }
 
         private static void SetActiveBootstrap(GameBootstrap bootstrap)

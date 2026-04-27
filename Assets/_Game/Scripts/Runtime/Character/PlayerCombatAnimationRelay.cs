@@ -1,4 +1,6 @@
+using CampusRPG.Camera;
 using CampusRPG.Combat;
+using CampusRPG.Composition;
 using UnityEngine;
 
 namespace CampusRPG.Character
@@ -6,11 +8,15 @@ namespace CampusRPG.Character
     [DisallowMultipleComponent]
     public sealed class PlayerCombatAnimationRelay : MonoBehaviour
     {
-        private const string LocomotionStateName = "Locomotion";
+        public const string LocomotionStateName = "Locomotion";
+        public const string AirborneStateName = "Airborne";
+        public const string HitStateName = "Hit";
+        public const string GuardBreakHitStateName = "GuardBreak";
+        public const string GroundDodgeStateName = "Dodge";
+        public const string CombatRollStateName = "CombatRoll";
+        public const string AirDodgeStateName = "AirDodge";
+
         private const string BlockStateName = "Block";
-        private const string AirborneStateName = "Airborne";
-        private const string DodgeStateName = "Dodge";
-        private const string HitStateName = "Hit";
         private const string DeathStateName = "Death";
 
         private static readonly int GroundSpeedHash = Animator.StringToHash("GroundSpeed");
@@ -25,17 +31,22 @@ namespace CampusRPG.Character
         [SerializeField] private PlayerStateMachine stateMachine;
         [SerializeField] private PlayerMotor motor;
         [SerializeField] private Animator animator;
+        [SerializeField] private ThirdPersonCameraController cameraController;
         [SerializeField] private Transform proxyWeaponGrip;
         [SerializeField] private Transform importedWeaponAnchor;
         [SerializeField] private int baseLayerIndex;
-        [SerializeField] private float crossFadeSeconds = 0.05f;
-        [SerializeField] private float locomotionDampSeconds = 0.08f;
+        [SerializeField] private float crossFadeSeconds = 0.035f;
+        [SerializeField] private float locomotionDampSeconds = 0.05f;
         [SerializeField] private float dodgeAnimationDurationSeconds = 0.4f;
-        [SerializeField] private float hitAnimationDurationSeconds = 0.35f;
+        [SerializeField] private float combatRollAnimationDurationSeconds = 0.52f;
+        [SerializeField] private float airDodgeAnimationDurationSeconds = 0.34f;
+        [SerializeField] private float hitAnimationDurationSeconds = 0.26f;
         [SerializeField] private float proxyWeaponFollowSmoothing = 24f;
         [SerializeField] private float immediateProxyWeaponFollowSeconds = 0.12f;
         [SerializeField] private float snapProxyWeaponFollowAngleDegrees = 12f;
         [SerializeField] private float snapProxyWeaponFollowDistance = 0.025f;
+        [SerializeField] private float guardBreakCameraImpulseDistance = 0.18f;
+        [SerializeField] private float guardBreakCameraImpulseSeconds = 0.16f;
 
         private static readonly string[] ImportedWeaponAnchorCandidateNames =
         {
@@ -55,7 +66,13 @@ namespace CampusRPG.Character
 
         public float DodgeAnimationDurationSeconds => Mathf.Max(0.01f, dodgeAnimationDurationSeconds);
 
+        public float CombatRollAnimationDurationSeconds => Mathf.Max(0.01f, combatRollAnimationDurationSeconds);
+
+        public float AirDodgeAnimationDurationSeconds => Mathf.Max(0.01f, airDodgeAnimationDurationSeconds);
+
         public float HitAnimationDurationSeconds => Mathf.Max(0.01f, hitAnimationDurationSeconds);
+
+        public PlayerHitReactionType CurrentHitReactionType { get; private set; } = PlayerHitReactionType.Standard;
 
         private void Awake()
         {
@@ -84,6 +101,7 @@ namespace CampusRPG.Character
                 animator = GetComponent<Animator>();
             }
 
+            ResolveCameraController();
             EnsureProxyWeaponReferences();
             CaptureProxyWeaponDefaults();
         }
@@ -158,7 +176,15 @@ namespace CampusRPG.Character
 
         public void PlayAttack(AttackDefinitionSO attackDefinition)
         {
-            if (animator == null || attackDefinition == null || string.IsNullOrWhiteSpace(attackDefinition.AnimationStateName))
+            if (attackDefinition == null)
+            {
+                return;
+            }
+
+            TriggerAttackCameraFeedback(attackDefinition);
+            TriggerAttackAudioFeedback(attackDefinition);
+
+            if (animator == null || string.IsNullOrWhiteSpace(attackDefinition.AnimationStateName))
             {
                 return;
             }
@@ -178,7 +204,26 @@ namespace CampusRPG.Character
 
         public void NotifyStateChanged(PlayerState previousState, PlayerState currentState)
         {
-            if (animator == null || currentState == null)
+            if (currentState == null)
+            {
+                return;
+            }
+
+            CurrentHitReactionType = currentState is PlayerHitState hitState
+                ? hitState.ReactionType
+                : PlayerHitReactionType.Standard;
+
+            if (currentState is PlayerHitState)
+            {
+                TriggerHitReactionFeedback(CurrentHitReactionType);
+            }
+
+            if (currentState is PlayerDodgeState dodgeStateForFeedback)
+            {
+                TriggerEvasiveActionFeedback(dodgeStateForFeedback.ActionType);
+            }
+
+            if (animator == null)
             {
                 return;
             }
@@ -190,15 +235,15 @@ namespace CampusRPG.Character
                     immediateProxyWeaponFollowSeconds);
             }
 
-            if (currentState is PlayerDodgeState)
+            if (currentState is PlayerDodgeState dodgeState)
             {
-                CrossFadeState(DodgeStateName);
+                CrossFadeState(ResolveEvasiveActionStateName(dodgeState.ActionType));
                 return;
             }
 
             if (currentState is PlayerHitState)
             {
-                CrossFadeState(HitStateName);
+                CrossFadeState(ResolveHitReactionStateName(CurrentHitReactionType));
                 return;
             }
 
@@ -228,8 +273,84 @@ namespace CampusRPG.Character
 
             if (currentState is PlayerLocomotionState && isRecoveringFromAction)
             {
-                CrossFadeState(motor != null && !motor.IsGrounded ? AirborneStateName : LocomotionStateName);
+                CrossFadeState(ResolveActionRecoveryStateName(motor != null, motor == null || motor.IsGrounded));
             }
+        }
+
+        public static string ResolveActionRecoveryStateName(bool hasGroundingSource, bool isGrounded)
+        {
+            return hasGroundingSource && !isGrounded ? AirborneStateName : LocomotionStateName;
+        }
+
+        public static string ResolveHitReactionStateName(PlayerHitReactionType reactionType)
+        {
+            return reactionType == PlayerHitReactionType.GuardBreak ? GuardBreakHitStateName : HitStateName;
+        }
+
+        public static string ResolveEvasiveActionStateName(PlayerEvasiveActionType actionType)
+        {
+            return actionType switch
+            {
+                PlayerEvasiveActionType.CombatRoll => CombatRollStateName,
+                PlayerEvasiveActionType.AirDodge => AirDodgeStateName,
+                _ => GroundDodgeStateName
+            };
+        }
+
+        public float ResolveEvasiveAnimationDurationSeconds(PlayerEvasiveActionType actionType)
+        {
+            return actionType switch
+            {
+                PlayerEvasiveActionType.CombatRoll => CombatRollAnimationDurationSeconds,
+                PlayerEvasiveActionType.AirDodge => AirDodgeAnimationDurationSeconds,
+                _ => DodgeAnimationDurationSeconds
+            };
+        }
+
+        private void TriggerHitReactionFeedback(PlayerHitReactionType reactionType)
+        {
+            if (reactionType != PlayerHitReactionType.GuardBreak)
+            {
+                return;
+            }
+
+            TriggerActionAudioFeedback(ProceduralAudioUtility.ResolveHitReactionCue(reactionType));
+            ResolveCameraController();
+            ActionCameraFeedbackUtility.TryRequestImpulse(
+                cameraController,
+                transform,
+                ActionCameraFeedbackUtility.ResolveGuardBreakImpulse(
+                    guardBreakCameraImpulseDistance,
+                    guardBreakCameraImpulseSeconds));
+        }
+
+        private void TriggerEvasiveActionFeedback(PlayerEvasiveActionType actionType)
+        {
+            TriggerActionAudioFeedback(ProceduralAudioUtility.ResolveEvasiveActionCue(actionType));
+            ResolveCameraController();
+            ActionCameraFeedbackUtility.TryRequestImpulse(
+                cameraController,
+                transform,
+                ActionCameraFeedbackUtility.ResolveEvasiveImpulse(actionType));
+        }
+
+        private void TriggerAttackCameraFeedback(AttackDefinitionSO attackDefinition)
+        {
+            ResolveCameraController();
+            ActionCameraFeedbackUtility.TryRequestImpulse(
+                cameraController,
+                transform,
+                ActionCameraFeedbackUtility.ResolvePlayerAttackImpulse(attackDefinition));
+        }
+
+        private void TriggerAttackAudioFeedback(AttackDefinitionSO attackDefinition)
+        {
+            TriggerActionAudioFeedback(ProceduralAudioUtility.ResolvePlayerAttackCue(attackDefinition));
+        }
+
+        private void TriggerActionAudioFeedback(ProceduralActionAudioPlan plan)
+        {
+            ProceduralAudioUtility.TryPlayActionCue(transform.position, plan);
         }
 
         private void CrossFadeState(string stateName)
@@ -240,6 +361,11 @@ namespace CampusRPG.Character
             }
 
             animator.CrossFadeInFixedTime(stateName, Mathf.Max(0f, crossFadeSeconds), baseLayerIndex);
+        }
+
+        private void ResolveCameraController()
+        {
+            cameraController = SceneRuntimeReferenceUtility.ResolveCameraController(cameraController);
         }
 
         private static bool RequiresImmediateProxyWeaponFollow(PlayerState state)

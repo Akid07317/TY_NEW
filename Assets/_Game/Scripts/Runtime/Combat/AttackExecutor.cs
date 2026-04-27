@@ -30,12 +30,17 @@ namespace CampusRPG.Combat
 
             return plan.Shape switch
             {
-                AttackHitboxShape.Box => ExecuteBox(plan.Center, plan.HalfExtents, plan.Rotation, plan.Damage, source),
-                _ => ExecuteSphere(plan.Center, plan.Radius, plan.Damage, source)
+                AttackHitboxShape.Box => ExecuteBox(plan.Center, plan.HalfExtents, plan.Rotation, plan.Damage, source, definition),
+                _ => ExecuteSphere(plan.Center, plan.Radius, plan.Damage, source, definition)
             };
         }
 
-        public int ExecuteSphere(Vector3 sphereCenter, float radius, float damage, GameObject source)
+        public int ExecuteSphere(
+            Vector3 sphereCenter,
+            float radius,
+            float damage,
+            GameObject source,
+            AttackDefinitionSO attackDefinition = null)
         {
             if (radius <= 0f)
             {
@@ -52,13 +57,19 @@ namespace CampusRPG.Combat
 
             for (int i = 0; i < colliders.Length; i++)
             {
-                TryApplyDamage(colliders[i], attackOrigin.position, damage, source);
+                TryApplyDamage(colliders[i], attackOrigin.position, damage, source, attackDefinition);
             }
 
             return hitTargets.Count;
         }
 
-        public int ExecuteBox(Vector3 center, Vector3 halfExtents, Quaternion rotation, float damage, GameObject source)
+        public int ExecuteBox(
+            Vector3 center,
+            Vector3 halfExtents,
+            Quaternion rotation,
+            float damage,
+            GameObject source,
+            AttackDefinitionSO attackDefinition = null)
         {
             if (halfExtents.x <= 0f || halfExtents.y <= 0f || halfExtents.z <= 0f)
             {
@@ -76,13 +87,18 @@ namespace CampusRPG.Combat
 
             for (int i = 0; i < colliders.Length; i++)
             {
-                TryApplyDamage(colliders[i], center, damage, source);
+                TryApplyDamage(colliders[i], center, damage, source, attackDefinition);
             }
 
             return hitTargets.Count;
         }
 
-        private void TryApplyDamage(Collider collider, Vector3 hitReferencePoint, float damage, GameObject source)
+        private void TryApplyDamage(
+            Collider collider,
+            Vector3 hitReferencePoint,
+            float damage,
+            GameObject source,
+            AttackDefinitionSO attackDefinition)
         {
             if (!AttackHitboxExecutionUtility.TryResolveDamageable(collider, source, out IDamageable damageable))
             {
@@ -94,7 +110,15 @@ namespace CampusRPG.Combat
                 return;
             }
 
-            damageable.ReceiveDamage(damage, ResolveHitPoint(collider, hitReferencePoint), source);
+            Vector3 hitPoint = ResolveHitPoint(collider, hitReferencePoint);
+
+            if (damageable is DamageableReceiver damageableReceiver)
+            {
+                damageableReceiver.ReceiveDamage(damage, hitPoint, source, attackDefinition);
+                return;
+            }
+
+            damageable.ReceiveDamage(damage, hitPoint, source);
         }
 
         private static Vector3 ResolveHitPoint(Collider collider, Vector3 fallbackPoint)

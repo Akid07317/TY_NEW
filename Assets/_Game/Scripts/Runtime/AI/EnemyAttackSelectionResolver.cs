@@ -1,3 +1,4 @@
+using CampusRPG.Character;
 using CampusRPG.Combat;
 using UnityEngine;
 
@@ -42,8 +43,23 @@ namespace CampusRPG.AI
             }
 
             float targetDistance = ResolveFlatTargetDistance(attackOrigin, target);
+            EnemyTargetResponseType targetResponse = ResolveTargetResponseType(attackOrigin, target);
+
+            if (TryResolveTargetResponseSelection(
+                archetype,
+                baseline,
+                targetDistance,
+                targetResponse,
+                lastAttackIndex,
+                repeatSelectionSlack,
+                canUseAttack,
+                out EnemyAttackSelection responseSelection))
+            {
+                return responseSelection;
+            }
+
             EnemyAttackSelection fallback = baseline;
-            bool hasFallback = baseline.Attack != null;
+            bool hasFallback = baseline.Attack != null && IsAttackUsableForTargetResponse(baseline.Attack, targetResponse);
             float fallbackRange = hasFallback ? ResolveAttackRange(archetype, baseline.Attack) : float.MinValue;
             EnemyAttackSelection bestViable = baseline;
             bool hasBestViable = false;
@@ -60,6 +76,11 @@ namespace CampusRPG.AI
                 AttackDefinitionSO candidateAttack = archetype.Attacks[candidateIndex];
 
                 if (candidateAttack == null)
+                {
+                    continue;
+                }
+
+                if (!IsAttackUsableForTargetResponse(candidateAttack, targetResponse))
                 {
                     continue;
                 }
@@ -116,6 +137,45 @@ namespace CampusRPG.AI
             return includeFallbackRange && hasFallback ? fallback : baseline;
         }
 
+        public static EnemyTargetResponseType ResolveTargetResponseType(Transform attackOrigin, Transform target)
+        {
+            if (target == null)
+            {
+                return EnemyTargetResponseType.None;
+            }
+
+            PlayerStateMachine stateMachine = target.GetComponentInParent<PlayerStateMachine>();
+
+            if (stateMachine != null)
+            {
+                if (stateMachine.CurrentEvasiveActionType == PlayerEvasiveActionType.AirDodge)
+                {
+                    return EnemyTargetResponseType.AntiAir;
+                }
+
+                if (stateMachine.CurrentEvasiveActionType == PlayerEvasiveActionType.CombatRoll)
+                {
+                    return EnemyTargetResponseType.ChaseRoll;
+                }
+            }
+
+            float verticalDelta = ResolveTargetVerticalDelta(attackOrigin, target);
+
+            if (verticalDelta >= 0.75f)
+            {
+                return EnemyTargetResponseType.AntiAir;
+            }
+
+            PlayerMotor motor = target.GetComponentInParent<PlayerMotor>();
+
+            if (motor != null && !motor.IsGrounded && verticalDelta >= 0.35f)
+            {
+                return EnemyTargetResponseType.AntiAir;
+            }
+
+            return EnemyTargetResponseType.None;
+        }
+
         public static int ResolveAttackIndex(EnemyArchetypeSO archetype, int attackIndex)
         {
             if (archetype == null || archetype.Attacks == null || archetype.Attacks.Length == 0)
@@ -158,6 +218,96 @@ namespace CampusRPG.AI
                 && archetype.Attacks.Length > 1;
         }
 
+        private static bool TryResolveTargetResponseSelection(
+            EnemyArchetypeSO archetype,
+            EnemyAttackSelection baseline,
+            float targetDistance,
+            EnemyTargetResponseType targetResponse,
+            int lastAttackIndex,
+            float repeatSelectionSlack,
+            global::System.Func<AttackDefinitionSO, bool> canUseAttack,
+            out EnemyAttackSelection selection)
+        {
+            selection = baseline;
+
+            if (targetResponse == EnemyTargetResponseType.None)
+            {
+                return false;
+            }
+
+            EnemyAttackSelection bestViable = baseline;
+            bool hasBestViable = false;
+            float bestScore = float.MaxValue;
+            int bestOffset = int.MaxValue;
+            EnemyAttackSelection bestAlternate = baseline;
+            bool hasBestAlternate = false;
+            float bestAlternateScore = float.MaxValue;
+            int bestAlternateOffset = int.MaxValue;
+
+            for (int offset = 0; offset < archetype.Attacks.Length; offset++)
+            {
+                int candidateIndex = (baseline.Index + offset) % archetype.Attacks.Length;
+                AttackDefinitionSO candidateAttack = archetype.Attacks[candidateIndex];
+
+                if (candidateAttack == null || candidateAttack.EnemyTargetResponse != targetResponse)
+                {
+                    continue;
+                }
+
+                if (canUseAttack != null && !canUseAttack(candidateAttack))
+                {
+                    continue;
+                }
+
+                float candidateRange = ResolveAttackRange(archetype, candidateAttack);
+
+                if (targetDistance > candidateRange)
+                {
+                    continue;
+                }
+
+                float candidateScore = ResolveBossAttackPreferenceScore(archetype, candidateAttack, targetDistance);
+
+                if (IsPreferredCandidate(candidateScore, offset, bestScore, bestOffset))
+                {
+                    bestViable = new EnemyAttackSelection(candidateAttack, candidateIndex);
+                    bestScore = candidateScore;
+                    bestOffset = offset;
+                    hasBestViable = true;
+                }
+
+                if (candidateIndex != lastAttackIndex
+                    && IsPreferredCandidate(candidateScore, offset, bestAlternateScore, bestAlternateOffset))
+                {
+                    bestAlternate = new EnemyAttackSelection(candidateAttack, candidateIndex);
+                    bestAlternateScore = candidateScore;
+                    bestAlternateOffset = offset;
+                    hasBestAlternate = true;
+                }
+            }
+
+            if (!hasBestViable)
+            {
+                return false;
+            }
+
+            selection = bestViable.Index == lastAttackIndex
+                && hasBestAlternate
+                && bestAlternateScore <= bestScore + Mathf.Max(0f, repeatSelectionSlack)
+                    ? bestAlternate
+                    : bestViable;
+            return true;
+        }
+
+        private static bool IsAttackUsableForTargetResponse(
+            AttackDefinitionSO attack,
+            EnemyTargetResponseType targetResponse)
+        {
+            return attack == null
+                || attack.EnemyTargetResponse == EnemyTargetResponseType.None
+                || attack.EnemyTargetResponse == targetResponse;
+        }
+
         private static float ResolveBossAttackPreferenceScore(
             EnemyArchetypeSO archetype,
             AttackDefinitionSO attack,
@@ -198,6 +348,16 @@ namespace CampusRPG.AI
             Vector3 flatDirection = target.position - attackOrigin.position;
             flatDirection.y = 0f;
             return flatDirection.magnitude;
+        }
+
+        private static float ResolveTargetVerticalDelta(Transform attackOrigin, Transform target)
+        {
+            if (attackOrigin == null || target == null)
+            {
+                return 0f;
+            }
+
+            return target.position.y - attackOrigin.position.y;
         }
     }
 }

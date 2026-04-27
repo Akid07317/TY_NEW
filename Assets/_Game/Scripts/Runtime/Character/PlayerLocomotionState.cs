@@ -25,6 +25,11 @@ namespace CampusRPG.Character
                 return;
             }
 
+            if (IsAirborneWithoutExecutableSwordArt())
+            {
+                return;
+            }
+
             stateMachine.SwitchToAttack(PlayerAttackRequest.Light);
         }
 
@@ -36,12 +41,23 @@ namespace CampusRPG.Character
                 return;
             }
 
+            if (IsAirborneWithoutExecutableSwordArt())
+            {
+                return;
+            }
+
             stateMachine.SwitchToAttack(PlayerAttackRequest.Heavy);
         }
 
         public override void HandleDodge()
         {
-            stateMachine.SwitchToDodge();
+            if (IsAirborne())
+            {
+                stateMachine.SwitchToAirDodge();
+                return;
+            }
+
+            stateMachine.SwitchToDodge(ResolveGroundEvasiveActionType());
         }
 
         public override void HandleSkill1()
@@ -52,6 +68,26 @@ namespace CampusRPG.Character
         public override void HandleSkill2()
         {
             stateMachine.SwitchToSkill(1);
+        }
+
+        private bool IsAirborneWithoutExecutableSwordArt()
+        {
+            return IsAirborne()
+                && (Owner.CombatController == null || !Owner.CombatController.TryPreviewBufferedSwordArt(out _, out _));
+        }
+
+        private bool IsAirborne()
+        {
+            return Owner.Motor != null && !Owner.Motor.IsGrounded;
+        }
+
+        private PlayerEvasiveActionType ResolveGroundEvasiveActionType()
+        {
+            bool hasLockOnTarget = Owner.LockOnTargetSelector != null && Owner.LockOnTargetSelector.CurrentTarget != null;
+            bool hasCommittedMoveInput = Owner.InputReader != null && Owner.InputReader.MoveValue.sqrMagnitude >= 0.25f;
+            return !hasLockOnTarget && hasCommittedMoveInput
+                ? PlayerEvasiveActionType.CombatRoll
+                : PlayerEvasiveActionType.GroundDodge;
         }
     }
 }

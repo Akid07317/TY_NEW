@@ -17,6 +17,8 @@ MonoBehaviour:
   straightProjectileCueAccentColor: {r: 0.34, g: 0.86, b: 0.97, a: 1}
   arcProjectileCueAccentColor: {r: 0.97, g: 0.53, b: 0.28, a: 1}
   rangedCueAccentColor: {r: 0.74, g: 0.91, b: 0.67, a: 1}
+  antiAirCueAccentColor: {r: 0.42, g: 0.72, b: 1, a: 1}
+  chaseRollCueAccentColor: {r: 1, g: 0.42, b: 0.24, a: 1}
   encounterPulseColor: {r: 0.92, g: 0.62, b: 0.18, a: 0.22}
   attackPulseColor: {r: 0.9, g: 0.2, b: 0.18, a: 0.26}
   groundTelegraphVisualPrefab: {fileID: 6709925139911200042, guid: e5b75133dd80e4fb3913a87b3d6b644a, type: 3}

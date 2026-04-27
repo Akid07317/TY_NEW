@@ -56,16 +56,21 @@ namespace CampusRPG.Interaction
 
         private void OnTriggerEnter(Collider other)
         {
-            if (isCollected || other.GetComponentInParent<PlayerCharacter>() == null)
+            TryCollect(other);
+        }
+
+        public bool TryCollect(Collider other)
+        {
+            if (isCollected || other == null || other.GetComponentInParent<PlayerCharacter>() == null)
             {
-                return;
+                return false;
             }
 
             ResolveReferences();
 
             if (chapterProgressService == null || string.IsNullOrWhiteSpace(keyItemId))
             {
-                return;
+                return false;
             }
 
             bool changed = completeChapterOnPickup
@@ -74,12 +79,13 @@ namespace CampusRPG.Interaction
 
             if (!changed)
             {
-                return;
+                return false;
             }
 
             isCollected = true;
             disabledByCollectedState = true;
             gameObject.SetActive(false);
+            return true;
         }
 
         private void HandleProgressChanged()

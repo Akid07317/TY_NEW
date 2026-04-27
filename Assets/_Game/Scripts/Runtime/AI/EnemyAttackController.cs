@@ -6,8 +6,8 @@ namespace CampusRPG.AI
     public sealed class EnemyAttackController : MonoBehaviour
     {
         [SerializeField] private Transform attackOrigin;
-        [SerializeField] private float rangePadding = 0.35f;
-        [SerializeField] private float maxHitAngle = 70f;
+        [SerializeField] private float rangePadding = 0.08f;
+        [SerializeField] private float maxHitAngle = 45f;
         [SerializeField] private float bossRepeatSelectionSlack = 0.3f;
 
         private float cooldownTimer;
@@ -45,7 +45,12 @@ namespace CampusRPG.AI
 
         public AttackDefinitionSO PreviewAttackForTarget(Transform target, EnemyArchetypeSO archetype)
         {
-            return ResolveAttackSelection(target, archetype, includeFallbackRange: true).Attack;
+            return PreviewAttackSelectionForTarget(target, archetype).Attack;
+        }
+
+        public EnemyAttackSelection PreviewAttackSelectionForTarget(Transform target, EnemyArchetypeSO archetype)
+        {
+            return ResolveAttackSelection(target, archetype, includeFallbackRange: true);
         }
 
         public float GetAttackRangeForTarget(Transform target, EnemyArchetypeSO archetype)
@@ -61,8 +66,7 @@ namespace CampusRPG.AI
                 return false;
             }
 
-            AttackDefinitionSO attack = PreviewNextAttack(archetype);
-            return attack == null || attack.ProjectilePrefab == null || HasClearShot(target);
+            return HasClearShot(target);
         }
 
         public bool HasAttackClearShotForTarget(Transform target, EnemyArchetypeSO archetype)
@@ -72,8 +76,7 @@ namespace CampusRPG.AI
                 return false;
             }
 
-            AttackDefinitionSO attack = PreviewAttackForTarget(target, archetype);
-            return attack == null || attack.ProjectilePrefab == null || HasClearShot(target);
+            return HasClearShot(target);
         }
 
         public void ResetRuntimeState()
@@ -85,10 +88,14 @@ namespace CampusRPG.AI
 
         public bool TryAttack(Transform target, EnemyArchetypeSO archetype)
         {
-            EnemyAttackSelection selection = ResolveAttackSelection(target, archetype, includeFallbackRange: false);
+            return TryAttack(target, archetype, ResolveAttackSelection(target, archetype, includeFallbackRange: false));
+        }
+
+        public bool TryAttack(Transform target, EnemyArchetypeSO archetype, EnemyAttackSelection selection)
+        {
             AttackDefinitionSO attack = selection.Attack;
             Transform origin = ResolveAttackOrigin();
-            bool hasClearShot = attack == null || attack.ProjectilePrefab == null || HasClearShot(target);
+            bool hasClearShot = HasClearShot(target);
             bool canAttack = archetype != null && CanAttack(archetype.AttackCooldown);
 
             if (!EnemyAttackExecutionUtility.TryResolveAttackTarget(
@@ -117,12 +124,23 @@ namespace CampusRPG.AI
             }
             else
             {
-                damageable.ReceiveDamage(damage, origin.position, gameObject);
+                ApplyDamage(damageable, damage, origin.position, gameObject, attack);
             }
 
             cooldownTimer = archetype.AttackCooldown;
             AdvanceAttackIndex(archetype, selection.Index);
             return true;
+        }
+
+        public void RegisterCommittedMiss(EnemyArchetypeSO archetype, EnemyAttackSelection selection)
+        {
+            if (archetype == null)
+            {
+                return;
+            }
+
+            cooldownTimer = Mathf.Max(cooldownTimer, archetype.AttackCooldown);
+            AdvanceAttackIndex(archetype, selection.Index);
         }
 
         private void AdvanceAttackIndex(EnemyArchetypeSO archetype, int usedAttackIndex)
@@ -181,6 +199,22 @@ namespace CampusRPG.AI
         private Transform ResolveAttackOrigin()
         {
             return attackOrigin != null ? attackOrigin : transform;
+        }
+
+        private static void ApplyDamage(
+            IDamageable damageable,
+            float damage,
+            Vector3 hitPoint,
+            GameObject source,
+            AttackDefinitionSO attack)
+        {
+            if (damageable is DamageableReceiver damageableReceiver)
+            {
+                damageableReceiver.ReceiveDamage(damage, hitPoint, source, attack);
+                return;
+            }
+
+            damageable.ReceiveDamage(damage, hitPoint, source);
         }
     }
 }

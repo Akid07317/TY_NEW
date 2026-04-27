@@ -52,7 +52,9 @@
 - 若主工程 `/Users/don/TY_NEW` 已被本地 Unity 编辑器打开，自动化构建优先使用临时克隆目录执行，避免与人工编辑状态互相抢锁。
 - 命令行执行 Unity `-runTests` 时不要附带 `-quit`；当前 `com.unity.test-framework@1.6.0` 会在测试结束后自行退出，而 `-quit` 会让测试不启动。
 - 本地回归优先使用 `Tools/unity-cli/unity-run-tests`，避免测试参数漂移。
+- 自动化严禁裸跑没有墙钟超时的 Unity `-batchmode` / `-executeMethod` 命令。若必须执行编辑器方法，先确认同项目 GUI Editor 已退出或改用隔离副本，并给本次进程设置明确的最大等待时间；若日志在启动阶段长时间只停留在 licensing / Package Manager 之前，记录阻塞并停止等待。
 - 批处理失败时先看 `licensing` 与 `Package` 日志，再判断是否属于代码问题；不要把环境阻塞误判成运行时代码回归。
+- 若授权/entitlement 问题反复出现，自动化可以按 `Tools/unity-cli/README.md` 热启动 `Unity Hub` 与 Unity Editor 做 warmup；warmup 完成后仍需确认 `Unity Hub` 已退出，再执行 batchmode 测试。
 
 ## 5. 代码与工程规范
 

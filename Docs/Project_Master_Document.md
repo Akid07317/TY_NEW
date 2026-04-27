@@ -7,7 +7,8 @@
 | 产品定位 | `Unity 3D 第三人称动作 RPG`，第一版只做校园主题的第一章，主打战斗手感和短流程高密度体验 |
 | 目标体验 | `读招明确`、`防反与闪避都有价值`、`章节完整可通关`、`低成本可扩展` |
 | 目标时长 | 理想时长 `15-20 分钟`，必要时压缩为 `10-15 分钟` |
-| 技术基线 | `Unity 6000.4.2f1`、`C#`、`Input System`、`Cinemachine`、`Animator`、`CharacterController`、`NavMeshAgent`、`ScriptableObject` |
+| 技术基线 | `Unity 6000.4.2f1`、`C#`、`Input System`、`Cinemachine`、`Animator`、`CharacterController`、`NavMeshAgent`、`ScriptableObject`、`Built-in Render Pipeline` |
+| 发布身份 | 产品名 `TY_NEW`，版本 `0.1.0`，Standalone 包名 `com.don.tynew` |
 | 美术方向 | `低多边形`、`偏像素`、`中立风`，优先现成素材，强调统一而非精细度 |
 | 开发模式 | 独立开发、少插件、代码模块化、注释清晰、调试优先 |
 | 第一版必须达成 | 玩家核心战斗闭环、完整第一章、3 种普通敌人、1 个 Boss、检查点、自动存档、Win/Mac 构建 |
@@ -41,11 +42,11 @@
 | 移动 | `WASD` 地面移动；自由镜头下朝输入方向转身，锁定时保持面敌并使用前后左右步态；走跑一体，不做体力条 | 冲刺、更复杂的攀爬、特殊移动 |
 | 镜头 | 自由镜头与锁定镜头两种模式 | 动态 FOV、战斗特写 |
 | 锁定 | 锁定最近敌人，敌人死亡或超距自动解锁 | 左右切换锁定目标 |
-| 轻攻击 | 地面 `3 连`，连段窗口固定，命中带轻微硬直 | 空中连段、更多派生 |
+| 轻攻击 | 地面 `3 连`，每段只在尾段输入窗口内排下一段，命中带轻微硬直 | 空中连段、更多派生 |
 | 重攻击 | 地面 `1 段终结`，高硬直高收益 | 蓄力重击、破防重击 |
-| 闪避 | 定向闪避；锁定且无输入时默认为后撤步，成功穿招后累积 `AgilityGauge` | 完美闪避、空中闪避 |
+| 闪避 | 定向闪避；短启动后进入无敌帧；锁定且无输入时默认为后撤步，成功穿招后累积 `AgilityGauge` | 完美闪避、空中闪避 |
 | 闪避追击 | 成功闪避后短窗口内按轻攻击触发 | 追击分支、空中追击 |
-| 格挡 | 按住格挡，成功格挡累积 `CounterGauge` | 完美格挡、破防对抗 |
+| 格挡 | 按住格挡，进入姿态后有短启动窗口；启动完成后的成功格挡累积 `CounterGauge`；少数慢重击会造成 block stun 或破防，要求玩家改用闪避 | 完美格挡、破防对抗 |
 | 格挡反击 | 成功格挡后短窗口内按重攻击触发 | 连锁反击、武器差异 |
 | 强力反击 | `CounterGauge` 满后可释放一次强化反击 | 量表转化、更多终结技 |
 | 强化追击 | `AgilityGauge` 满后可释放一次强化闪避追击 | 持续 Buff、技能联动 |
@@ -74,15 +75,17 @@
 | 近战兵 | 稳定前压与基础考核 | 巡逻、索敌、追击、近战二连、受击硬直、死亡掉落 | 格挡后反击最稳 | 突进、连段派生 |
 | 机动兵 | 干扰玩家节奏 | 侧移、短闪避、快速单段出手 | 闪避追击、预判截击 | 假动作、后撤反打 |
 | 远程兵 | 中距离压制与站位惩罚 | 投射物攻击、贴身后后撤、低血量 | 快速贴近、技能打断 | 蓄力射击、范围法术 |
-| 校园守门者 | 章节终局考核 | 单阶段 Boss，清晰前摇，近中距离混合招式，能被格挡或闪避应对 | 读前摇、防反与闪避追击轮替 | 第二形态、剧情演出 |
+| 校园守门者 | 章节终局考核 | 单阶段 Boss，清晰前摇，近中距离混合招式，普通招可格挡，慢重击破防并要求闪避 | 读前摇、防反与闪避追击轮替 | 第二形态、剧情演出 |
 
-Boss 第一版建议固定 5 招，不再继续膨胀：
+Boss V1 发布底线固定 5 招，避免第一章收尾时继续膨胀：
 
 1. 横扫二连
 2. 直线突刺
-3. 下砸重击
+3. 下砸重击（破防，主解法是闪避）
 4. 单发术式投射
 5. 地面冲击波
+
+V2 进攻线允许在不改变单阶段 Boss 边界的前提下补“解法回应槽”：当前 Gatekeeper 已追加 `Sky Hook` 反空与 `Pursuit Slam` 追滚，用来回应 `AirDodge` / 空中 SwordArt 和 `CombatRoll`；两招已有专属 cue 颜色/文案、前压 lane、轻量 camera impulse 和程序生成 SFX，但它们仍服务读招清晰，不进入多阶段 Boss。
 
 Boss 设计核心不是复杂，而是让玩家把“格挡反击”和“闪避追击”都用出来。
 
@@ -94,7 +97,7 @@ Boss 设计核心不是复杂，而是让玩家把“格挡反击”和“闪避
 | 玩家 MP | `100` | 技能施法资源 |
 | Attack | `20` | 作为基础伤害系数 |
 | Defense | `10` | 简单线性减伤即可 |
-| CounterGauge | `0-100` | 成功格挡累积，满值触发强化反击 |
+| CounterGauge | `0-100` | 有效格挡成功后累积，满值触发强化反击 |
 | AgilityGauge | `0-100` | 成功闪避累积，满值触发强化追击 |
 | 轻攻击倍率 | `1.0 / 1.1 / 1.4` | 第三段作为小终结 |
 | 重攻击倍率 | `1.8` | 高收招风险 |
@@ -191,14 +194,14 @@ Boss 设计核心不是复杂，而是让玩家把“格挡反击”和“闪避
 | 状态 | 职责 | 主要转移 |
 |---|---|---|
 | `LocomotionState` | 地面移动、待机、转向、锁定步态 | 可转攻击、格挡、闪避、跳跃、技能、交互 |
-| `AttackState` | 轻连段、重击、追击、反击执行 | 连段继续留在本状态，结束回 Locomotion |
-| `BlockState` | 持续格挡与格挡判定 | 成功格挡后打开反击窗口，松开或结束回 Locomotion |
-| `DodgeState` | 闪避位移与无敌帧 | 成功闪避后打开追击窗口，结束回 Locomotion |
+| `AttackState` | 轻连段、重击、追击、反击执行；轻击只在尾段 buffer 窗口内排下一段 | 连段继续留在本状态，结束回 Locomotion |
+| `BlockState` | 持续格挡；进入后先过短启动窗口，之后才进入有效防御判定；格挡硬直期间延迟反击和松手退出 | 成功格挡后打开反击窗口，松开、硬直结束或破防受击后退出 |
+| `DodgeState` | 闪避位移；进入后先过短启动窗口，之后进入无敌帧 | 成功闪避后打开追击窗口，结束回 Locomotion |
 | `MantleState` | 低矮障碍翻越与落点控制 | 完成回 Locomotion |
 | `JumpState` | 起跳、空中控制、落地 | 落地回 Locomotion |
 | `SkillState` | 技能施法、MP 消耗、CD 设置 | 结束回 Locomotion |
 | `InteractState` | 交互短动作 | 完成回 Locomotion |
-| `HitState` | 受击硬直 | 结束回 Locomotion |
+| `HitState` | 受击硬直；可携带 `Standard` / `GuardBreak` 反应类型供动画 relay、HUD、相机 impact impulse 和后续专属反馈读取 | 结束回 Locomotion |
 | `DeathState` | 死亡与重生交接 | 调用检查点恢复流程 |
 
 ### 敌人状态机
@@ -232,7 +235,7 @@ Boss 设计核心不是复杂，而是让玩家把“格挡反击”和“闪避
 | SO 名称 | 用途 | 关键字段 | 第一版必须做 | 以后可扩展 |
 |---|---|---|---|---|
 | `PlayerBaseStatsSO` | 玩家基础属性 | HP、MP、Attack、Defense、移动速度/加减速、mantle 参数 | 是 | 多角色模板 |
-| `CombatBalanceSO` | 全局战斗参数 | 量表积累、格挡窗口、无敌帧、闪避距离、Hit Stop | 是 | 难度配置 |
+| `CombatBalanceSO` | 全局战斗参数 | 量表积累、格挡启动/反击窗口、闪避启动/无敌帧、闪避距离、Hit Stop | 是 | 难度配置 |
 | `AttackDefinitionSO` | 单段攻击定义 | 动画、倍率、命中框、前后摇、可取消窗口 | 是 | 属性伤害、破甲 |
 | `ComboChainSO` | 连段关系 | 下一段攻击、输入窗口、派生条件 | 是 | 武器分支树 |
 | `SkillDefinitionSO` | 技能配置 | MP、CD、Prefab、释放时间、目标模式 | 是 | 升级分支 |
@@ -242,6 +245,7 @@ Boss 设计核心不是复杂，而是让玩家把“格挡反击”和“闪避
 | `EncounterDefinitionSO` | 遭遇战配置 | 出生点、敌群、清场条件、门控逻辑 | 是 | 波次战 |
 | `CheckpointDefinitionSO` | 检查点定义 | ID、恢复点、激活条件、恢复策略 | 是 | 多类型检查点 |
 | `ChapterProgressionSO` | 章节推进结构 | 区域顺序、关键物品、成长节点 | 是 | 多章节共用模板 |
+| `ChapterMapDefinitionSO` | 章节地图表达层 | 五区定义、目标提示、路线门、捷径、遭遇/奖励关联 | 是 | 地图 UI、任务追踪、分区加载 |
 
 ## 10. 场景与 Prefab 组织方案
 
@@ -266,11 +270,14 @@ Chapter01_Combined
   _Lighting
   _NavMesh
   _Triggers
+  Chapter01_MapZones
   Area01_Entrance
   Area02_Outdoor
   Area03_Interior
   Area04_Boss
 ```
+
+V2 地图表达层已经在不改变章节进度 ID 的前提下叠加到 `Chapter01_Combined`：`Chapter01_MapZones` 标记入口教学、宽场混战、窄廊压迫、侧路/捷径、Boss 前厅/Boss 房五个动作区；主路线由三段 connector floor 连通，场景仍保持单主章节场景和 public-safe primitive/proxy baseline。`SO_Chapter01_MapDefinition` 现在记录五区目标、遭遇/奖励、门禁和捷径关系，`Zone04_SideRouteShortcut` 已标记 `SideRouteCache` 可选奖励与 Interior 清场后的捷径回环语义；场景 marker 通过 `ChapterMapZoneMarker` 绑定回数据资产，后续地图 UI、目标提示和真实奖励拾取物可以直接消费数据层。
 
 ### Prefab 分类
 
@@ -327,7 +334,7 @@ Chapter01_Combined
 | PlayMode | `CheckpointRestoreTests`、`BossResetTests`、`LockOnAcquireTests` | 覆盖章节关键闭环 |
 | 烟雾测试 | 新开局、死亡恢复、Boss 开战、Boss 击败、章节结算 | 每日必跑 |
 | 人工战斗测试 | 记录格挡成功率、闪避追击触发率、Boss 读招清晰度 | 每周至少两轮 |
-| 构建测试 | Win/Mac 各做完整通关验证 | 发布前必须完成 |
+| 构建测试 | 先用 `ReleaseCandidateBuildUtility` 验证 Win/Mac 构建输入与输出路径，再各做完整通关验证 | 发布前必须完成 |
 
 必须补的调试能力：
 
@@ -350,4 +357,4 @@ Chapter01_Combined
 7. 存档恢复能正确还原当前检查点、关键物品、固定成长和已清除遭遇战。
 8. 关键参数已 ScriptableObject 化，不依赖散落硬编码常量。
 9. `CombatTest` 与 `BossTest` 两个测试场景均存在并可独立验证。
-10. Windows 与 Mac 构建可启动并完成整章，无持续 Console Error。
+10. Windows 与 Mac 构建通过统一 release candidate 构建入口生成，可启动并完成整章，无持续 Console Error。

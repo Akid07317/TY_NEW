@@ -1,0 +1,112 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d8177f45e4ad48c592d1c1ee1901b45, type: 3}
+  m_Name: SO_Chapter01_MapDefinition
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Save.ChapterMapDefinitionSO
+  chapterId: Chapter01
+  zones:
+  - zoneId: zone01_entrance_tutorial
+    sceneObjectName: Zone01_EntranceTutorial
+    displayName: Entrance Tutorial
+    areaId: Area01_Entrance
+    objectiveHint: Learn movement, lock-on, light attacks, guard and dodge before
+      the first route gate.
+    primaryEncounterId: EN_A01_TUTORIAL
+    checkpointId: CP01
+    rewardKeyItemId: 
+    optionalRoute: 0
+    center: {x: 0, y: 1, z: 0}
+    size: {x: 14, y: 2.5, z: 18}
+  - zoneId: zone02_courtyard_arena
+    sceneObjectName: Zone02_CourtyardArena
+    displayName: Courtyard Arena
+    areaId: Area02_Courtyard
+    objectiveHint: Use wide lanes, cover, ranged pressure and mixed enemies to test
+      roll and dodge spacing.
+    primaryEncounterId: EN_A02_COURTYARD
+    checkpointId: CP02
+    rewardKeyItemId: 
+    optionalRoute: 0
+    center: {x: 0, y: 1, z: 28}
+    size: {x: 20, y: 2.5, z: 22}
+  - zoneId: zone03_interior_narrow_hall
+    sceneObjectName: Zone03_InteriorNarrowHall
+    displayName: Interior Narrow Hall
+    areaId: Area03_Interior
+    objectiveHint: Fight through camera pressure, mantle cover and the sigil lock-room
+      before the boss gate.
+    primaryEncounterId: EN_A03_INTERIOR
+    checkpointId: CP03
+    rewardKeyItemId: KeyItem_GateSigil
+    optionalRoute: 0
+    center: {x: 0, y: 1, z: 50}
+    size: {x: 9, y: 2.5, z: 12}
+  - zoneId: zone04_side_route_shortcut
+    sceneObjectName: Zone04_SideRouteShortcut
+    displayName: Side Route Shortcut
+    areaId: Area03_Interior
+    objectiveHint: Optional side lane that reads as a shortcut return after the interior
+      lock-room is solved.
+    primaryEncounterId: 
+    checkpointId: CP03
+    rewardKeyItemId: KeyItem_SideRouteCache
+    optionalRoute: 1
+    center: {x: -5.25, y: 1, z: 58}
+    size: {x: 5.5, y: 2.5, z: 15}
+  - zoneId: zone05_boss_approach_and_arena
+    sceneObjectName: Zone05_BossApproachAndArena
+    displayName: Boss Approach And Arena
+    areaId: Area04_Boss
+    objectiveHint: Prepare in the antechamber, fight Gatekeeper, then claim the Ritual
+      Core to finish Chapter01.
+    primaryEncounterId: EN_A04_GATEKEEPER
+    checkpointId: CP03
+    rewardKeyItemId: KeyItem_RitualCore
+    optionalRoute: 0
+    center: {x: 0, y: 1, z: 82}
+    size: {x: 18, y: 2.5, z: 24}
+  routeGates:
+  - gateId: route_gate_a01_to_a02
+    displayName: Entrance To Courtyard
+    fromZoneId: zone01_entrance_tutorial
+    toZoneId: zone02_courtyard_arena
+    requiredEncounterId: EN_A01_TUTORIAL
+    requiredKeyItemId: 
+    opensShortcut: 0
+  - gateId: route_gate_a02_to_a03
+    displayName: Courtyard To Interior
+    fromZoneId: zone02_courtyard_arena
+    toZoneId: zone03_interior_narrow_hall
+    requiredEncounterId: EN_A02_COURTYARD
+    requiredKeyItemId: 
+    opensShortcut: 0
+  - gateId: route_gate_a03_side_shortcut
+    displayName: Interior Shortcut Return
+    fromZoneId: zone03_interior_narrow_hall
+    toZoneId: zone04_side_route_shortcut
+    requiredEncounterId: EN_A03_INTERIOR
+    requiredKeyItemId: 
+    opensShortcut: 1
+  - gateId: route_gate_a03_to_a04
+    displayName: Interior To Boss Gate
+    fromZoneId: zone04_side_route_shortcut
+    toZoneId: zone05_boss_approach_and_arena
+    requiredEncounterId: 
+    requiredKeyItemId: KeyItem_GateSigil
+    opensShortcut: 0
+  - gateId: route_gate_a04_to_ritual_core
+    displayName: Gatekeeper To Ritual Core
+    fromZoneId: zone05_boss_approach_and_arena
+    toZoneId: zone05_boss_approach_and_arena
+    requiredEncounterId: EN_A04_GATEKEEPER
+    requiredKeyItemId: 
+    opensShortcut: 0

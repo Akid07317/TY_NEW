@@ -125,6 +125,22 @@ namespace CampusRPG.Tests
             }
         }
 
+        [Test]
+        public void ChapterObjectiveLayout_ClampsPanelAndTextInsideSmallGameplayView()
+        {
+            ChapterObjectiveLayout layout = ChapterObjectiveLayoutUtility.Build(240f, 144f);
+
+            Assert.GreaterOrEqual(layout.PanelRect.xMin, 0f);
+            Assert.GreaterOrEqual(layout.PanelRect.yMin, 0f);
+            Assert.LessOrEqual(layout.PanelRect.xMax, 240f);
+            Assert.LessOrEqual(layout.PanelRect.yMax, 144f);
+            Assert.LessOrEqual(layout.PanelRect.width, 240f);
+
+            AssertRectInside(layout.TitleRect, layout.PanelRect);
+            AssertRectInside(layout.HeadingRect, layout.PanelRect);
+            AssertRectInside(layout.BodyRect, layout.PanelRect);
+        }
+
         private static ChapterProgressionSO CreateProgression()
         {
             ChapterProgressionSO progression = ScriptableObject.CreateInstance<ChapterProgressionSO>();
@@ -153,6 +169,14 @@ namespace CampusRPG.Tests
             FieldInfo field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(field, fieldName);
             field.SetValue(instance, value);
+        }
+
+        private static void AssertRectInside(Rect inner, Rect outer)
+        {
+            Assert.GreaterOrEqual(inner.xMin, outer.xMin);
+            Assert.GreaterOrEqual(inner.yMin, outer.yMin);
+            Assert.LessOrEqual(inner.xMax, outer.xMax);
+            Assert.LessOrEqual(inner.yMax, outer.yMax);
         }
     }
 }

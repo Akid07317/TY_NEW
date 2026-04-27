@@ -277,6 +277,256 @@ namespace CampusRPG.Tests.PlayMode
         }
 
         [Test]
+        public void BossPreviewAttackForTarget_PrefersAntiAirResponse_ForAirborneTarget()
+        {
+            GameObject enemyObject = null;
+            GameObject targetObject = null;
+            GameObject projectilePrefab = null;
+            EnemyArchetypeSO archetype = null;
+            AttackDefinitionSO closeAttack = null;
+            AttackDefinitionSO reachAttack = null;
+            AttackDefinitionSO projectileAttack = null;
+            AttackDefinitionSO antiAirAttack = null;
+
+            try
+            {
+                Vector3 testOrigin = new Vector3(96f, 0f, 96f);
+                enemyObject = new GameObject("Boss");
+                enemyObject.transform.position = testOrigin;
+                enemyObject.transform.rotation = Quaternion.identity;
+                enemyObject.AddComponent<BoxCollider>();
+                enemyObject.AddComponent<HealthComponent>();
+                enemyObject.AddComponent<DamageableReceiver>();
+                enemyObject.AddComponent<EnemyBrain>();
+                EnemyAttackController controller = enemyObject.AddComponent<EnemyAttackController>();
+
+                targetObject = new GameObject("Target");
+                targetObject.transform.position = testOrigin + new Vector3(0f, 0f, 4.5f);
+                targetObject.AddComponent<BoxCollider>();
+                targetObject.AddComponent<HealthComponent>();
+                targetObject.AddComponent<DamageableReceiver>();
+                targetObject.AddComponent<PlayerCharacter>();
+
+                projectilePrefab = new GameObject("ProjectilePrefab");
+                projectilePrefab.AddComponent<ProjectileController>();
+
+                closeAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+                reachAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+                projectileAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+                antiAirAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+
+                SetPrivateField(closeAttack, "attackId", "Boss_Close");
+                SetPrivateField(closeAttack, "range", 1f);
+                SetPrivateField(closeAttack, "radius", 0.2f);
+
+                SetPrivateField(reachAttack, "attackId", "Boss_Reach");
+                SetPrivateField(reachAttack, "range", 2.8f);
+                SetPrivateField(reachAttack, "radius", 0.4f);
+
+                SetPrivateField(projectileAttack, "attackId", "Boss_Projectile");
+                SetPrivateField(projectileAttack, "range", 4.8f);
+                SetPrivateField(projectileAttack, "radius", 0.35f);
+                SetPrivateField(projectileAttack, "projectilePrefab", projectilePrefab);
+                SetPrivateField(projectileAttack, "projectileSpeed", 17f);
+                SetPrivateField(projectileAttack, "projectileLifetimeSeconds", 1.2f);
+                SetPrivateField(projectileAttack, "projectileSpawnOffset", 0.25f);
+
+                SetPrivateField(antiAirAttack, "attackId", "Boss_AntiAir");
+                SetPrivateField(antiAirAttack, "range", 5.8f);
+                SetPrivateField(antiAirAttack, "radius", 0.35f);
+                SetPrivateField(antiAirAttack, "projectilePrefab", projectilePrefab);
+                SetPrivateField(antiAirAttack, "projectileSpeed", 20f);
+                SetPrivateField(antiAirAttack, "projectileLifetimeSeconds", 1.0f);
+                SetPrivateField(antiAirAttack, "projectileSpawnOffset", 0.35f);
+                SetPrivateField(antiAirAttack, "enemyTargetResponse", EnemyTargetResponseType.AntiAir);
+
+                archetype = ScriptableObject.CreateInstance<EnemyArchetypeSO>();
+                SetPrivateField(archetype, "archetypeType", EnemyArchetypeType.Boss);
+                SetPrivateField(archetype, "baseAttack", 10f);
+                SetPrivateField(archetype, "attackCooldown", 0.1f);
+                SetPrivateField(archetype, "attackDistance", 1f);
+                SetPrivateField(archetype, "attacks", new[] { closeAttack, reachAttack, projectileAttack, antiAirAttack });
+                Physics.SyncTransforms();
+
+                Assert.AreSame(projectileAttack, controller.PreviewAttackForTarget(targetObject.transform, archetype));
+                Assert.AreEqual(
+                    EnemyTargetResponseType.None,
+                    EnemyAttackSelectionResolver.ResolveTargetResponseType(enemyObject.transform, targetObject.transform));
+
+                targetObject.transform.position = testOrigin + new Vector3(0f, 1.1f, 4.5f);
+                Physics.SyncTransforms();
+
+                Assert.AreEqual(
+                    EnemyTargetResponseType.AntiAir,
+                    EnemyAttackSelectionResolver.ResolveTargetResponseType(enemyObject.transform, targetObject.transform));
+                Assert.AreSame(antiAirAttack, controller.PreviewAttackForTarget(targetObject.transform, archetype));
+                Assert.Greater(controller.GetAttackRangeForTarget(targetObject.transform, archetype), 6f);
+                Assert.IsTrue(controller.TryAttack(targetObject.transform, archetype));
+            }
+            finally
+            {
+                if (antiAirAttack != null)
+                {
+                    Object.DestroyImmediate(antiAirAttack);
+                }
+
+                if (projectileAttack != null)
+                {
+                    Object.DestroyImmediate(projectileAttack);
+                }
+
+                if (reachAttack != null)
+                {
+                    Object.DestroyImmediate(reachAttack);
+                }
+
+                if (closeAttack != null)
+                {
+                    Object.DestroyImmediate(closeAttack);
+                }
+
+                if (archetype != null)
+                {
+                    Object.DestroyImmediate(archetype);
+                }
+
+                if (projectilePrefab != null)
+                {
+                    Object.DestroyImmediate(projectilePrefab);
+                }
+
+                if (targetObject != null)
+                {
+                    Object.DestroyImmediate(targetObject);
+                }
+
+                if (enemyObject != null)
+                {
+                    Object.DestroyImmediate(enemyObject);
+                }
+            }
+        }
+
+        [Test]
+        public void BossPreviewAttackForTarget_PrefersChaseRollResponse_ForCombatRollTarget()
+        {
+            GameObject enemyObject = null;
+            GameObject targetObject = null;
+            GameObject projectilePrefab = null;
+            EnemyArchetypeSO archetype = null;
+            AttackDefinitionSO closeAttack = null;
+            AttackDefinitionSO projectileAttack = null;
+            AttackDefinitionSO chaseRollAttack = null;
+
+            try
+            {
+                Vector3 testOrigin = new Vector3(112f, 0f, 112f);
+                enemyObject = new GameObject("Boss");
+                enemyObject.transform.position = testOrigin;
+                enemyObject.transform.rotation = Quaternion.identity;
+                enemyObject.AddComponent<BoxCollider>();
+                enemyObject.AddComponent<HealthComponent>();
+                enemyObject.AddComponent<DamageableReceiver>();
+                enemyObject.AddComponent<EnemyBrain>();
+                EnemyAttackController controller = enemyObject.AddComponent<EnemyAttackController>();
+
+                targetObject = new GameObject("Target");
+                targetObject.transform.position = testOrigin + new Vector3(0f, 0f, 4.1f);
+                targetObject.AddComponent<BoxCollider>();
+                targetObject.AddComponent<HealthComponent>();
+                targetObject.AddComponent<DamageableReceiver>();
+                PlayerCharacter player = targetObject.AddComponent<PlayerCharacter>();
+                PlayerStateMachine stateMachine = targetObject.AddComponent<PlayerStateMachine>();
+                stateMachine.Initialize(player);
+
+                projectilePrefab = new GameObject("ProjectilePrefab");
+                projectilePrefab.AddComponent<ProjectileController>();
+
+                closeAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+                projectileAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+                chaseRollAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+
+                SetPrivateField(closeAttack, "attackId", "Boss_Close");
+                SetPrivateField(closeAttack, "range", 1f);
+                SetPrivateField(closeAttack, "radius", 0.2f);
+
+                SetPrivateField(projectileAttack, "attackId", "Boss_Projectile");
+                SetPrivateField(projectileAttack, "range", 4.8f);
+                SetPrivateField(projectileAttack, "radius", 0.35f);
+                SetPrivateField(projectileAttack, "projectilePrefab", projectilePrefab);
+                SetPrivateField(projectileAttack, "projectileSpeed", 17f);
+                SetPrivateField(projectileAttack, "projectileLifetimeSeconds", 1.2f);
+                SetPrivateField(projectileAttack, "projectileSpawnOffset", 0.25f);
+
+                SetPrivateField(chaseRollAttack, "attackId", "Boss_ChaseRoll");
+                SetPrivateField(chaseRollAttack, "range", 4.25f);
+                SetPrivateField(chaseRollAttack, "radius", 0.65f);
+                SetPrivateField(chaseRollAttack, "startupSeconds", 0.28f);
+                SetPrivateField(chaseRollAttack, "enemyTargetResponse", EnemyTargetResponseType.ChaseRoll);
+
+                archetype = ScriptableObject.CreateInstance<EnemyArchetypeSO>();
+                SetPrivateField(archetype, "archetypeType", EnemyArchetypeType.Boss);
+                SetPrivateField(archetype, "baseAttack", 10f);
+                SetPrivateField(archetype, "attackCooldown", 0.1f);
+                SetPrivateField(archetype, "attackDistance", 1f);
+                SetPrivateField(archetype, "attacks", new[] { closeAttack, projectileAttack, chaseRollAttack });
+                Physics.SyncTransforms();
+
+                Assert.AreEqual(
+                    EnemyTargetResponseType.None,
+                    EnemyAttackSelectionResolver.ResolveTargetResponseType(enemyObject.transform, targetObject.transform));
+                Assert.AreSame(projectileAttack, controller.PreviewAttackForTarget(targetObject.transform, archetype));
+
+                stateMachine.SwitchToDodge(PlayerEvasiveActionType.CombatRoll);
+
+                Assert.AreEqual(
+                    PlayerEvasiveActionType.CombatRoll,
+                    stateMachine.CurrentEvasiveActionType);
+                Assert.AreEqual(
+                    EnemyTargetResponseType.ChaseRoll,
+                    EnemyAttackSelectionResolver.ResolveTargetResponseType(enemyObject.transform, targetObject.transform));
+                Assert.AreSame(chaseRollAttack, controller.PreviewAttackForTarget(targetObject.transform, archetype));
+            }
+            finally
+            {
+                if (chaseRollAttack != null)
+                {
+                    Object.DestroyImmediate(chaseRollAttack);
+                }
+
+                if (projectileAttack != null)
+                {
+                    Object.DestroyImmediate(projectileAttack);
+                }
+
+                if (closeAttack != null)
+                {
+                    Object.DestroyImmediate(closeAttack);
+                }
+
+                if (archetype != null)
+                {
+                    Object.DestroyImmediate(archetype);
+                }
+
+                if (projectilePrefab != null)
+                {
+                    Object.DestroyImmediate(projectilePrefab);
+                }
+
+                if (targetObject != null)
+                {
+                    Object.DestroyImmediate(targetObject);
+                }
+
+                if (enemyObject != null)
+                {
+                    Object.DestroyImmediate(enemyObject);
+                }
+            }
+        }
+
+        [Test]
         public void BossPreviewAttackForTarget_AvoidsImmediateRepeat_WhenAlternateAttackIsCloseInFit()
         {
             GameObject enemyObject = null;
@@ -547,6 +797,84 @@ namespace CampusRPG.Tests.PlayMode
                 if (projectilePrefab != null)
                 {
                     Object.DestroyImmediate(projectilePrefab);
+                }
+
+                if (wallObject != null)
+                {
+                    Object.DestroyImmediate(wallObject);
+                }
+
+                if (targetObject != null)
+                {
+                    Object.DestroyImmediate(targetObject);
+                }
+
+                if (enemyObject != null)
+                {
+                    Object.DestroyImmediate(enemyObject);
+                }
+            }
+        }
+
+        [Test]
+        public void TryAttack_DoesNotMeleeThroughWall()
+        {
+            GameObject enemyObject = null;
+            GameObject targetObject = null;
+            GameObject wallObject = null;
+            EnemyArchetypeSO archetype = null;
+            AttackDefinitionSO meleeAttack = null;
+
+            try
+            {
+                enemyObject = new GameObject("Enemy");
+                enemyObject.transform.position = Vector3.zero;
+                enemyObject.transform.rotation = Quaternion.identity;
+                enemyObject.AddComponent<BoxCollider>();
+                enemyObject.AddComponent<HealthComponent>();
+                enemyObject.AddComponent<DamageableReceiver>();
+                enemyObject.AddComponent<EnemyBrain>();
+                EnemyAttackController controller = enemyObject.AddComponent<EnemyAttackController>();
+
+                targetObject = new GameObject("Target");
+                targetObject.transform.position = new Vector3(0f, 0f, 1.4f);
+                targetObject.AddComponent<BoxCollider>();
+                HealthComponent targetHealth = targetObject.AddComponent<HealthComponent>();
+                targetObject.AddComponent<DamageableReceiver>();
+                targetObject.AddComponent<PlayerCharacter>();
+
+                wallObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                wallObject.name = "Wall";
+                wallObject.transform.position = new Vector3(0f, 0f, 0.75f);
+                wallObject.transform.localScale = new Vector3(2f, 2f, 0.25f);
+
+                meleeAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+                SetPrivateField(meleeAttack, "damageMultiplier", 1f);
+                SetPrivateField(meleeAttack, "range", 1.5f);
+                SetPrivateField(meleeAttack, "radius", 0.25f);
+
+                archetype = ScriptableObject.CreateInstance<EnemyArchetypeSO>();
+                SetPrivateField(archetype, "baseAttack", 10f);
+                SetPrivateField(archetype, "attackCooldown", 0.1f);
+                SetPrivateField(archetype, "attackDistance", 1.5f);
+                SetPrivateField(archetype, "attacks", new[] { meleeAttack });
+                Physics.SyncTransforms();
+
+                float targetStartHealth = targetHealth.CurrentValue;
+
+                Assert.IsFalse(controller.TryAttack(targetObject.transform, archetype));
+                Assert.AreEqual(targetStartHealth, targetHealth.CurrentValue, 0.01f);
+            }
+            finally
+            {
+                if (meleeAttack != null)
+                {
+                    Object.DestroyImmediate(meleeAttack);
+                }
+
+                if (archetype != null)
+                {
+                    Object.DestroyImmediate(archetype);
                 }
 
                 if (wallObject != null)

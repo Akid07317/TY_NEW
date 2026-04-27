@@ -31,7 +31,7 @@ namespace CampusRPG.Tests
                 targetObject.AddComponent<BoxCollider>();
                 HealthComponent targetHealth = targetObject.AddComponent<HealthComponent>();
                 DamageableReceiver targetReceiver = targetObject.AddComponent<DamageableReceiver>();
-                targetObject.transform.position = new Vector3(0f, 0f, 1.8f);
+                targetObject.transform.position = new Vector3(0f, 0f, 1.65f);
                 targetObject.SetActive(true);
 
                 attack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
@@ -67,6 +67,95 @@ namespace CampusRPG.Tests
                 Assert.AreEqual(90f, targetHealth.CurrentValue, 0.01f);
                 Assert.Greater(enemyObject.transform.position.z, 0.45f);
                 Assert.Less(enemyObject.transform.position.z, targetObject.transform.position.z);
+            }
+            finally
+            {
+                if (attack != null)
+                {
+                    Object.DestroyImmediate(attack);
+                }
+
+                if (archetype != null)
+                {
+                    Object.DestroyImmediate(archetype);
+                }
+
+                if (targetObject != null)
+                {
+                    Object.DestroyImmediate(targetObject);
+                }
+
+                if (enemyObject != null)
+                {
+                    Object.DestroyImmediate(enemyObject);
+                }
+            }
+        }
+
+        [Test]
+        public void AttackState_CommitsForwardMovement_AndConsumesCooldownOnWhiff()
+        {
+            GameObject enemyObject = null;
+            GameObject targetObject = null;
+            EnemyArchetypeSO archetype = null;
+            AttackDefinitionSO attack = null;
+
+            try
+            {
+                enemyObject = new GameObject("Enemy");
+                EnemyMotor motor = enemyObject.AddComponent<EnemyMotor>();
+                EnemyAttackController attackController = enemyObject.AddComponent<EnemyAttackController>();
+                EnemyStateMachine stateMachine = enemyObject.AddComponent<EnemyStateMachine>();
+                HealthComponent enemyHealth = enemyObject.AddComponent<HealthComponent>();
+                EnemyBrain brain = enemyObject.AddComponent<EnemyBrain>();
+
+                targetObject = new GameObject("Target");
+                targetObject.SetActive(false);
+                targetObject.AddComponent<BoxCollider>();
+                HealthComponent targetHealth = targetObject.AddComponent<HealthComponent>();
+                DamageableReceiver targetReceiver = targetObject.AddComponent<DamageableReceiver>();
+                targetObject.transform.position = new Vector3(0f, 0f, 1.55f);
+                targetObject.SetActive(true);
+
+                attack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+                SetPrivateField(attack, "startupSeconds", 0.1f);
+                SetPrivateField(attack, "activeSeconds", 0.1f);
+                SetPrivateField(attack, "recoverySeconds", 0.3f);
+                SetPrivateField(attack, "forwardMovement", 0.45f);
+                SetPrivateField(attack, "range", 1f);
+                SetPrivateField(attack, "radius", 0.2f);
+
+                archetype = ScriptableObject.CreateInstance<EnemyArchetypeSO>();
+                SetPrivateField(archetype, "baseAttack", 10f);
+                SetPrivateField(archetype, "attackCooldown", 0.4f);
+                SetPrivateField(archetype, "attackDistance", 1f);
+                SetPrivateField(archetype, "attacks", new[] { attack });
+
+                InvokeMethod(attackController, "Awake");
+                InvokeMethod(motor, "Awake");
+                InvokeMethod(targetReceiver, "Awake");
+
+                SetPrivateField(brain, "archetype", archetype);
+                SetPrivateField(brain, "stateMachine", stateMachine);
+                SetPrivateField(brain, "attackController", attackController);
+                SetPrivateField(brain, "health", enemyHealth);
+                SetPrivateField(brain, "motor", motor);
+                brain.SetTarget(targetObject.transform);
+                Physics.SyncTransforms();
+
+                stateMachine.Initialize(brain);
+                stateMachine.SwitchToAttack();
+                stateMachine.Tick(0.1f);
+
+                targetObject.transform.position = new Vector3(2f, 0f, 1.55f);
+                Physics.SyncTransforms();
+                stateMachine.Tick(0.2f);
+
+                Assert.AreEqual(targetHealth.MaxValue, targetHealth.CurrentValue, 0.01f);
+                Assert.AreEqual(0f, enemyObject.transform.position.x, 0.01f);
+                Assert.Greater(enemyObject.transform.position.z, 0.35f);
+                Assert.IsFalse(attackController.CanAttack(archetype.AttackCooldown));
+                Assert.IsInstanceOf<EnemyAttackState>(stateMachine.CurrentState);
             }
             finally
             {

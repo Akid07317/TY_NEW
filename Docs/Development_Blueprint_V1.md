@@ -48,7 +48,8 @@
 | 项目 | 预算 |
 |---|---:|
 | 正式章节数 | 1 |
-| 小区域数 | 4 |
+| 章节进度区域数 | 4 |
+| 动作地图节奏区 | 5 |
 | 检查点数 | 3 |
 | 锁门清怪房间 | 1-2 间 |
 | 关键物品数 | 1 |
@@ -106,6 +107,8 @@
 完成章节系统最小闭环：
 
 - 教学提示触发
+- 五区动作灰盒：入口、宽场、窄廊、侧路/捷径、Boss 前厅/房；V2 已追加 public-safe 模块化灰盒层，用 primitive/proxy 强化入口门框、宽场侧栏、窄廊梁柱、侧路台阶和 Boss 前厅读路
+- 五区地图数据层：`SO_Chapter01_MapDefinition` 记录区域目标、路线门、捷径、遭遇与奖励；侧路 `Zone04` 已有 `SideRouteCache` 可选奖励语义
 - 区域门控
 - 遭遇战触发与清场
 - 检查点激活
@@ -131,7 +134,7 @@ Boss 目标不是“炫”，而是“让玩家把战斗系统都用一遍”。
 - 镜头修整
 - 小型表现增强
 - Bug 修复
-- 双平台构建验证
+- 双平台构建验证；发布候选构建入口固定为 `ReleaseCandidateBuildUtility`，先做 dry-run 输入检查，再分别产出 `Builds/ReleaseCandidate/Windows/TY_NEW.exe` 与 `Builds/ReleaseCandidate/Mac/TY_NEW.app`
 
 不再增加新系统。
 
@@ -184,8 +187,8 @@ Boss 目标不是“炫”，而是“让玩家把战斗系统都用一遍”。
 | Day 24 | 掉落与资源节奏修整 |
 | Day 25 | 动效、音效、提示强化 |
 | Day 26 | 阻断 Bug 清理 |
-| Day 27 | Windows 构建与通关 |
-| Day 28 | Mac 构建与通关 |
+| Day 27 | Windows 构建与通关，先跑 release build dry-run gate |
+| Day 28 | Mac 构建与通关，复用同一套 release build gate |
 
 ## 6. 第一版关键实现策略
 

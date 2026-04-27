@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 714aac83943c74b3faabadc19252ec0d, type: 3}
+  m_Name: SO_Attack_SwordArt_MoonSever
+  m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Combat.AttackDefinitionSO
+  attackId: SwordArt_MoonSever
+  displayName: Moon Sever
+  animationStateName: SwordArt_MoonSever
+  damageMultiplier: 1.65
+  startupSeconds: 0.1
+  activeSeconds: 0.1
+  recoverySeconds: 0.26
+  animationDurationSeconds: 0.54279995
+  hitStopSeconds: 0.065
+  breaksGuard: 0
+  blockStunSeconds: 0
+  guardBreakHitStunSeconds: 0.12
+  forwardMovement: 0.58
+  movementSpeedScale: 0.72
+  range: 2.15
+  radius: 0.68
+  hitboxShape: 2
+  hitboxLocalCenter: {x: 0, y: 0, z: 1.075}
+  hitboxHalfExtents: {x: 0.782, y: 0.85, z: 0.8600001}
+  hitboxRadius: 0.68
+  hitboxActivationMode: 0
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 0
+  projectileLifetimeSeconds: 0
+  projectileSpawnOffset: 0
+  projectileTrajectoryMode: 0
+  projectileArcHeight: 0
+  enemyTargetResponse: 0

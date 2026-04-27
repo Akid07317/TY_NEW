@@ -41,15 +41,34 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
-        public void Apply_SkipsProxyGeneration_WhenExternalVisualsAlreadyExist()
+        public void Apply_PlayerExternalVisuals_CreatesWeaponOverlayAndKeepsImportedRenderers()
         {
             GameObject actor = Track(GameObject.CreatePrimitive(PrimitiveType.Capsule));
             GameObject importedVisual = Track(GameObject.CreatePrimitive(PrimitiveType.Cube));
             importedVisual.transform.SetParent(actor.transform, false);
             importedVisual.transform.localPosition = new Vector3(0f, 1f, 0f);
 
-            CombatProxyVisualUtility.Apply(actor, CombatProxyVisualKind.Player);
+            bool changed = CombatProxyVisualUtility.Apply(actor, CombatProxyVisualKind.Player);
 
+            Assert.IsTrue(changed);
+            Transform proxyRoot = actor.transform.Find("CombatProxyVisualRoot");
+            Assert.IsNotNull(proxyRoot);
+            Assert.IsNotNull(proxyRoot.Find("ForwardMarker"));
+            Assert.IsNotNull(proxyRoot.Find("WeaponGrip"));
+            Assert.IsNotNull(importedVisual.GetComponent<MeshRenderer>());
+        }
+
+        [Test]
+        public void Apply_EnemyExternalVisuals_SkipsProxyGenerationAndKeepsImportedRenderers()
+        {
+            GameObject actor = Track(GameObject.CreatePrimitive(PrimitiveType.Capsule));
+            GameObject importedVisual = Track(GameObject.CreatePrimitive(PrimitiveType.Cube));
+            importedVisual.transform.SetParent(actor.transform, false);
+            importedVisual.transform.localPosition = new Vector3(0f, 1f, 0f);
+
+            bool changed = CombatProxyVisualUtility.Apply(actor, CombatProxyVisualKind.EnemyMelee);
+
+            Assert.IsTrue(changed);
             Assert.IsNull(actor.transform.Find("CombatProxyVisualRoot"));
             Assert.IsNotNull(importedVisual.GetComponent<MeshRenderer>());
         }

@@ -13,6 +13,16 @@ namespace CampusRPG.AI
             }
 
             Vector3 origin = ResolveAimPoint(attackOrigin);
+            return HasClearShot(ownerRoot, origin, target);
+        }
+
+        public static bool HasClearShot(Transform ownerRoot, Vector3 origin, Transform target)
+        {
+            if (target == null)
+            {
+                return false;
+            }
+
             Transform targetRoot = target.root;
             Vector3 targetPoint = ResolveAimPoint(target);
             Vector3 toTarget = targetPoint - origin;

@@ -153,12 +153,17 @@ namespace CampusRPG.UI
             BossGroundTelegraphPresenter.TelegraphMode mode,
             AttackDefinitionSO attack)
         {
-            if (mode != BossGroundTelegraphPresenter.TelegraphMode.Attack || attack == null || attack.ProjectilePrefab == null)
+            if (mode != BossGroundTelegraphPresenter.TelegraphMode.Attack || attack == null)
             {
                 return BossGroundTelegraphPresenter.TelegraphShape.GroundCircle;
             }
 
-            return attack.ProjectileTrajectoryMode == ProjectileTrajectoryMode.Straight
+            if (attack.EnemyTargetResponse == EnemyTargetResponseType.ChaseRoll)
+            {
+                return BossGroundTelegraphPresenter.TelegraphShape.AttackLane;
+            }
+
+            return attack.ProjectilePrefab != null && attack.ProjectileTrajectoryMode == ProjectileTrajectoryMode.Straight
                 ? BossGroundTelegraphPresenter.TelegraphShape.AttackLane
                 : BossGroundTelegraphPresenter.TelegraphShape.GroundCircle;
         }

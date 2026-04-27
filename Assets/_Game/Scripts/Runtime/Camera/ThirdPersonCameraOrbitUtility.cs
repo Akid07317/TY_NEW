@@ -30,6 +30,21 @@ namespace CampusRPG.Camera
 
     public static class ThirdPersonCameraOrbitUtility
     {
+        public static Vector3 ResolveDesiredPosition(
+            Vector3 focusPoint,
+            Vector3 followOffset,
+            float yaw,
+            float pitch)
+        {
+            Quaternion orbitRotation = Quaternion.Euler(pitch, yaw, 0f);
+            return focusPoint + orbitRotation * followOffset;
+        }
+
+        public static float ResolveLerpFactor(float followSharpness, float deltaTime)
+        {
+            return 1f - Mathf.Exp(-Mathf.Max(0f, followSharpness) * Mathf.Max(0f, deltaTime));
+        }
+
         public static ThirdPersonCameraOrbitAngles ResolveInitialAngles(Quaternion rotation, float minPitch, float maxPitch)
         {
             Vector3 euler = rotation.eulerAngles;
@@ -115,9 +130,8 @@ namespace CampusRPG.Camera
             float followSharpness,
             float deltaTime)
         {
-            Quaternion orbitRotation = Quaternion.Euler(pitch, yaw, 0f);
-            Vector3 desiredPosition = focusPoint + orbitRotation * followOffset;
-            float lerpFactor = 1f - Mathf.Exp(-Mathf.Max(0f, followSharpness) * Mathf.Max(0f, deltaTime));
+            Vector3 desiredPosition = ResolveDesiredPosition(focusPoint, followOffset, yaw, pitch);
+            float lerpFactor = ResolveLerpFactor(followSharpness, deltaTime);
             return new ThirdPersonCameraFollowStep(
                 Vector3.Lerp(currentPosition, desiredPosition, lerpFactor),
                 lerpFactor);

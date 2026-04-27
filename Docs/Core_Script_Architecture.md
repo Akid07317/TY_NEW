@@ -53,7 +53,7 @@ CampusRPG.UI
 
 | 类名 | 职责 |
 |---|---|
-| `ThirdPersonCameraController` | 管理自由镜头与锁定镜头参数，并在贴墙时维持玩家可见性 |
+| `ThirdPersonCameraController` | 管理自由镜头、锁定镜头和短促命中 impact impulse，并在贴墙时维持玩家可见性 |
 | `ThirdPersonCameraOrbitUtility` | 统一第三人称镜头自由视角、锁定视角与跟随位姿计算 |
 | `LockOnTargetSelector` | 搜索、筛选、切换锁定目标 |
 | `LockOnTargetSearchUtility` | 统一锁定目标候选解析、合法性校验与评分搜索 |
@@ -68,7 +68,7 @@ CampusRPG.UI
 | `PlayerMovementRuntimeUtility` | 统一相机相对移动、锁定步态轴、闪避方向与距离倍率解析 |
 | `PlayerMovementProbe` | 探测低矮障碍是否可 mantle，并给出目标落点 |
 | `PlayerCombatController` | 轻重攻击、追击、反击与量表窗口管理 |
-| `PlayerCombatAnimationRelay` | 把玩家状态机与战斗事件同步到 Animator，统一驱动基础动作层与攻击播放 |
+| `PlayerCombatAnimationRelay` | 把玩家状态机与战斗事件同步到 Animator，统一驱动基础动作层、攻击播放与破防相机反馈请求 |
 | `PlayerCombatRuntimeUtility` | 统一连段推进、反击/追击派生决策与窗口计时辅助 |
 | `PlayerStateMachine` | 玩家 FSM 宿主 |
 | `PlayerLocomotionState` | 待机、移动、转向、锁定步态 |
@@ -78,7 +78,7 @@ CampusRPG.UI
 | `PlayerMantleState` | 受控翻越状态，结束回 Locomotion |
 | `PlayerJumpState` | 起跳与落地 |
 | `PlayerSkillState` | 技能施法 |
-| `PlayerHitState` | 受击硬直 |
+| `PlayerHitState` | 受击硬直；携带 `Standard` / `GuardBreak` 反应类型供动画、HUD 与相机反馈读取 |
 | `PlayerDeathState` | 死亡与恢复交接 |
 
 ### 3.5 Combat
@@ -88,7 +88,7 @@ CampusRPG.UI
 | `HealthComponent` | HP 读写、死亡事件 |
 | `ManaComponent` | MP 管理 |
 | `GaugeComponent` | CounterGauge 与 AgilityGauge 管理 |
-| `DamageableReceiver` | 统一受击入口，处理格挡、成功闪避和命中后的状态反馈 |
+| `DamageableReceiver` | 统一受击入口，处理格挡、成功闪避、破防反应类型和命中后的状态反馈 |
 | `DamageableReactionUtility` | 统一受击前防御结果解析与命中后仇恨/硬直反馈规划 |
 | `AttackExecutor` | 负责攻击启动、局部 Hitbox 命中与伤害投递，兼容旧范围判定 |
 | `AttackHitboxExecutionUtility` | 统一攻击命中体配置解析、legacy 回退与可受击目标过滤 |
@@ -96,6 +96,7 @@ CampusRPG.UI
 | `ProjectileController` | 投射物飞行、命中与销毁 |
 | `ProjectileFlightUtility` | 统一投射物发射参数归一化与单帧轨迹步进计算 |
 | `ProjectileImpactFeedbackUtility` | 统一投射物命中后的特效、音效与运行时销毁反馈 |
+| `ProceduralAudioUtility` | 统一程序生成 one-shot 音效、SFX 音量解析，以及玩家新动作、SwordArt、破防和 Boss 回应的轻量音频计划；action cue 计划携带 mix group、短 cooldown、空间混合和衰减距离策略 |
 | `CombatResolver` | 统一伤害、硬直、击退结算 |
 | `AttackContext` | 单次攻击运行时数据 |
 
@@ -159,6 +160,8 @@ CampusRPG.UI
 | `CheckpointRestorePlanner` | 计算恢复点、血蓝恢复值与存档基础数据 |
 | `CheckpointRestoreSceneResetter` | 管理回档参与者注册并执行交互物、遭遇战、敌人的回档重置 |
 | `ChapterProgressService` | 管理章节关键进度 |
+| `ChapterMapDefinitionSO` | 章节地图数据资产，描述五区、目标提示、遭遇/奖励与路线门要求 |
+| `ChapterMapZoneMarker` | 场景中的地图区 marker，绑定 `ChapterMapDefinitionSO` 的 zone id 供测试、UI 与后续地图系统消费 |
 | `ChapterProgressPersistence` | 统一章节进度的存档快照与恢复归一化 |
 | `ChapterProgressStateUtility` | 统一章节进度的运行时状态变更、需求判断与快照回填 |
 | `EncounterStateService` | 记录遭遇战是否被清理 |
@@ -171,6 +174,8 @@ CampusRPG.UI
 | 类名 | 职责 |
 |---|---|
 | `HudPresenter` | 玩家 HUD 数据刷新 |
+| `SwordArtHudPresenter` | 正式战斗 HUD 招式提示，显示当前触发、最近触发、cancel 链接窗口和候选 SwordArt |
+| `SwordArtHudUtility` | 计算 SwordArt HUD 展示计划，供正式 HUD 与测试复用 |
 | `BossBarPresenter` | Boss 血条显示 |
 | `BossAttackCuePresenter` | Boss 招式预警条与提示文案 |
 | `BossAttackCuePlanner` | 计算 Boss 招式预警文案、颜色与可见时长 |
@@ -246,9 +251,11 @@ CampusRPG.UI
 5. `CombatResolver` 计算伤害、硬直、击退。
 6. 命中结果回传给 `HudPresenter`、特效与音效。
 
+轻击连段的下一段输入只在当前段尾部的 `CombatBalanceSO.InputBufferSeconds` 窗口内排队；窗口外过早输入不会自动连到下一段。
+
 ### 格挡成功流程
 
-1. 玩家处于 `PlayerBlockState`。
+1. 玩家处于 `PlayerBlockState`，且格挡启动窗口已经结束。
 2. 来袭攻击进入受击判断。
 3. 若满足格挡条件，则取消伤害或降低伤害。
 4. `GaugeComponent` 增加 `CounterGauge`。
@@ -257,9 +264,10 @@ CampusRPG.UI
 ### 闪避成功流程
 
 1. 玩家进入 `PlayerDodgeState`。
-2. 攻击穿过玩家无敌帧窗口。
-3. `GaugeComponent` 增加 `AgilityGauge`。
-4. 状态机打开 `DodgeFollowUp` 输入窗口。
+2. 闪避启动窗口结束后进入无敌帧。
+3. 攻击穿过玩家无敌帧窗口。
+4. `GaugeComponent` 增加 `AgilityGauge`。
+5. 状态机打开 `DodgeFollowUp` 输入窗口。
 
 ## 7. 推荐脚本创建顺序
 

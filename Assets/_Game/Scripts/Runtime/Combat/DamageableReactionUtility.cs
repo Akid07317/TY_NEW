@@ -8,7 +8,8 @@ namespace CampusRPG.Combat
     {
         None,
         SuccessfulDodge,
-        SuccessfulBlock
+        SuccessfulBlock,
+        GuardBroken
     }
 
     public readonly struct DamageableReactionPlan
@@ -36,7 +37,9 @@ namespace CampusRPG.Combat
 
     public static class DamageableReactionUtility
     {
-        public static DamageDefenseOutcome ResolveDefenseOutcome(PlayerCharacter playerCharacter)
+        public static DamageDefenseOutcome ResolveDefenseOutcome(
+            PlayerCharacter playerCharacter,
+            AttackDefinitionSO incomingAttack = null)
         {
             if (playerCharacter == null || playerCharacter.StateMachine == null)
             {
@@ -48,9 +51,29 @@ namespace CampusRPG.Combat
                 return DamageDefenseOutcome.SuccessfulDodge;
             }
 
-            return playerCharacter.StateMachine.IsBlocking
-                ? DamageDefenseOutcome.SuccessfulBlock
-                : DamageDefenseOutcome.None;
+            if (!playerCharacter.StateMachine.HasActiveGuard)
+            {
+                return DamageDefenseOutcome.None;
+            }
+
+            return incomingAttack != null && incomingAttack.BreaksGuard
+                ? DamageDefenseOutcome.GuardBroken
+                : DamageDefenseOutcome.SuccessfulBlock;
+        }
+
+        public static float ResolvePlayerHitStunSeconds(
+            float defaultHitStunSeconds,
+            DamageDefenseOutcome defenseOutcome,
+            AttackDefinitionSO incomingAttack)
+        {
+            float hitStunSeconds = Mathf.Max(0f, defaultHitStunSeconds);
+
+            if (defenseOutcome == DamageDefenseOutcome.GuardBroken && incomingAttack != null)
+            {
+                hitStunSeconds = Mathf.Max(hitStunSeconds, incomingAttack.GuardBreakHitStunSeconds);
+            }
+
+            return hitStunSeconds;
         }
 
         public static DamageableReactionPlan BuildPostDamageReaction(

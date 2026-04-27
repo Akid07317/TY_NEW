@@ -43,6 +43,11 @@ namespace CampusRPG.UI
                         "Gate Sigil Recovered",
                         "The boss gate is open. Push forward into the gatekeeper arena.",
                         true);
+                case Chapter01Ids.KeyItems.SideRouteCache:
+                    return new KeyItemAcquisitionPlan(
+                        "Side Route Cache Recovered",
+                        "Optional cache secured. Use the shortcut return or push toward the boss gate.",
+                        true);
                 case Chapter01Ids.KeyItems.RitualCore:
                     return new KeyItemAcquisitionPlan(
                         "Ritual Core Recovered",

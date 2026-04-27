@@ -9,6 +9,7 @@
 - `CampusRPG/Setup/Build CombatTest Scene`
 - `CampusRPG/Setup/Build CombatTest Scene (Force Rebuild)`
 - `CampusRPG/Setup/Repair CombatTest Prefab Wiring`
+- `CampusRPG/Setup/Repair CombatTest Scene Lighting`
 - `CampusRPG/Setup/Repair CombatTest Scene NavMesh`
 - `CampusRPG/Setup/Local Preview/Apply Imported Enemy Avatar Chain To CombatTest Enemy Prefabs`
 
@@ -21,19 +22,29 @@
 - 生成 `PF_Projectile_SpellBolt`
 - 生成 `PF_VFX_ProjectileImpact_SpellBolt`
 - 生成 `AC_Player_CombatTest`、玩家攻击片段，以及基础动作层片段
-  当前玩家控制器除了攻击状态，还会生成 `Locomotion / Block / Airborne / Dodge / Hit / Death` 基础状态
+  当前玩家控制器除了攻击状态，还会生成 `Locomotion / Block / Airborne / Dodge / CombatRoll / AirDodge / Hit / GuardBreak / Death` 基础状态
   仓库默认只生成可提交的 proxy / approved `_Game` 动作片段；只有在你本地手动打开预览开关并执行 local preview 菜单时，才会重建 imported preview 动作
+  当前 SwordArt 片段包含 `Sidewind Cut`、`Rising Cleave`、`Iron Gate Break`、`Falling Star`、`Cross Step` 与 `Moon Sever`；其中 `Falling Star` 使用空中 `Heavy + Neutral/Backward` 触发，`Moon Sever` 使用空中 dodge 后 Light 触发，`Cross Step` 使用 roll 后 Light 触发，`Rising Cleave` 保留空中/前推 heavy 的追击角色
   玩家攻击片段现在会保留一小段导入动作的收招尾巴，而不是只按命中窗口长度硬裁；运行时也会把 `forwardMovement` 用到玩家攻击前送上
+  新增的 `SwordArt_` 运行时恢复策略会额外保留下砸、横切和破防类招式的可见 follow-through，避免 `Falling Star`、`Moon Sever` 等绑定素材在 hit window 结束后立刻被切回 locomotion；命中窗口和输入触发仍以 attack SO / SwordArt SO 为准
   因此现在已经可以直接评估移动、格挡、闪避、受击和死亡的整体手感，而不只是静态壳子加命中事件
 - 当项目里已经导入兼容的 Humanoid 角色与动作资源时，你可以手动切到 local preview 模式，让玩家本地 `CombatTest` 动画片段重建成真实动作副本，并把玩家 prefab 切到导入的人物外观；详细规则见 [素材来源清单](Docs/Asset_Source_List.md)
-- 敌人 imported Avatar chain 目前不属于标准 build / repair 链；如果你要实验，只能走单独的 local preview 菜单。它会给 enemy root 挂单独的 `Animator + EnemyCombatAnimationRelay`，而不是再把 skinned humanoid 塞进旧 proxy 表现链
+- 敌人 imported Avatar chain 目前不属于标准 build / repair 链；如果你要实验，只能走单独的 local preview 菜单。它会给 enemy root 挂单独的 `Animator + EnemyCombatAnimationRelay`，而不是再把 skinned humanoid 塞进旧 proxy 表现链。Gatekeeper `Sky Hook` / `Pursuit Slam` / `Gate Slam` 的 `ResponseRead` / `AntiAirRead` / `ChaseRollRead` / `GuardBreakRead` 会随 Startup / Advance / Recovery 渐入渐出；当前本地 `AC_Enemy_ImportedPreview_EnemyMelee/Mobile/Ranged.controller` 也已带 `Attack_AntiAir`、`Attack_ChaseRoll` 与 `Attack_GuardBreak` state，便于判断绑定动作是否有预备、出手和回收，而不是一进攻击态就满值弹姿态。
 - 重建 `Assets/_Game/Scenes/CombatTest.unity`
-- 在场景内放入 `CombatDebugHUD`
+- 在场景内放入 `CombatDebugHUD` 与正式 `SwordArtHUD`；Debug HUD 会显示技能状态、当前/候选 SwordArt、玩家当前 Animator clip / normalized time / blend weight、锁定目标当前 Animator clip / normalized time / blend weight，以及 roll、air dodge、破防、反空和追滚的短反馈行，并按 Game 视图宽度收缩、在接近底部 `SwordArtHUD` 前停止继续下画；如果信息被折叠，最后一行会显示 `+N debug lines hidden`，避免绑定素材走查时左上调试层压住动作或静默吞掉状态。锁定目标的 `Target Anim` 会排在目标 HP、技能状态和操作帮助之前，短 Game 视图中优先保留敌人当前动画读招证据。当前攻击会显示 compact `Atk:` 行，例如 `Atk: MoonSever Act 0.25/0.72 hit .20-.32`，把 `Startup` / `Active` / `Recovery` / `Done` 与 hit window 直接暴露出来，方便逐招核对命中点和收招拖尾；短 Game 视图里会优先保留攻击阶段和 `Target Anim`，再显示较重复的 action cue。左上调试层会绘制半透明深色底板，避免白字压在浅天空、浅地面或本机预览素材上读不清；需要专心看角色身体、武器轨迹和敌人起手时，可按 `F1` 或反引号键 `` ` `` 折叠 Debug HUD，只保留一条小提示，正式 `SwordArtHUD` 仍会显示。`SwordArtHUD` 会在屏幕下方显示当前触发、最近触发、cancel 链接窗口和候选招式，优先覆盖 `Cross Step`、`Falling Star` 与 `Iron Gate Break`。当前玩家 roll / air dodge / 核心 SwordArt 与 Gatekeeper 反空/追滚 cue 会触发轻量 camera impulse；相机冲击带优先级，低优先级移动反馈不会覆盖 `Falling Star`、`Iron Gate Break`、GuardBreak 或 `Pursuit Slam` 这类更重要的读招/命中反馈。动作反馈同时会播放经过 `SO_AudioSettings` 全局 SFX 音量、per-cue cooldown、mix group、空间衰减和短暂 priority dominance 策略处理的程序生成 one-shot chirp；低优先级 roll / air dodge 声效不会在同一拍盖住 `Pursuit Slam`、`Falling Star`、`Iron Gate Break` 或 GuardBreak 这类更重要提示。Debug HUD 还会短暂显示最近一次 SFX 决策，例如 `SFX: PursuitSlam play p30 BossResponse`、`SFX: Roll held p30 0.07s` 或 `SFX: Roll cd 0.08s`，用于实听时判断声效是已播放、被冷却挡住，还是被高优先级读招压住；短屏下这行只是辅助信息，不会挤掉 `Atk`、`Target Anim`、`Tgt Atk` 这些核心走查证据。Debug HUD 里的 Boss 读招会使用 compact 行，例如 `Boss: RollCatch PursuitSlam - delay dodge`，短 Game 视图中会优先保留 `Atk` / `Target Anim` / `Tgt Atk` / compact Boss cue，内部 `State` 行可后移；顶部正式 Boss cue 仍保留完整解法文案。Boss 顶部 cue 会用响应式安全宽高显示短解法提示，并在短 Game 视图里与底部 `SwordArtHUD` 保持最小间距，方便在手感走查时判断动作层级和主解法是否读得出来
+- `Gate Slam` 破防现在也会进入 Boss 读招观察链：顶部正式 cue 会显示 `Guard Break Incoming`，左上 Debug HUD compact 行会显示 `Boss: GuardBreak GateSlam - dodge; guard breaks`，方便和 `Attack_GuardBreak`、`GuardBreakRead`、`Tgt Atk` 同屏核对。
+- `Gate Slam` 硬挡失败后的玩家反馈也已独立：`PlayerHitState` 会按 `GuardBreak` 保留约 `0.16s` 破防受击，不再被普通受击 `0.12s` 上限截断；这段时间内移动、跳跃、dodge、轻重攻击和 skill 都不能立即取消。`PlayerCombatAnimationRelay` 会请求 `GuardBreak` Animator state，当前 CombatTest 生成链会绑定 `AN_Player_GuardBreak_CombatTest`，local preview 优先尝试盾挡受击 / 重受击素材，public-safe proxy baseline 则使用专属 guard-drop / collapse 曲线，不再只复用普通 `Hit` motion 慢放。走查时要确认“闪避是主解、硬挡会短暂失控”能从身体反馈、HUD、SFX 和镜头一起读出来。
+- Boss 顶部正式 cue 的攻击名会按当前矩形宽度只在绘制层做中间省略，避免绑定 local preview / imported 资源后长显示名在窄 Game 视图里横向裁掉；内部完整攻击名仍保留给合同、调试和日志。
+- Boss 顶部正式 cue 的短解法提示也会在绘制层做语义压缩，例如 `Delay dodge; lane catches rolls` 会显示为 `Delay dodge; lane`，`Land or guard; avoid air hang` 会显示为 `Land/guard; avoid air`；内部完整 `CurrentResponseHint` 仍保留给合同和调试，避免窄 Game 视图把“怎么解”这行硬裁掉。
+- Boss 顶部正式 cue 的三行样式现在都显式不换行，并在各自 `Rect` 内裁切。绑定 local-preview 素材后如果攻击名或提示里混入长素材名、宽字形或临时调试前缀，文字最多被面板内裁掉，不会溢出到 Boss 身体、地面 telegraph、`SwordArtHUD` 或画面动作区域。
+- 锁定目标正在攻击时，Debug HUD 会在 `Target Anim` 后显示 `Tgt Atk:` 短行，例如 `Tgt Atk: PursuitSlam Start 0.14/0.84 hit .28-.40`。这行用于核对敌人当前 startup / active / recovery、hit window、Boss cue 和画面起手是否一致；短 Game 视图会优先保留 `Target Anim`、`Tgt Atk` 与 compact Boss cue，玩家自身 `Anim Clip` 和内部 `State` 行会后移，避免检查 `Sky Hook` / `Pursuit Slam` 时敌人时序证据被折叠。
+- `Atk:` / `Tgt Atk:` 行会为长 local-preview / imported 动作名动态压缩显示名，优先保留阶段、elapsed / total 和 hit window。绑定素材后如果显示名带素材包前缀或长变体名，HUD 仍应保留类似 `Act 0.25/0.72 hit .20-.32`、`Start 0.14/0.84 hit .28-.40` 的关键信息，而不是只显示一串被裁掉的动作名。
 
 如果你只是想快速进入战斗测试，优先使用这个菜单，而不是按下面清单逐项手工创建。
 
 如果你已经有现成的 `CombatTest` 角色 prefab，不想整包重建场景，只想把 `RequireComponent` 造成的重复组件清掉，并把玩家的 `PlayerCombatAnimationRelay` 接回 prefab，请使用 `Repair CombatTest Prefab Wiring`。它会就地修复 `PF_Player_CombatTest` 和三类敌人 prefab 的内部组件引用，并把玩家/敌人一起恢复到 public-safe proxy baseline；敌人 imported Avatar chain 即使之前做过 local preview，也会在这里被拆回稳定的 proxy 基线，不会重建整个场景。
 当前修复流程也会把玩家的 `Animator`、`PlayerCharacter`、`PlayerStateMachine`、`PlayerMotor` 和 `PlayerCombatAnimationRelay` 的新动作层引用重新接齐。
+如果当前 `CombatTest` 画面过曝、地面发白、角色细节被洗掉，可以先执行 `Repair CombatTest Scene Lighting`。它会把方向光、环境光和反射强度收回到适合本地预览读动作的范围，不会改玩家/敌人的正式基线接线。
 
 当前默认入口在检测到以下目标已存在时，会先弹确认框，再执行覆盖：
 
@@ -44,6 +55,26 @@
 - `Assets/_Game/Prefabs/Characters/PF_Enemy_Ranged_CombatTest.prefab`
 
 如果你已经在这些文件里做了手调，请先复制备份，再执行重建。`Force Rebuild` 入口保留给明确知道自己要覆盖的人，批处理和自动化仍会直接重建。
+
+## 0.5 P0.5 后手感走查入口
+
+P0 / P0.5 当前已经通过自动化合同回归，下一步不是继续盲目增加新动作，而是在 `CombatTest` 里做一次实机手感走查。走查记录统一填到 [动作手感研究](Action_Game_Feel_Research.md) 的“P0.5 后实机走查记录表”。
+
+推荐进入顺序：
+
+1. 打开 `Assets/_Game/Scenes/CombatTest.unity`。
+2. 若只是做公开仓库安全基线走查，先执行 `CampusRPG/Setup/Repair CombatTest Prefab Wiring`，确认玩家和敌人都回到 proxy baseline。
+3. 若画面过曝或角色细节被洗掉，执行 `CampusRPG/Setup/Repair CombatTest Scene Lighting`。
+4. 只在需要判断本机 imported 预览动作时，才手动执行 local preview 菜单；走查结束后再执行 `Repair CombatTest Prefab Wiring` 回到 proxy baseline。
+5. 按 `Action_Game_Feel_Research.md` 的表格逐项填写 `观察结果` 和 `判定`，判定只用 `Pass` / `Tune P0.5` / `Open P0.6`。
+
+进入 `P0.6-NewActions` 前必须满足下面任一条件：
+
+- 现有参数、现有 clip、现有镜头或反馈无法表达走查观察到的问题。
+- 当前动作合同导致玩家无法稳定读懂“该挡、该闪、该走”。
+- 需要新状态、新 clip 或专属受击/破防反馈才能解决问题。
+
+否则先留在 `Tune P0.5`，只调现有数据、镜头或反馈参数。
 
 ## 1. 场景最小构成
 
@@ -58,6 +89,7 @@
 - `EnemySpawn_Mobile`
 - `EnemySpawn_Ranged`
 - `CombatDebugHUD`
+- `SwordArtHUD`
 
 ## 2. Bootstrap 对象
 
@@ -130,7 +162,8 @@
 - 如需把当前玩家 prefab 切到导入角色，再执行 `CampusRPG/Setup/Local Preview/Apply Imported Player Visuals To CombatTest Player Prefab`
   当前会优先使用 `Assets/JC_LP_MedievalCharacters_LITE/Prefabs/SM_MedievalMaleLite_01.prefab`；若该资源不存在，再回退到 `Assets/Kevin Iglesias/` 下的兼容 Humanoid prefab
   如果首选角色材质仍指向 HDRP / 不受支持 shader，本地预览现在会自动在 `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/Materials/Player/` 下生成 built-in 兼容材质，避免玩家在 CombatTest 里整个人变成粉紫色
-  如果本机存在 `Assets/Free medieval weapons/Prefabs/Sword_DH.prefab`，同一步还会把第三方剑模型挂到 imported 右手骨，并自动隐藏 proxy 剑体，只留下前向标记方便读朝向
+  如果角色材质已经正常但场景还是偏白，先执行一次 `CampusRPG/Setup/Repair CombatTest Scene Lighting` 再看 Game 视图，避免把“场景灯太亮”误判成“角色材质有问题”
+  如果本机存在 `Assets/Free medieval weapons/Prefabs/Sword_OH.prefab`，同一步会优先把这把单手剑挂到 imported 右手骨；若缺失才回退到其他本地武器候选。应用后会自动隐藏 proxy 剑体，只留下前向标记方便读朝向
 - local preview 结束后，再执行一次 `Repair CombatTest Prefab Wiring`，把 prefab 恢复回 public-safe baseline
 
 `PlayerCharacter` 需要连接：
@@ -298,7 +331,7 @@
 - 如果项目里已导入兼容的 Humanoid 动作包，`CombatTest` 现在会优先使用真实近战动作来重建本地 clip；未导入时仍自动回退到占位动画
 - 玩家与三类敌人当前使用的是低成本代理可视外形，不是正式模型资产；它们的职责是帮助判断朝向、距离与战斗空间，不替代最终美术资源
 - 玩家格挡与成功闪避已有统一受击入口，但仍缺动画和表现层反馈
-- 敌人当前已补出近战 / 机动 / 远程三类最小行为差异，远程兵已接最小投射物链路、弧线弹道、命中闪光、全局 SFX 音量和程序生成音效，但仍缺更完整的资源化音频和命中特效
+- 敌人当前已补出近战 / 机动 / 远程三类最小行为差异，远程兵已接最小投射物链路、弧线弹道、命中闪光、全局 SFX 音量和程序生成音效；Gatekeeper `Sky Hook` / `Pursuit Slam` / `Gate Slam` 也分别有 `AntiAirRead` / `ChaseRollRead` / `GuardBreakRead` 读招参数与 local-preview 起手 state，但仍缺更完整的资源化音频和专属 Boss 起手 clip
 - 技能现在已接入最小施法执行，`SpellBolt` 已接最小投射物链路、命中闪光、全局 SFX 音量和程序生成音效，但仍缺动画事件、正式弹道表现和完整特效
 
 这些空位是故意保留的，目的是先让主干可接，再逐步细化。

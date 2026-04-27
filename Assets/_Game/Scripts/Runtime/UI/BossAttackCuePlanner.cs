@@ -6,10 +6,16 @@ namespace CampusRPG.UI
 {
     public readonly struct BossAttackCuePlan
     {
-        public BossAttackCuePlan(string cueLabel, string attackName, Color cueAccentColor, float visibleSeconds)
+        public BossAttackCuePlan(
+            string cueLabel,
+            string attackName,
+            string responseHint,
+            Color cueAccentColor,
+            float visibleSeconds)
         {
             CueLabel = cueLabel ?? string.Empty;
             AttackName = attackName ?? string.Empty;
+            ResponseHint = responseHint ?? string.Empty;
             CueAccentColor = cueAccentColor;
             VisibleSeconds = visibleSeconds;
         }
@@ -17,6 +23,8 @@ namespace CampusRPG.UI
         public string CueLabel { get; }
 
         public string AttackName { get; }
+
+        public string ResponseHint { get; }
 
         public Color CueAccentColor { get; }
 
@@ -29,6 +37,8 @@ namespace CampusRPG.UI
         private static readonly Color StraightProjectileCueAccentColor = new Color(0.48f, 0.88f, 0.92f);
         private static readonly Color ArcProjectileCueAccentColor = new Color(1f, 0.58f, 0.32f);
         private static readonly Color RangedCueAccentColor = new Color(0.78f, 0.88f, 0.56f);
+        private static readonly Color AntiAirCueAccentColor = new Color(0.42f, 0.72f, 1f);
+        private static readonly Color ChaseRollCueAccentColor = new Color(1f, 0.42f, 0.24f);
 
         public static BossAttackCuePlan Build(
             EnemyBrain bossEnemy,
@@ -41,6 +51,7 @@ namespace CampusRPG.UI
             return new BossAttackCuePlan(
                 ResolveCueLabel(defaultCueLabel, attack),
                 ResolveAttackName(attack),
+                ResolveResponseHint(attack),
                 ResolveCueAccentColor(telegraphStyle, attack),
                 attack != null ? Mathf.Max(minimumVisibleSeconds, attack.StartupSeconds) : minimumVisibleSeconds);
         }
@@ -52,7 +63,27 @@ namespace CampusRPG.UI
 
         private static string ResolveCueLabel(string defaultCueLabel, AttackDefinitionSO attack)
         {
-            if (attack == null || attack.ProjectilePrefab == null)
+            if (attack == null)
+            {
+                return defaultCueLabel;
+            }
+
+            if (attack.EnemyTargetResponse == EnemyTargetResponseType.AntiAir)
+            {
+                return "Anti-Air Incoming";
+            }
+
+            if (attack.EnemyTargetResponse == EnemyTargetResponseType.ChaseRoll)
+            {
+                return "Roll Catch Incoming";
+            }
+
+            if (attack.BreaksGuard)
+            {
+                return "Guard Break Incoming";
+            }
+
+            if (attack.ProjectilePrefab == null)
             {
                 return defaultCueLabel;
             }
@@ -80,9 +111,59 @@ namespace CampusRPG.UI
             return string.IsNullOrWhiteSpace(attack.AttackId) ? "Brace" : attack.AttackId;
         }
 
+        private static string ResolveResponseHint(AttackDefinitionSO attack)
+        {
+            if (attack == null)
+            {
+                return "Watch, then answer";
+            }
+
+            if (attack.EnemyTargetResponse == EnemyTargetResponseType.AntiAir)
+            {
+                return "Land or guard; avoid air hang";
+            }
+
+            if (attack.EnemyTargetResponse == EnemyTargetResponseType.ChaseRoll)
+            {
+                return "Delay dodge; lane catches rolls";
+            }
+
+            if (attack.BreaksGuard)
+            {
+                return "Dodge heavy; guard breaks";
+            }
+
+            if (attack.ProjectilePrefab != null)
+            {
+                return attack.ProjectileTrajectoryMode switch
+                {
+                    ProjectileTrajectoryMode.Straight => "Sidestep line shot",
+                    ProjectileTrajectoryMode.Arc => "Leave marked impact",
+                    _ => "Move before shot lands"
+                };
+            }
+
+            return "Block or step out";
+        }
+
         private static Color ResolveCueAccentColor(BossTelegraphStyleSO telegraphStyle, AttackDefinitionSO attack)
         {
-            if (attack == null || attack.ProjectilePrefab == null)
+            if (attack == null)
+            {
+                return ResolveDefaultCueAccentColor(telegraphStyle);
+            }
+
+            if (attack.EnemyTargetResponse == EnemyTargetResponseType.AntiAir)
+            {
+                return telegraphStyle != null ? telegraphStyle.AntiAirCueAccentColor : AntiAirCueAccentColor;
+            }
+
+            if (attack.EnemyTargetResponse == EnemyTargetResponseType.ChaseRoll)
+            {
+                return telegraphStyle != null ? telegraphStyle.ChaseRollCueAccentColor : ChaseRollCueAccentColor;
+            }
+
+            if (attack.ProjectilePrefab == null)
             {
                 return ResolveDefaultCueAccentColor(telegraphStyle);
             }

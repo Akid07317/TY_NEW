@@ -13,6 +13,8 @@ namespace CampusRPG.Character
 
         public virtual bool AllowsJump => true;
 
+        public virtual float MovementSpeedScale => 1f;
+
         public virtual void Enter()
         {
         }

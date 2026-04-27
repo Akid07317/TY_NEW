@@ -1,3 +1,4 @@
+using CampusRPG.Combat;
 using UnityEngine;
 
 namespace CampusRPG.AI
@@ -51,7 +52,9 @@ namespace CampusRPG.AI
             float moveSpeedNormalized = ResolveMoveSpeedNormalized(deltaTime);
             locomotionCycle += deltaTime * Mathf.Lerp(1.5f, 5.4f, moveSpeedNormalized);
 
-            EnemyAttackPresentationPhase attackPhase = ResolveAttackPhase(out float attackProgress);
+            EnemyAttackPresentationPhase attackPhase = ResolveAttackPhase(
+                out float attackProgress,
+                out EnemyTargetResponseType targetResponse);
             EnemyArchetypeType archetypeType = enemyBrain != null && enemyBrain.Archetype != null
                 ? enemyBrain.Archetype.ArchetypeType
                 : EnemyArchetypeType.Melee;
@@ -62,7 +65,8 @@ namespace CampusRPG.AI
                 moveSpeedNormalized,
                 locomotionCycle,
                 attackPhase,
-                attackProgress);
+                attackProgress,
+                targetResponse);
 
             float poseLerp = ResolveLerpFactor(poseSmoothing, deltaTime);
             visualRoot.localPosition = Vector3.Lerp(
@@ -193,9 +197,12 @@ namespace CampusRPG.AI
             return Mathf.Clamp01(speed / baselineMoveSpeed);
         }
 
-        private EnemyAttackPresentationPhase ResolveAttackPhase(out float attackProgress)
+        private EnemyAttackPresentationPhase ResolveAttackPhase(
+            out float attackProgress,
+            out EnemyTargetResponseType targetResponse)
         {
             attackProgress = 0f;
+            targetResponse = EnemyTargetResponseType.None;
 
             if (stateMachine == null || stateMachine.CurrentState is not EnemyAttackState attackState)
             {
@@ -203,7 +210,25 @@ namespace CampusRPG.AI
             }
 
             attackProgress = attackState.PresentationProgress;
+            targetResponse = ResolveTargetResponse(attackState.CurrentAttackDefinition);
             return attackState.PresentationPhase;
+        }
+
+        private static EnemyTargetResponseType ResolveTargetResponse(AttackDefinitionSO attackDefinition)
+        {
+            if (attackDefinition == null)
+            {
+                return EnemyTargetResponseType.None;
+            }
+
+            if (attackDefinition.EnemyTargetResponse != EnemyTargetResponseType.None)
+            {
+                return attackDefinition.EnemyTargetResponse;
+            }
+
+            return attackDefinition.BreaksGuard
+                ? EnemyTargetResponseType.GuardBreak
+                : EnemyTargetResponseType.None;
         }
 
         private void RestoreImmediate()

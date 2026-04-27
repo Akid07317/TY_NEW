@@ -9,6 +9,7 @@ namespace CampusRPG.Editor
         private const string ImportedVisualRootName = "ImportedVisualRoot";
         private const string ImportedWeaponVisualRootName = "ImportedWeaponVisualRoot";
         private const string ProxyRootName = "CombatProxyVisualRoot";
+        private const string ForwardMarkerName = "ForwardMarker";
         private const string LocalPreviewMaterialFolder = "Assets/_Game/Animations/Characters/CombatTest/LocalPreview/Materials/Player";
         private const string LocalImportedSourcePreferenceKey = "CampusRPG.CombatTest.UseImportedPlayerSources";
         private const bool DefaultUseImportedPlayerSourcesForLocalPreview = false;
@@ -31,6 +32,11 @@ namespace CampusRPG.Editor
 
         private static readonly string[] PlayerWeaponPrefabCandidatePaths =
         {
+            "Assets/Free medieval weapons/Prefabs/Sword_OH.prefab",
+            "Assets/MYFG-Weapon Pack Lite/Perfabs/Sword/Sword01.prefab",
+            "Assets/MYFG-Weapon Pack Lite/Perfabs/Sword/Sword14.prefab",
+            "Assets/MYFG-Weapon Pack Lite/Perfabs/Sword/Sword16.prefab",
+            "Assets/MYFG-Weapon Pack Lite/Perfabs/Sword/Sword30.prefab",
             "Assets/Free medieval weapons/Prefabs/Sword_DH.prefab",
             "Assets/MYFG-Weapon Pack Lite/Perfabs/Two-Handed Sword/TH_Sword08.prefab",
             "Assets/MYFG-Weapon Pack Lite/Perfabs/Two-Handed Sword/TH_Sword05.prefab",
@@ -52,6 +58,8 @@ namespace CampusRPG.Editor
         private static readonly Vector3 ImportedWeaponVisualLocalPosition = Vector3.zero;
         private static readonly Quaternion ImportedWeaponVisualLocalRotation = Quaternion.Euler(0f, 0f, -90f);
         private static readonly Vector3 ImportedWeaponVisualLocalScale = new Vector3(1.05f, 1.05f, 1.05f);
+        private static readonly Vector3 SwordOneHandVisualLocalPosition = new Vector3(0.1f, 0.01f, -0.04f);
+        private static readonly Quaternion SwordOneHandVisualLocalRotation = new Quaternion(0.5f, 0.5f, 0.5f, 0.5f);
 
         public static bool UseImportedPlayerSourcesForLocalPreview
         {
@@ -176,6 +184,7 @@ namespace CampusRPG.Editor
 
             changed |= RemoveImportedWeaponPreview(actor);
             changed |= SetProxyWeaponRenderersEnabled(actor.transform, true);
+            changed |= SetForwardMarkerRenderersEnabled(actor.transform, true);
 
             if (rootAnimator != null && rootAnimator.avatar != null)
             {
@@ -200,6 +209,7 @@ namespace CampusRPG.Editor
             if (importedVisualRoot == null)
             {
                 changed |= SetProxyWeaponRenderersEnabled(actor.transform, true);
+                changed |= SetForwardMarkerRenderersEnabled(actor.transform, true);
                 return changed;
             }
 
@@ -209,6 +219,7 @@ namespace CampusRPG.Editor
             if (weaponPrefab == null || weaponAnchor == null)
             {
                 changed |= SetProxyWeaponRenderersEnabled(actor.transform, true);
+                changed |= SetForwardMarkerRenderersEnabled(actor.transform, true);
                 return changed;
             }
 
@@ -229,13 +240,14 @@ namespace CampusRPG.Editor
 
             weaponInstance.name = weaponPrefab.name;
             weaponInstance.transform.SetParent(weaponRoot.transform, false);
-            weaponInstance.transform.localPosition = ImportedWeaponVisualLocalPosition;
-            weaponInstance.transform.localRotation = ImportedWeaponVisualLocalRotation;
+            weaponInstance.transform.localPosition = ResolveImportedWeaponVisualLocalPosition(weaponPrefab);
+            weaponInstance.transform.localRotation = ResolveImportedWeaponVisualLocalRotation(weaponPrefab);
             weaponInstance.transform.localScale = ImportedWeaponVisualLocalScale;
 
             StripImportedVisualComponents(weaponInstance);
             changed |= NormalizePreviewMaterialsForBuiltinPipeline(weaponInstance);
             changed |= SetProxyWeaponRenderersEnabled(actor.transform, false);
+            changed |= SetForwardMarkerRenderersEnabled(actor.transform, false);
 
             EditorUtility.SetDirty(weaponRoot.transform);
             EditorUtility.SetDirty(weaponRoot);
@@ -389,6 +401,57 @@ namespace CampusRPG.Editor
             }
 
             return changed;
+        }
+
+        private static bool SetForwardMarkerRenderersEnabled(Transform actorRoot, bool enabled)
+        {
+            Transform forwardMarker = actorRoot != null ? actorRoot.Find($"{ProxyRootName}/{ForwardMarkerName}") : null;
+
+            if (forwardMarker == null)
+            {
+                return false;
+            }
+
+            bool changed = false;
+            Renderer[] renderers = forwardMarker.GetComponentsInChildren<Renderer>(true);
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i].enabled == enabled)
+                {
+                    continue;
+                }
+
+                renderers[i].enabled = enabled;
+                EditorUtility.SetDirty(renderers[i]);
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        private static Quaternion ResolveImportedWeaponVisualLocalRotation(GameObject weaponPrefab)
+        {
+            string weaponPrefabPath = weaponPrefab != null ? AssetDatabase.GetAssetPath(weaponPrefab) : string.Empty;
+
+            if (string.Equals(weaponPrefabPath, "Assets/Free medieval weapons/Prefabs/Sword_OH.prefab", System.StringComparison.Ordinal))
+            {
+                return SwordOneHandVisualLocalRotation;
+            }
+
+            return ImportedWeaponVisualLocalRotation;
+        }
+
+        private static Vector3 ResolveImportedWeaponVisualLocalPosition(GameObject weaponPrefab)
+        {
+            string weaponPrefabPath = weaponPrefab != null ? AssetDatabase.GetAssetPath(weaponPrefab) : string.Empty;
+
+            if (string.Equals(weaponPrefabPath, "Assets/Free medieval weapons/Prefabs/Sword_OH.prefab", System.StringComparison.Ordinal))
+            {
+                return SwordOneHandVisualLocalPosition;
+            }
+
+            return ImportedWeaponVisualLocalPosition;
         }
 
         private static GameObject LoadFirstAvailablePrefab(string[] candidatePaths)
@@ -659,6 +722,36 @@ namespace CampusRPG.Editor
                     if (texture != null)
                     {
                         return texture;
+                    }
+                }
+            }
+
+            SerializedObject serializedMaterial = new SerializedObject(material);
+            SerializedProperty serializedTextureEnvironments = serializedMaterial.FindProperty("m_SavedProperties.m_TexEnvs");
+
+            if (serializedTextureEnvironments != null && serializedTextureEnvironments.isArray)
+            {
+                for (int propertyIndex = 0; propertyIndex < propertyNames.Length; propertyIndex++)
+                {
+                    for (int environmentIndex = 0; environmentIndex < serializedTextureEnvironments.arraySize; environmentIndex++)
+                    {
+                        SerializedProperty environment = serializedTextureEnvironments.GetArrayElementAtIndex(environmentIndex);
+                        SerializedProperty key = environment.FindPropertyRelative("first");
+
+                        if (key == null || key.stringValue != propertyNames[propertyIndex])
+                        {
+                            continue;
+                        }
+
+                        SerializedProperty value = environment.FindPropertyRelative("second");
+                        SerializedProperty textureReference = value != null
+                            ? value.FindPropertyRelative("m_Texture")
+                            : null;
+
+                        if (textureReference?.objectReferenceValue is Texture serializedTexture)
+                        {
+                            return serializedTexture;
+                        }
                     }
                 }
             }

@@ -164,6 +164,11 @@ namespace CampusRPG.Character
                 return 0.08f;
             }
 
+            if (IsSwordArtState(animationStateName))
+            {
+                return 0.18f;
+            }
+
             if (animationStateName.StartsWith("Light_", System.StringComparison.Ordinal))
             {
                 return 0.06f;
@@ -196,6 +201,13 @@ namespace CampusRPG.Character
                 return Mathf.Min(configuredDuration, baseDuration + 0.18f);
             }
 
+            if (IsSwordArtState(animationStateName))
+            {
+                return Mathf.Min(
+                    configuredDuration,
+                    Mathf.Max(baseDuration + 0.24f, configuredDuration * 0.88f));
+            }
+
             if (animationStateName.StartsWith("Light_", System.StringComparison.Ordinal))
             {
                 return Mathf.Min(configuredDuration, Mathf.Max(baseDuration + 0.18f, 0.72f));
@@ -213,6 +225,11 @@ namespace CampusRPG.Character
             }
 
             return Mathf.Min(configuredDuration, baseDuration + 0.18f);
+        }
+
+        private static bool IsSwordArtState(string animationStateName)
+        {
+            return animationStateName.StartsWith("SwordArt_", System.StringComparison.Ordinal);
         }
     }
 }

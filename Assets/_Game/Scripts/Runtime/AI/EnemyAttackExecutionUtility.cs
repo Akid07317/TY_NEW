@@ -75,6 +75,11 @@ namespace CampusRPG.AI
                 return false;
             }
 
+            if (!hasClearShot)
+            {
+                return false;
+            }
+
             Vector3 flatDirection = target.position - origin.position;
             flatDirection.y = 0f;
             float maxRange = EnemyAttackSelectionResolver.ResolveAttackRange(archetype, attack) + Mathf.Max(0f, rangePadding);
@@ -98,12 +103,6 @@ namespace CampusRPG.AI
 
             if (damageable == null)
             {
-                return false;
-            }
-
-            if (attack != null && attack.ProjectilePrefab != null && !hasClearShot)
-            {
-                damageable = null;
                 return false;
             }
 

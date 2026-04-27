@@ -21,9 +21,11 @@ namespace CampusRPG.Editor
         private const string RootMenu = "CampusRPG/Setup/Build Chapter01 Combined Scene";
         private const string ForceRebuildMenu = "CampusRPG/Setup/Build Chapter01 Combined Scene (Force Rebuild)";
         private const string RepairBaselineTraversalMenu = "CampusRPG/Setup/Repair Chapter01 Baseline And Traversal Wiring";
+        private const string RepairSceneNavMeshMenu = "CampusRPG/Setup/Repair Chapter01 Scene NavMesh";
         private const string LegacyRepairTraversalMenu = "CampusRPG/Setup/Repair Chapter01 Traversal Wiring";
         private const string ScenePath = "Assets/_Game/Scenes/Chapter01_Combined.unity";
         private const string ChapterProgressionPath = "Assets/_Game/Data/Chapter/SO_Chapter01_Progression.asset";
+        private const string ChapterMapDefinitionPath = "Assets/_Game/Data/Chapter/SO_Chapter01_MapDefinition.asset";
         private const string PlayerPrefabPath = "Assets/_Game/Prefabs/Characters/PF_Player_CombatTest.prefab";
         private const string EnemyMeleePrefabPath = "Assets/_Game/Prefabs/Characters/PF_Enemy_Melee_CombatTest.prefab";
         private const string EnemyMobilePrefabPath = "Assets/_Game/Prefabs/Characters/PF_Enemy_Mobile_CombatTest.prefab";
@@ -37,6 +39,23 @@ namespace CampusRPG.Editor
         private const string BossTelegraphStylePath = "Assets/_Game/Data/Enemies/SO_BossTelegraphStyle_Gatekeeper.asset";
         private const string MantleProbeOriginName = "MantleProbeOrigin";
         private const string InteriorMantleObstacleName = "TraversalMantle_InteriorApproach";
+        private const string MapZonesRootName = "Chapter01_MapZones";
+        private const string ModularGreyboxRootName = "Chapter01_ModularGreybox";
+        private const string Zone01Name = "Zone01_EntranceTutorial";
+        private const string Zone02Name = "Zone02_CourtyardArena";
+        private const string Zone03Name = "Zone03_InteriorNarrowHall";
+        private const string Zone04Name = "Zone04_SideRouteShortcut";
+        private const string Zone05Name = "Zone05_BossApproachAndArena";
+        private const string Zone01Id = "zone01_entrance_tutorial";
+        private const string Zone02Id = "zone02_courtyard_arena";
+        private const string Zone03Id = "zone03_interior_narrow_hall";
+        private const string Zone04Id = "zone04_side_route_shortcut";
+        private const string Zone05Id = "zone05_boss_approach_and_arena";
+        private const string RouteGateA01A02Id = "route_gate_a01_to_a02";
+        private const string RouteGateA02A03Id = "route_gate_a02_to_a03";
+        private const string RouteGateA03ShortcutId = "route_gate_a03_side_shortcut";
+        private const string RouteGateA03A04Id = "route_gate_a03_to_a04";
+        private const string RouteGateA04RitualCoreId = "route_gate_a04_to_ritual_core";
         private static readonly Vector3 MantleProbeOriginLocalPosition = new Vector3(0f, 1.0f, 0.18f);
         private static readonly Vector3 InteriorMantleObstaclePosition = new Vector3(0f, 0.56f, 47.8f);
         private static readonly Vector3 InteriorMantleObstacleScale = new Vector3(3.2f, 1.12f, 1.6f);
@@ -62,6 +81,25 @@ namespace CampusRPG.Editor
         public static void RepairChapter01BaselineAndTraversalWiring()
         {
             RepairChapter01BaselineAndTraversalWiringInternal();
+        }
+
+        [MenuItem(RepairSceneNavMeshMenu)]
+        public static void RepairChapter01SceneNavMesh()
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+            {
+                Debug.LogWarning("Chapter01 scene NavMesh repair skipped because the scene asset does not exist yet.");
+                return;
+            }
+
+            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            bool built = RebuildChapter01SceneNavMesh(scene);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log(
+                built
+                    ? "Chapter01 scene NavMesh rebuilt and saved."
+                    : "Chapter01 scene NavMesh repair completed, but no baked NavMesh data was produced.");
         }
 
         [MenuItem(LegacyRepairTraversalMenu)]
@@ -119,6 +157,7 @@ namespace CampusRPG.Editor
             EnsureFolder("Assets/_Game/Scenes");
 
             ChapterProgressionSO chapterProgression = CreateOrLoadChapterProgressionAsset();
+            ChapterMapDefinitionSO chapterMapDefinition = CreateOrLoadChapterMapDefinitionAsset();
             GameObject playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
             GameObject meleeEnemyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(EnemyMeleePrefabPath);
             GameObject mobileEnemyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(EnemyMobilePrefabPath);
@@ -136,7 +175,8 @@ namespace CampusRPG.Editor
                 || mobileEnemyPrefab == null
                 || rangedEnemyPrefab == null
                 || inputActions == null
-                || chapterProgression == null)
+                || chapterProgression == null
+                || chapterMapDefinition == null)
             {
                 Debug.LogError("Failed to build Chapter01 scene because a required asset is missing.");
                 return;
@@ -167,6 +207,8 @@ namespace CampusRPG.Editor
             BuildAreaShell(area02.transform, new Vector3(0f, 0f, 28f));
             BuildAreaShell(area03.transform, new Vector3(0f, 0f, 56f));
             BuildAreaShell(area04.transform, new Vector3(0f, 0f, 84f));
+            BuildChapter01MapZones(chapterRoot.transform, area02.transform, area03.transform, area04.transform, chapterMapDefinition);
+            BuildChapter01ModularGreybox(chapterRoot.transform);
 
             GameObject player = (GameObject)PrefabUtility.InstantiatePrefab(playerPrefab);
             player.name = "Player";
@@ -457,8 +499,14 @@ namespace CampusRPG.Editor
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
+            bool navMeshBuilt = RebuildChapter01SceneNavMesh(scene);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+
+            if (!navMeshBuilt)
+            {
+                Debug.LogWarning("Chapter01 combined scene was generated, but no baked NavMesh data was produced.");
+            }
 
             Debug.Log("Chapter01 combined scene graybox and progression asset were generated using the public-safe proxy baseline.");
         }
@@ -490,6 +538,138 @@ namespace CampusRPG.Editor
             return asset;
         }
 
+        private static ChapterMapDefinitionSO CreateOrLoadChapterMapDefinitionAsset()
+        {
+            ChapterMapDefinitionSO asset = AssetDatabase.LoadAssetAtPath<ChapterMapDefinitionSO>(ChapterMapDefinitionPath);
+
+            if (asset == null)
+            {
+                asset = ScriptableObject.CreateInstance<ChapterMapDefinitionSO>();
+                AssetDatabase.CreateAsset(asset, ChapterMapDefinitionPath);
+            }
+
+            asset.Configure(
+                Chapter01Ids.Chapter,
+                CreateChapterMapZoneDefinitions(),
+                CreateChapterMapRouteGateDefinitions());
+            EditorUtility.SetDirty(asset);
+            return asset;
+        }
+
+        private static ChapterMapDefinitionSO.MapZoneDefinition[] CreateChapterMapZoneDefinitions()
+        {
+            return new[]
+            {
+                new ChapterMapDefinitionSO.MapZoneDefinition(
+                    Zone01Id,
+                    Zone01Name,
+                    "Entrance Tutorial",
+                    Chapter01Ids.Areas.Entrance,
+                    "Learn movement, lock-on, light attacks, guard and dodge before the first route gate.",
+                    Chapter01Ids.Encounters.EntranceTutorial,
+                    Chapter01Ids.Checkpoints.Start,
+                    string.Empty,
+                    false,
+                    new Vector3(0f, 1f, 0f),
+                    new Vector3(14f, 2.5f, 18f)),
+                new ChapterMapDefinitionSO.MapZoneDefinition(
+                    Zone02Id,
+                    Zone02Name,
+                    "Courtyard Arena",
+                    Chapter01Ids.Areas.Courtyard,
+                    "Use wide lanes, cover, ranged pressure and mixed enemies to test roll and dodge spacing.",
+                    Chapter01Ids.Encounters.Courtyard,
+                    Chapter01Ids.Checkpoints.Courtyard,
+                    string.Empty,
+                    false,
+                    new Vector3(0f, 1f, 28f),
+                    new Vector3(20f, 2.5f, 22f)),
+                new ChapterMapDefinitionSO.MapZoneDefinition(
+                    Zone03Id,
+                    Zone03Name,
+                    "Interior Narrow Hall",
+                    Chapter01Ids.Areas.Interior,
+                    "Fight through camera pressure, mantle cover and the sigil lock-room before the boss gate.",
+                    Chapter01Ids.Encounters.Interior,
+                    Chapter01Ids.Checkpoints.Interior,
+                    Chapter01Ids.KeyItems.GateSigil,
+                    false,
+                    new Vector3(0f, 1f, 50f),
+                    new Vector3(9f, 2.5f, 12f)),
+                new ChapterMapDefinitionSO.MapZoneDefinition(
+                    Zone04Id,
+                    Zone04Name,
+                    "Side Route Shortcut",
+                    Chapter01Ids.Areas.Interior,
+                    "Optional side lane that reads as a shortcut return after the interior lock-room is solved.",
+                    string.Empty,
+                    Chapter01Ids.Checkpoints.Interior,
+                    Chapter01Ids.KeyItems.SideRouteCache,
+                    true,
+                    new Vector3(-5.25f, 1f, 58f),
+                    new Vector3(5.5f, 2.5f, 15f)),
+                new ChapterMapDefinitionSO.MapZoneDefinition(
+                    Zone05Id,
+                    Zone05Name,
+                    "Boss Approach And Arena",
+                    Chapter01Ids.Areas.Boss,
+                    "Prepare in the antechamber, fight Gatekeeper, then claim the Ritual Core to finish Chapter01.",
+                    Chapter01Ids.Encounters.Gatekeeper,
+                    Chapter01Ids.Checkpoints.Interior,
+                    Chapter01Ids.KeyItems.RitualCore,
+                    false,
+                    new Vector3(0f, 1f, 82f),
+                    new Vector3(18f, 2.5f, 24f))
+            };
+        }
+
+        private static ChapterMapDefinitionSO.RouteGateDefinition[] CreateChapterMapRouteGateDefinitions()
+        {
+            return new[]
+            {
+                new ChapterMapDefinitionSO.RouteGateDefinition(
+                    RouteGateA01A02Id,
+                    "Entrance To Courtyard",
+                    Zone01Id,
+                    Zone02Id,
+                    Chapter01Ids.Encounters.EntranceTutorial,
+                    string.Empty,
+                    false),
+                new ChapterMapDefinitionSO.RouteGateDefinition(
+                    RouteGateA02A03Id,
+                    "Courtyard To Interior",
+                    Zone02Id,
+                    Zone03Id,
+                    Chapter01Ids.Encounters.Courtyard,
+                    string.Empty,
+                    false),
+                new ChapterMapDefinitionSO.RouteGateDefinition(
+                    RouteGateA03ShortcutId,
+                    "Interior Shortcut Return",
+                    Zone03Id,
+                    Zone04Id,
+                    Chapter01Ids.Encounters.Interior,
+                    string.Empty,
+                    true),
+                new ChapterMapDefinitionSO.RouteGateDefinition(
+                    RouteGateA03A04Id,
+                    "Interior To Boss Gate",
+                    Zone04Id,
+                    Zone05Id,
+                    string.Empty,
+                    Chapter01Ids.KeyItems.GateSigil,
+                    false),
+                new ChapterMapDefinitionSO.RouteGateDefinition(
+                    RouteGateA04RitualCoreId,
+                    "Gatekeeper To Ritual Core",
+                    Zone05Id,
+                    Zone05Id,
+                    Chapter01Ids.Encounters.Gatekeeper,
+                    string.Empty,
+                    false)
+            };
+        }
+
         private static GameObject CreateAreaRoot(Transform parent, string name, Vector3 position)
         {
             GameObject areaRoot = new GameObject(name);
@@ -503,8 +683,132 @@ namespace CampusRPG.Editor
             CreateFloor(parent, "Floor", center + new Vector3(0f, -0.5f, 0f), new Vector3(18f, 1f, 20f));
             CreateWall(parent, "Wall_Left", center + new Vector3(-9.5f, 1.5f, 0f), new Vector3(1f, 3f, 20f));
             CreateWall(parent, "Wall_Right", center + new Vector3(9.5f, 1.5f, 0f), new Vector3(1f, 3f, 20f));
-            CreateWall(parent, "Wall_Back", center + new Vector3(0f, 1.5f, -10.5f), new Vector3(18f, 3f, 1f));
-            CreateWall(parent, "Wall_Front", center + new Vector3(0f, 1.5f, 10.5f), new Vector3(18f, 3f, 1f));
+            CreateWall(parent, "Wall_Back_Left", center + new Vector3(-6f, 1.5f, -10.5f), new Vector3(6f, 3f, 1f));
+            CreateWall(parent, "Wall_Back_Right", center + new Vector3(6f, 1.5f, -10.5f), new Vector3(6f, 3f, 1f));
+            CreateWall(parent, "Wall_Front_Left", center + new Vector3(-6f, 1.5f, 10.5f), new Vector3(6f, 3f, 1f));
+            CreateWall(parent, "Wall_Front_Right", center + new Vector3(6f, 1.5f, 10.5f), new Vector3(6f, 3f, 1f));
+        }
+
+        private static void BuildChapter01MapZones(
+            Transform chapterRoot,
+            Transform courtyardArea,
+            Transform interiorArea,
+            Transform bossArea,
+            ChapterMapDefinitionSO mapDefinition)
+        {
+            GameObject zonesRoot = new GameObject(MapZonesRootName);
+            zonesRoot.transform.SetParent(chapterRoot);
+            zonesRoot.transform.position = Vector3.zero;
+
+            ChapterMapDefinitionSO.MapZoneDefinition[] zones = mapDefinition != null
+                ? mapDefinition.Zones
+                : CreateChapterMapZoneDefinitions();
+
+            for (int i = 0; i < zones.Length; i++)
+            {
+                CreateMapZoneMarker(zonesRoot.transform, zones[i], mapDefinition);
+            }
+
+            CreateFloor(chapterRoot, "Connector_A01_A02_Floor", new Vector3(0f, -0.5f, 14f), new Vector3(6f, 1f, 8f));
+            CreateFloor(chapterRoot, "Connector_A02_A03_Floor", new Vector3(0f, -0.5f, 42f), new Vector3(6f, 1f, 8f));
+            CreateFloor(chapterRoot, "Connector_A03_A04_Floor", new Vector3(0f, -0.5f, 70f), new Vector3(6f, 1f, 8f));
+
+            CreateFloor(courtyardArea, "Zone02_LeftEvadeLane_Floor", new Vector3(-6.1f, -0.48f, 28f), new Vector3(3.8f, 0.14f, 17f));
+            CreateFloor(courtyardArea, "Zone02_RightEvadeLane_Floor", new Vector3(6.1f, -0.48f, 28f), new Vector3(3.8f, 0.14f, 17f));
+            CreateWall(courtyardArea, "Zone02_CenterCover_A", new Vector3(-1.9f, 0.35f, 28.5f), new Vector3(1.4f, 0.7f, 2.6f));
+            CreateWall(courtyardArea, "Zone02_CenterCover_B", new Vector3(2.2f, 0.35f, 33f), new Vector3(1.4f, 0.7f, 2.6f));
+
+            CreateWall(interiorArea, "Zone03_CameraPillar_Left_A", new Vector3(-3.4f, 1.4f, 49.5f), new Vector3(0.8f, 2.8f, 0.8f));
+            CreateWall(interiorArea, "Zone03_CameraPillar_Right_A", new Vector3(3.4f, 1.4f, 52.5f), new Vector3(0.8f, 2.8f, 0.8f));
+            CreateWall(interiorArea, "Zone03_CameraPillar_Left_B", new Vector3(-3.4f, 1.4f, 55.5f), new Vector3(0.8f, 2.8f, 0.8f));
+            CreateWall(interiorArea, "Zone03_CameraPillar_Right_B", new Vector3(3.4f, 1.4f, 58.5f), new Vector3(0.8f, 2.8f, 0.8f));
+
+            CreateFloor(interiorArea, "Zone04_SideRouteShortcut_Floor", new Vector3(-5.7f, -0.46f, 58.5f), new Vector3(3.8f, 0.12f, 14f));
+            CreateWall(interiorArea, "Zone04_SideRoute_LowCover_A", new Vector3(-2.7f, 0.35f, 55.5f), new Vector3(0.6f, 0.7f, 3.8f));
+            CreateWall(interiorArea, "Zone04_SideRoute_LowCover_B", new Vector3(-2.7f, 0.35f, 62f), new Vector3(0.6f, 0.7f, 3.8f));
+            CreateWall(interiorArea, "Zone04_ShortcutReturn_Gate_Left", new Vector3(-7.4f, 1.2f, 65.3f), new Vector3(0.45f, 2.4f, 0.45f));
+            CreateWall(interiorArea, "Zone04_ShortcutReturn_Gate_Right", new Vector3(-4f, 1.2f, 65.3f), new Vector3(0.45f, 2.4f, 0.45f));
+
+            CreateFloor(bossArea, "Zone05_BossAntechamber_Floor", new Vector3(0f, -0.46f, 75.8f), new Vector3(12f, 0.12f, 4.6f));
+            CreateWall(bossArea, "Zone05_BossAntechamber_SupplyMarker", new Vector3(-5.2f, 0.45f, 76.2f), new Vector3(1.2f, 0.9f, 1.2f));
+            CreateWall(bossArea, "Zone05_BossArenaBoundary_Left", new Vector3(-7.2f, 0.6f, 81.2f), new Vector3(0.6f, 1.2f, 6f));
+            CreateWall(bossArea, "Zone05_BossArenaBoundary_Right", new Vector3(7.2f, 0.6f, 81.2f), new Vector3(0.6f, 1.2f, 6f));
+            CreateFloor(bossArea, "Zone05_BossArena_CenterRing", new Vector3(0f, -0.44f, 84f), new Vector3(7.5f, 0.1f, 7.5f));
+        }
+
+        private static void BuildChapter01ModularGreybox(Transform chapterRoot)
+        {
+            GameObject modularRoot = new GameObject(ModularGreyboxRootName);
+            modularRoot.transform.SetParent(chapterRoot);
+            modularRoot.transform.position = Vector3.zero;
+
+            Transform entranceRoot = CreateModularZoneRoot(modularRoot.transform, "Modular_Zone01_Entrance");
+            Transform courtyardRoot = CreateModularZoneRoot(modularRoot.transform, "Modular_Zone02_Courtyard");
+            Transform interiorRoot = CreateModularZoneRoot(modularRoot.transform, "Modular_Zone03_Interior");
+            Transform sideRouteRoot = CreateModularZoneRoot(modularRoot.transform, "Modular_Zone04_SideRoute");
+            Transform bossRoot = CreateModularZoneRoot(modularRoot.transform, "Modular_Zone05_BossApproach");
+
+            CreateModularBlock(entranceRoot, "Modular_Zone01_EntranceArch_LeftPost", new Vector3(-4.8f, 1.45f, 8.9f), new Vector3(0.65f, 2.9f, 0.65f));
+            CreateModularBlock(entranceRoot, "Modular_Zone01_EntranceArch_RightPost", new Vector3(4.8f, 1.45f, 8.9f), new Vector3(0.65f, 2.9f, 0.65f));
+            CreateModularBlock(entranceRoot, "Modular_Zone01_EntranceArch_TopBeam", new Vector3(0f, 3.05f, 8.9f), new Vector3(10.1f, 0.45f, 0.7f));
+            CreateModularBlock(entranceRoot, "Modular_Zone01_TutorialSightline_LeftPlinth", new Vector3(-6.2f, 0.35f, -3.2f), new Vector3(1.2f, 0.7f, 1.2f));
+            CreateModularBlock(entranceRoot, "Modular_Zone01_TutorialSightline_RightPlinth", new Vector3(6.2f, 0.35f, -3.2f), new Vector3(1.2f, 0.7f, 1.2f));
+
+            CreateModularBlock(courtyardRoot, "Modular_Zone02_LeftLane_Rail_A", new Vector3(-7.9f, 0.45f, 24.5f), new Vector3(0.45f, 0.9f, 4.4f));
+            CreateModularBlock(courtyardRoot, "Modular_Zone02_LeftLane_Rail_B", new Vector3(-7.9f, 0.45f, 32.6f), new Vector3(0.45f, 0.9f, 4.4f));
+            CreateModularBlock(courtyardRoot, "Modular_Zone02_RightLane_Rail_A", new Vector3(7.9f, 0.45f, 24.5f), new Vector3(0.45f, 0.9f, 4.4f));
+            CreateModularBlock(courtyardRoot, "Modular_Zone02_RightLane_Rail_B", new Vector3(7.9f, 0.45f, 32.6f), new Vector3(0.45f, 0.9f, 4.4f));
+            CreateModularBlock(courtyardRoot, "Modular_Zone02_CenterCover_CrateStack", new Vector3(0.2f, 0.55f, 30.6f), new Vector3(1.4f, 1.1f, 1.4f));
+
+            CreateModularBlock(interiorRoot, "Modular_Zone03_CeilingBeam_A", new Vector3(0f, 3.15f, 50.8f), new Vector3(8.1f, 0.28f, 0.45f));
+            CreateModularBlock(interiorRoot, "Modular_Zone03_CeilingBeam_B", new Vector3(0f, 3.15f, 56.8f), new Vector3(8.1f, 0.28f, 0.45f));
+            CreateModularBlock(interiorRoot, "Modular_Zone03_PillarTrim_Left_A", new Vector3(-4.35f, 1.55f, 52.4f), new Vector3(0.42f, 3.1f, 1.1f));
+            CreateModularBlock(interiorRoot, "Modular_Zone03_PillarTrim_Right_A", new Vector3(4.35f, 1.55f, 55.6f), new Vector3(0.42f, 3.1f, 1.1f));
+
+            CreateModularBlock(sideRouteRoot, "Modular_Zone04_SideRoute_Step_A", new Vector3(-6.55f, -0.28f, 53.2f), new Vector3(2.3f, 0.22f, 1.0f));
+            CreateModularBlock(sideRouteRoot, "Modular_Zone04_SideRoute_Step_B", new Vector3(-5.1f, -0.16f, 57.5f), new Vector3(2.4f, 0.24f, 1.0f));
+            CreateModularBlock(sideRouteRoot, "Modular_Zone04_SideRoute_Step_C", new Vector3(-6.65f, -0.04f, 61.8f), new Vector3(2.3f, 0.26f, 1.0f));
+            CreateModularBlock(sideRouteRoot, "Modular_Zone04_SideRoute_CachePlinth", new Vector3(-6.1f, 0.38f, 64.5f), new Vector3(1.4f, 0.76f, 1.4f));
+
+            CreateModularBlock(bossRoot, "Modular_Zone05_AntechamberArch_LeftPost", new Vector3(-5.9f, 1.55f, 78.2f), new Vector3(0.7f, 3.1f, 0.7f));
+            CreateModularBlock(bossRoot, "Modular_Zone05_AntechamberArch_RightPost", new Vector3(5.9f, 1.55f, 78.2f), new Vector3(0.7f, 3.1f, 0.7f));
+            CreateModularBlock(bossRoot, "Modular_Zone05_AntechamberArch_TopBeam", new Vector3(0f, 3.25f, 78.2f), new Vector3(12.4f, 0.5f, 0.75f));
+            CreateModularBlock(bossRoot, "Modular_Zone05_ArenaRune_Left", new Vector3(-5.4f, 0.12f, 87.8f), new Vector3(1.8f, 0.24f, 1.8f));
+            CreateModularBlock(bossRoot, "Modular_Zone05_ArenaRune_Right", new Vector3(5.4f, 0.12f, 87.8f), new Vector3(1.8f, 0.24f, 1.8f));
+        }
+
+        private static Transform CreateModularZoneRoot(Transform parent, string name)
+        {
+            GameObject zoneRoot = new GameObject(name);
+            zoneRoot.transform.SetParent(parent);
+            zoneRoot.transform.position = Vector3.zero;
+            return zoneRoot.transform;
+        }
+
+        private static GameObject CreateModularBlock(Transform parent, string name, Vector3 position, Vector3 scale)
+        {
+            GameObject block = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            block.name = name;
+            block.transform.SetParent(parent);
+            block.transform.position = position;
+            block.transform.localScale = scale;
+            return block;
+        }
+
+        private static void CreateMapZoneMarker(
+            Transform parent,
+            ChapterMapDefinitionSO.MapZoneDefinition zone,
+            ChapterMapDefinitionSO mapDefinition)
+        {
+            GameObject marker = new GameObject(zone.SceneObjectName);
+            marker.transform.SetParent(parent);
+            marker.transform.position = zone.Center;
+            BoxCollider collider = marker.AddComponent<BoxCollider>();
+            collider.isTrigger = true;
+            collider.size = zone.Size;
+            ChapterMapZoneMarker zoneMarker = marker.AddComponent<ChapterMapZoneMarker>();
+            zoneMarker.Configure(mapDefinition, zone.ZoneId);
+            EditorUtility.SetDirty(zoneMarker);
         }
 
         private static void CreateFloor(Transform parent, string name, Vector3 position, Vector3 scale)
@@ -613,6 +917,65 @@ namespace CampusRPG.Editor
             barrier.transform.localScale = scale;
             barrier.SetActive(false);
             return barrier;
+        }
+
+        private static bool RebuildChapter01SceneNavMesh(Scene scene)
+        {
+            if (!scene.IsValid())
+            {
+                return false;
+            }
+
+            MarkSceneNavigationStatic();
+
+#pragma warning disable CS0618
+            UnityEditor.AI.NavMeshBuilder.ClearAllNavMeshes();
+            UnityEditor.AI.NavMeshBuilder.BuildNavMesh();
+#pragma warning restore CS0618
+            EditorSceneManager.MarkSceneDirty(scene);
+
+            if (!System.IO.File.Exists(scene.path))
+            {
+                return false;
+            }
+
+            EditorSceneManager.SaveScene(scene, scene.path);
+            string sceneYaml = System.IO.File.ReadAllText(scene.path);
+            return !string.IsNullOrWhiteSpace(sceneYaml) && !sceneYaml.Contains("m_NavMeshData: {fileID: 0}");
+        }
+
+        private static void MarkSceneNavigationStatic()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            GameObject[] roots = scene.GetRootGameObjects();
+
+            for (int i = 0; i < roots.Length; i++)
+            {
+                Transform[] transforms = roots[i].GetComponentsInChildren<Transform>(true);
+
+                for (int j = 0; j < transforms.Length; j++)
+                {
+                    if (IsNavigationFloorName(transforms[j].name))
+                    {
+                        SetNavigationStatic(transforms[j].gameObject);
+                    }
+                }
+            }
+        }
+
+        private static bool IsNavigationFloorName(string objectName)
+        {
+            return objectName == "Floor"
+                || objectName.EndsWith("_Floor", System.StringComparison.Ordinal)
+                || objectName.EndsWith("_CenterRing", System.StringComparison.Ordinal);
+        }
+
+        private static void SetNavigationStatic(GameObject gameObject)
+        {
+#pragma warning disable CS0618
+            StaticEditorFlags currentFlags = GameObjectUtility.GetStaticEditorFlags(gameObject);
+            GameObjectUtility.SetStaticEditorFlags(gameObject, currentFlags | StaticEditorFlags.NavigationStatic);
+#pragma warning restore CS0618
         }
 
         private static GameObject CreateOrUpdateTraversalMantleObstacle(Transform parent, string name, Vector3 position, Vector3 scale)
@@ -835,7 +1198,8 @@ namespace CampusRPG.Editor
             string[] candidatePaths =
             {
                 ScenePath,
-                ChapterProgressionPath
+                ChapterProgressionPath,
+                ChapterMapDefinitionPath
             };
 
             List<string> results = new List<string>();

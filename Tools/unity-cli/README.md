@@ -22,6 +22,9 @@
 - `unity-license-warmup`
 - `unity-license-diagnose`
 - `unity-run-tests`
+- `ty-new-final-gate`
+- `ty-new-v2-gate`
+- `ty-new-build-release`
 
 说明：
 
@@ -36,12 +39,20 @@ Tools/unity-cli/unity-csc -help
 Tools/unity-cli/unity-mcs --version
 Tools/unity-cli/unity-msbuild /path/to/project.csproj
 Tools/unity-cli/unity-license-warmup
+Tools/unity-cli/unity-license-warmup --open-hub --wait-timeout 90
 Tools/unity-cli/unity-license-diagnose --use-temp-clone
 Tools/unity-cli/unity-run-tests EditMode --assembly-names CampusRPG.Tests.EditMode
 Tools/unity-cli/unity-run-tests PlayMode --assembly-names CampusRPG.Tests.PlayMode
 Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.EditMode\\.'
 Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.EditMode\\.Chapter01' --use-temp-clone
 Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.EditMode\\.Chapter01' --startup-timeout 20
+Tools/unity-cli/ty-new-final-gate --startup-timeout 45
+Tools/unity-cli/ty-new-final-gate --skip-full --results-dir /tmp/ty_new_gates
+Tools/unity-cli/ty-new-v2-gate --startup-timeout 45
+Tools/unity-cli/ty-new-v2-gate --skip-full --results-dir /tmp/ty_new_v2_gates
+Tools/unity-cli/ty-new-build-release validate --use-temp-clone
+Tools/unity-cli/ty-new-build-release mac --use-temp-clone --wall-timeout 1800
+Tools/unity-cli/ty-new-build-release windows --use-temp-clone --wall-timeout 1800
 ```
 
 ## 注意
@@ -51,6 +62,7 @@ Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.Ed
 - 对 Unity 工程做静态编译检查时，仍可能需要补 Unity 引擎引用或以 Editor 生成的项目文件为准
 - `unity-run-tests` 会主动拒绝在 `Unity Hub` 常驻的情况下执行
 - `unity-license-warmup` 会先正常拉起一次 Unity 编辑器，等待 `[Project] Loading completed` 和授权恢复日志出现，再尝试软退出 `Unity Hub`；适合在 batchmode 又掉回 `0 entitlement groups` / `com.unity.editor.headless was not found` 之前，先把当前用户授权会话“热起来”
+- `unity-license-warmup --open-hub` 会先热启动 `Unity Hub`，再拉起 Unity Editor。授权/entitlement 卡住时自动化可以使用这条链路做 GUI 侧 warmup；warmup 成功后默认仍会请求退出 `Unity Hub`，让后续 batchmode / `unity-run-tests` 保持干净
 - 若 `unity-license-warmup` 本身超时，但 `Editor.log` 已明确出现 `[Project] Loading completed` 和 `Successfully updated access token`，可视为 GUI 侧预热已成功；这时继续确认 `Unity Hub` 已退出，再接 `unity-license-diagnose` / `unity-run-tests`
 - `unity-license-diagnose` 用于先探测“当前 batchmode 授权是否已恢复”，适合在正式跑 `unity-run-tests` 前先做一次快速健康检查；它会同时输出本地 `UnityEntitlementLicense.xml` / `packageAccessControlList.xml` 摘要，以及 `Unity.Licensing.Client.log` 的最近关键证据，帮助区分“本地许可证缺项”还是“运行时授权解析会话失真”
 - `unity-license-diagnose` 现在会在每次探测前清理本次 batchmode 的 probe log，避免旧的 `COMMAND LINE ARGUMENTS` / `Package Manager` 残留把新失败误判成 `STATUS: startup-ok`
@@ -89,21 +101,28 @@ Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.Ed
 - `unity-license-diagnose` 还会输出 `LOG_CONTEXT_SUMMARY`：给出 batchmode 实际连接的 Licensing channel、notification channel、客户端最近处理过的 license 路径，以及 `readonly database` 日志是否自带路径提示。若 sandbox-home 下仍显示 `SANDBOX_HOME_SHARED_USER_CHANNEL: yes`，说明 Unity 仍连着按原用户命名的授权通道，而不是一条随临时 HOME 隔离的新通道
 - 若同项目已有 Unity Editor 打开，`unity-run-tests` 会自动把工程复制到临时克隆目录后再跑批处理，避免 `Library` 与项目锁冲突
 - 若你想主动隔离本次回归，可显式追加 `--use-temp-clone`；临时克隆默认创建在 `${TMPDIR:-/tmp}`，也可通过 `--clone-root <path>` 指定
+- 不要直接裸跑无超时的 Unity `-batchmode -executeMethod`。这类命令不会享受 `unity-run-tests` 的启动监控，若同项目 GUI Editor 已打开，可能长时间卡在 licensing / project lock / Package Manager 之前。必须执行编辑器方法时，先退出同项目 GUI Editor，或在临时克隆里执行，并给外层自动化设置明确墙钟上限；超过上限就记录日志和 PID，停止等待。
 - `unity-run-tests` 现在会在每次启动前删除旧的 `/tmp/*tests.log` 与结果 XML，避免启动监控误读上一次残留的 entitlement / readonly 错误日志；如果你看到“秒失败”现象，先确认是不是旧版脚本
 - `unity-run-tests` 会在启动阶段监控日志；若 Unity 长时间没进入 `Package Manager` / `COMMAND LINE ARGUMENTS`，或已经出现 `0 entitlement groups`、`com.unity.editor.headless was not found`，脚本会尽快中止并给出更明确的环境诊断；`attempt to write a readonly database` 仍会被保留在输出里，但不会再抢在更明确的 entitlement / headless 失败前把根因盖掉
 - 当 `unity-run-tests` 明确提示 entitlement / headless / readonly database 启动阻塞时，优先执行一次 `Tools/unity-cli/unity-license-warmup`，再重跑 `unity-license-diagnose` 或 `unity-run-tests`；本项目已重复验证过“先正常拉起 GUI 编辑器热授权，再退掉 Unity Hub”的恢复路径
 - `unity-run-tests` 故意不传 `-quit`；当前 `com.unity.test-framework@1.6.0` 会在测试完成后自行退出，额外附带 `-quit` 会导致测试不启动也不产出结果文件
 - `unity-run-tests` 的 `--group-filter` 会原样转发到 Unity `-testFilter`，更适合按命名空间 / Fixture 正则过滤，而不是按单个测试方法名过滤
+- `ty-new-final-gate` 是 TY_NEW 发布候选的最后统一回归入口，会按顺序执行 release preflight、P0.6/Combat、Chapter/Boss、runtime smoke，以及默认的全量 EditMode / PlayMode。它只调用 `unity-run-tests --use-temp-clone --startup-timeout`，不会裸跑 Unity `-batchmode -executeMethod`
+- `ty-new-v2-gate` 是 TY_NEW V2 野心路线图的集中回归入口，会按顺序执行 release preflight、P0.7 动作表达、P1.5 地图表达、P2.5 招式表达、P5.5 表现反馈、P6.5 敌人回应、runtime smoke，以及默认的全量 EditMode / PlayMode。它只调用 `unity-run-tests --use-temp-clone --startup-timeout`，不会裸跑 Unity `-batchmode -executeMethod`
+- `ty-new-build-release` 是 TY_NEW 发布候选包的安全构建入口，支持 `validate`、`mac`、`windows` 三个动作。它会给 Unity `-executeMethod` 外层套明确墙钟上限、独立 log 和可选临时克隆；如果同项目 GUI Editor 已打开，会自动改用临时克隆，避免主工程 `Library` / 项目锁冲突
+- `ty-new-build-release validate` 只调用 `ReleaseCandidateBuildUtility.ValidateReleaseCandidateBuildInputs`，用于最终回归前检查 Build Settings、场景路径和输出路径；`mac` / `windows` 才会真正产出 `Builds/ReleaseCandidate/Mac/TY_NEW.app` 或 `Builds/ReleaseCandidate/Windows/TY_NEW.exe`
+- `ty-new-build-release` 默认不会删除临时克隆或构建产物；失败时保留目录和 log，方便继续排查。若命令超时，它只会结束自己启动的 Unity 子进程并返回 `124`
 
 ## 已验证恢复链路
 
 当 `unity-run-tests` 先前出现过 `0 entitlement groups` / `readonly database` 启动阻塞时，当前项目里已经验证过下面这条恢复顺序：
 
-1. 先执行 `Tools/unity-cli/unity-license-warmup`
-2. 若 warmup 命令自身超时，检查 `~/Library/Logs/Unity/Editor.log` 是否已有 `[Project] Loading completed` 与 `Successfully updated access token`
-3. 确认 `Unity Hub` 已退出，避免 batchmode 被 Hub 常驻干扰
-4. 用 `Tools/unity-cli/unity-license-diagnose --use-temp-clone` 复核 batchmode 是否已恢复到 `STATUS: startup-ok`
-5. 再执行目标 `unity-run-tests` 命令
+1. 若只是普通授权预热，先执行 `Tools/unity-cli/unity-license-warmup`
+2. 若授权/entitlement 反复卡住，允许执行 `Tools/unity-cli/unity-license-warmup --open-hub --wait-timeout 90`，显式热启动 `Unity Hub` 与 Unity Editor 做 GUI 侧授权 warmup
+3. 若 warmup 命令自身超时，检查 `~/Library/Logs/Unity/Editor.log` 是否已有 `[Project] Loading completed` 与 `Successfully updated access token` 或 entitlement resolved 相关日志
+4. 确认 `Unity Hub` 已退出，避免 batchmode 被 Hub 常驻干扰
+5. 用 `Tools/unity-cli/unity-license-diagnose --use-temp-clone --sandbox-home` 复核 batchmode 是否已恢复到 `STATUS: startup-ok`
+6. 再执行目标 `unity-run-tests` 命令
 
 这条链路在 `2026-04-20` 已实际验证通过，并最终跑通了：
 

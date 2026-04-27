@@ -134,17 +134,19 @@ namespace CampusRPG.Character
             {
                 bool allowsMovement = stateMachine == null || stateMachine.AllowsMovement;
                 bool allowsJump = stateMachine == null || stateMachine.AllowsJump;
+                float movementSpeedScale = stateMachine != null ? stateMachine.MovementSpeedScale : 1f;
                 Vector2 moveInput = allowsMovement
                     ? inputReader.MoveValue
                     : Vector2.zero;
-                bool jumpPressed = allowsJump && ConsumeJumpQueued();
+                bool hasQueuedJump = ConsumeJumpQueued();
+                bool jumpPressed = allowsJump && hasQueuedJump;
 
                 if (jumpPressed && TryBeginMantle())
                 {
                     jumpPressed = false;
                 }
 
-                motor.Tick(moveInput, jumpPressed, cameraTransform, allowsMovement);
+                motor.Tick(moveInput, jumpPressed, cameraTransform, allowsMovement, movementSpeedScale);
             }
 
             if (stateMachine != null)
@@ -179,6 +181,9 @@ namespace CampusRPG.Character
             mana?.SetCurrent(manaValue);
             gauges?.ResetAll();
             combatController?.ResetRuntimeState();
+            skillController?.ResetRuntimeState();
+            lockOnTargetSelector?.ResetRuntimeState();
+            SceneRuntimeReferenceUtility.ResolveCameraController()?.ResetRuntimeState();
             stateMachine?.SwitchToLocomotion();
         }
 

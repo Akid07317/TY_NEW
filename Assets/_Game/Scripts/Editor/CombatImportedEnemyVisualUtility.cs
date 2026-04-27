@@ -13,7 +13,16 @@ namespace CampusRPG.Editor
 
         private const string ProxyRootName = "CombatProxyVisualRoot";
         private const string LocalPreviewAnimationFolder = "Assets/_Game/Animations/Characters/CombatTest/LocalPreview";
-        private const string ImportedAnimatorControllerPath = LocalPreviewAnimationFolder + "/AC_Enemy_ImportedPreview.controller";
+        private const string ImportedAnimatorControllerPathPrefix = LocalPreviewAnimationFolder + "/AC_Enemy_ImportedPreview_";
+        private const string ImportedUpperBodyMaskPath = LocalPreviewAnimationFolder + "/AM_Enemy_ImportedUpperBody.mask";
+        private const float ImportedWalkThreshold = 0.18f;
+        private const float ImportedRunThreshold = 0.7f;
+        private const float AntiAirResponseStateSpeed = 1.12f;
+        private const float ChaseRollResponseStateSpeed = 0.88f;
+        private const float GuardBreakResponseStateSpeed = 0.78f;
+        private const float ImportedGroundingInset = 0.035f;
+        private const string CombatPoseLayerName = "CombatPose";
+        private const string CombatPoseStateName = "Hold";
 
         private static readonly string[] EnemyMeleeVisualPrefabCandidatePaths =
         {
@@ -41,8 +50,43 @@ namespace CampusRPG.Editor
             "Assets/Kevin Iglesias/Human Animations/Models/HumanF_Model.fbx"
         };
 
-        private static readonly string[] IdleClipCandidatePaths =
+        private static readonly string[] DefaultIdleClipCandidatePaths =
         {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatIdle01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/HumanF@CombatIdle01.fbx"
+        };
+
+        private static readonly string[] OneHandedIdleClipCandidatePaths =
+        {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@CombatIdle1H01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/1H/HumanF@CombatIdle1H01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatIdle01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/HumanF@CombatIdle01.fbx"
+        };
+
+        private static readonly string[] PolearmIdleClipCandidatePaths =
+        {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@CombatIdlePolearm01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/Polearm/HumanF@CombatIdlePolearm01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@CombatIdle2H01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/2H/HumanF@CombatIdle2H01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatIdle01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/HumanF@CombatIdle01.fbx"
+        };
+
+        private static readonly string[] TwoHandedIdleClipCandidatePaths =
+        {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@CombatIdle2H01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/2H/HumanF@CombatIdle2H01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@CombatIdlePolearm01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/Polearm/HumanF@CombatIdlePolearm01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatIdle01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/HumanF@CombatIdle01.fbx"
+        };
+
+        private static readonly string[] RangedIdleClipCandidatePaths =
+        {
+            "Assets/DoubleL/Bow/Movement/Idle/Idle/Bow_Idle_B.fbx",
             "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatIdle01.fbx",
             "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/HumanF@CombatIdle01.fbx"
         };
@@ -53,8 +97,28 @@ namespace CampusRPG.Editor
             "Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_Forward.fbx"
         };
 
+        private static readonly string[] OneHandedWalkClipCandidatePaths =
+        {
+            "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_InPlace.fbx",
+            "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_B_InPlace.fbx",
+            "Assets/DoubleL/One Hand Up/Movement/Walk/Base/1Hand_Up_Walk_A_F.fbx",
+            "Assets/DoubleL/One Hand Up/Movement/Walk/Base/1Hand_Up_Walk_A_B.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Forward.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_Forward.fbx"
+        };
+
         private static readonly string[] RunClipCandidatePaths =
         {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Forward.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_Forward.fbx"
+        };
+
+        private static readonly string[] OneHandedRunClipCandidatePaths =
+        {
+            "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_InPlace.fbx",
+            "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_B_InPlace.fbx",
+            "Assets/DoubleL/One Hand Up/Movement/Run/Base/1Hand_Up_Run_A_F.fbx",
+            "Assets/DoubleL/One Hand Up/Movement/Run/Base/1Hand_Up_Run_A_B.fbx",
             "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Forward.fbx",
             "Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_Forward.fbx"
         };
@@ -95,6 +159,32 @@ namespace CampusRPG.Editor
             "Assets/Kevin Iglesias/Human Animations/Animations/Female/Combat/1H/HumanF@Attack1H01_L.fbx"
         };
 
+        private static readonly string[] OneHandedHoldClipCandidatePaths =
+        {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Masked Poses/Human@ObjectGripHands01.fbx"
+        };
+
+        private static readonly string[] PolearmHoldClipCandidatePaths =
+        {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Masked Poses/HumanM@WeaponHoldPolearm01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Masked Poses/HumanF@WeaponHoldPolearm01.fbx"
+        };
+
+        private static readonly string[] TwoHandedHoldClipCandidatePaths =
+        {
+            "Assets/Kevin Iglesias/Human Animations/Animations/Masked Poses/HumanM@WeaponHold2H01.fbx",
+            "Assets/Kevin Iglesias/Human Animations/Animations/Masked Poses/HumanF@WeaponHold2H01.fbx"
+        };
+
+        private enum ImportedEnemyAnimationProfile
+        {
+            Default,
+            OneHanded,
+            Polearm,
+            TwoHanded,
+            Ranged
+        }
+
         public static bool HasHumanoidVisualSource(CombatProxyVisualKind kind)
         {
             return LoadFirstHumanoidPrefab(GetCandidatePaths(kind)) != null;
@@ -105,16 +195,18 @@ namespace CampusRPG.Editor
             return FindFirstCompatibleHumanoidPath(GetCandidatePaths(kind));
         }
 
-        public static RuntimeAnimatorController EnsureImportedAvatarPreviewController()
+        public static RuntimeAnimatorController EnsureImportedAvatarPreviewController(CombatProxyVisualKind kind)
         {
-            AnimationClip idleClip = LoadFirstAvailableAnimationClip(IdleClipCandidatePaths);
-            AnimationClip walkClip = LoadFirstAvailableAnimationClip(WalkClipCandidatePaths);
-            AnimationClip runClip = LoadFirstAvailableAnimationClip(RunClipCandidatePaths);
+            ImportedEnemyAnimationProfile profile = ResolveAnimationProfile(kind);
+            AnimationClip idleClip = LoadFirstAvailableAnimationClip(GetIdleClipCandidatePaths(profile));
+            AnimationClip walkClip = LoadFirstAvailableAnimationClip(GetWalkClipCandidatePaths(profile));
+            AnimationClip runClip = LoadFirstAvailableAnimationClip(GetRunClipCandidatePaths(profile));
             AnimationClip hitClip = LoadFirstAvailableAnimationClip(HitClipCandidatePaths);
             AnimationClip deathClip = LoadFirstAvailableAnimationClip(DeathClipCandidatePaths);
             AnimationClip meleeAttackClip = LoadFirstAvailableAnimationClip(MeleeAttackClipCandidatePaths);
             AnimationClip mobileAttackClip = LoadFirstAvailableAnimationClip(MobileAttackClipCandidatePaths);
             AnimationClip rangedAttackClip = LoadFirstAvailableAnimationClip(RangedAttackClipCandidatePaths);
+            AnimationClip holdClip = LoadFirstAvailableAnimationClip(GetHoldClipCandidatePaths(profile));
 
             if (idleClip == null
                 || walkClip == null
@@ -129,14 +221,19 @@ namespace CampusRPG.Editor
             }
 
             EnsureFolder(LocalPreviewAnimationFolder);
+            string controllerPath = GetImportedAnimatorControllerPath(kind);
 
-            if (AssetDatabase.LoadAssetAtPath<AnimatorController>(ImportedAnimatorControllerPath) != null)
+            if (AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath) != null)
             {
-                AssetDatabase.DeleteAsset(ImportedAnimatorControllerPath);
+                AssetDatabase.DeleteAsset(controllerPath);
             }
 
-            AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(ImportedAnimatorControllerPath);
+            AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
             controller.AddParameter(EnemyCombatAnimationPlanUtility.GroundSpeedParameterName, AnimatorControllerParameterType.Float);
+            controller.AddParameter(EnemyCombatAnimationPlanUtility.ResponseReadParameterName, AnimatorControllerParameterType.Float);
+            controller.AddParameter(EnemyCombatAnimationPlanUtility.AntiAirReadParameterName, AnimatorControllerParameterType.Float);
+            controller.AddParameter(EnemyCombatAnimationPlanUtility.ChaseRollReadParameterName, AnimatorControllerParameterType.Float);
+            controller.AddParameter(EnemyCombatAnimationPlanUtility.GuardBreakReadParameterName, AnimatorControllerParameterType.Float);
 
             AnimatorStateMachine stateMachine = controller.layers[0].stateMachine;
             BlendTree locomotionBlendTree = new BlendTree
@@ -148,8 +245,8 @@ namespace CampusRPG.Editor
             };
             AssetDatabase.AddObjectToAsset(locomotionBlendTree, controller);
             locomotionBlendTree.AddChild(idleClip, 0f);
-            locomotionBlendTree.AddChild(walkClip, 0.45f);
-            locomotionBlendTree.AddChild(runClip, 1f);
+            locomotionBlendTree.AddChild(walkClip, ImportedWalkThreshold);
+            locomotionBlendTree.AddChild(runClip, ImportedRunThreshold);
 
             AnimatorState locomotionState = stateMachine.AddState(EnemyCombatAnimationPlanUtility.LocomotionStateName);
             locomotionState.motion = locomotionBlendTree;
@@ -160,6 +257,14 @@ namespace CampusRPG.Editor
             AddClipState(stateMachine, EnemyCombatAnimationPlanUtility.MeleeAttackStateName, meleeAttackClip);
             AddClipState(stateMachine, EnemyCombatAnimationPlanUtility.MobileAttackStateName, mobileAttackClip);
             AddClipState(stateMachine, EnemyCombatAnimationPlanUtility.RangedAttackStateName, rangedAttackClip);
+            AddClipState(stateMachine, EnemyCombatAnimationPlanUtility.AntiAirAttackStateName, rangedAttackClip, AntiAirResponseStateSpeed);
+            AddClipState(stateMachine, EnemyCombatAnimationPlanUtility.ChaseRollAttackStateName, mobileAttackClip, ChaseRollResponseStateSpeed);
+            AddClipState(stateMachine, EnemyCombatAnimationPlanUtility.GuardBreakAttackStateName, meleeAttackClip, GuardBreakResponseStateSpeed);
+
+            if (holdClip != null)
+            {
+                AddCombatPoseLayer(controller, holdClip);
+            }
 
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
@@ -202,7 +307,8 @@ namespace CampusRPG.Editor
             visualInstance.transform.localRotation = Quaternion.identity;
             visualInstance.transform.localScale = Vector3.one;
 
-            Avatar avatar = FindAvatar(visualInstance);
+            Animator visualAnimator = FindAvatarAnimator(visualInstance);
+            Avatar avatar = visualAnimator != null ? visualAnimator.avatar : LoadFirstAvailableAvatar(EnemyAvatarCandidatePaths);
 
             if (avatar == null || !avatar.isValid)
             {
@@ -210,24 +316,50 @@ namespace CampusRPG.Editor
                 return changed;
             }
 
-            StripImportedVisualComponents(visualInstance);
+            StripImportedVisualComponents(visualInstance, visualAnimator);
             changed |= AlignImportedVisualToGround(visualInstance, actor.transform);
             changed |= SetProxyRenderersEnabled(proxyRoot, false);
 
-            if (rootAnimator.avatar != avatar)
+            if (visualAnimator != null)
             {
-                rootAnimator.avatar = avatar;
+                visualAnimator.avatar = avatar;
+                visualAnimator.applyRootMotion = false;
+                visualAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                visualAnimator.updateMode = AnimatorUpdateMode.Normal;
+                EditorUtility.SetDirty(visualAnimator);
+            }
+
+            if (rootAnimator.avatar != null)
+            {
+                rootAnimator.avatar = null;
                 changed = true;
             }
 
-            rootAnimator.applyRootMotion = false;
-            rootAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-            rootAnimator.updateMode = AnimatorUpdateMode.Normal;
+            if (rootAnimator.runtimeAnimatorController != null)
+            {
+                rootAnimator.runtimeAnimatorController = null;
+                changed = true;
+            }
+
+            rootAnimator.enabled = false;
 
             EditorUtility.SetDirty(rootAnimator);
             EditorUtility.SetDirty(visualInstance.transform);
             EditorUtility.SetDirty(visualInstance);
             return true;
+        }
+
+        public static Animator FindImportedPreviewAnimator(GameObject actor)
+        {
+            if (actor == null)
+            {
+                return null;
+            }
+
+            Transform importedVisualRoot = actor.transform.Find(ImportedVisualRootName);
+            return importedVisualRoot != null
+                ? importedVisualRoot.GetComponentInChildren<Animator>(true)
+                : null;
         }
 
         public static bool RemoveImportedVisual(GameObject actor, Animator rootAnimator)
@@ -259,6 +391,12 @@ namespace CampusRPG.Editor
 
             if (rootAnimator != null)
             {
+                if (!rootAnimator.enabled)
+                {
+                    rootAnimator.enabled = true;
+                    changed = true;
+                }
+
                 if (rootAnimator.avatar != null)
                 {
                     rootAnimator.avatar = null;
@@ -280,10 +418,165 @@ namespace CampusRPG.Editor
             return changed;
         }
 
-        private static void AddClipState(AnimatorStateMachine stateMachine, string stateName, AnimationClip clip)
+        private static void AddClipState(AnimatorStateMachine stateMachine, string stateName, AnimationClip clip, float speed = 1f)
         {
             AnimatorState state = stateMachine.AddState(stateName);
             state.motion = clip;
+            state.speed = Mathf.Max(0.01f, speed);
+        }
+
+        private static void AddCombatPoseLayer(AnimatorController controller, AnimationClip holdClip)
+        {
+            if (controller == null || holdClip == null)
+            {
+                return;
+            }
+
+            AvatarMask avatarMask = EnsureUpperBodyAvatarMask();
+
+            if (avatarMask == null)
+            {
+                return;
+            }
+
+            AnimatorStateMachine stateMachine = new AnimatorStateMachine
+            {
+                name = CombatPoseLayerName
+            };
+            AssetDatabase.AddObjectToAsset(stateMachine, controller);
+
+            AnimatorState holdState = stateMachine.AddState(CombatPoseStateName);
+            holdState.motion = holdClip;
+            stateMachine.defaultState = holdState;
+
+            AnimatorControllerLayer layer = new AnimatorControllerLayer
+            {
+                name = CombatPoseLayerName,
+                avatarMask = avatarMask,
+                blendingMode = AnimatorLayerBlendingMode.Override,
+                defaultWeight = 0f,
+                iKPass = false,
+                stateMachine = stateMachine,
+                syncedLayerAffectsTiming = false
+            };
+
+            controller.AddLayer(layer);
+        }
+
+        private static AvatarMask EnsureUpperBodyAvatarMask()
+        {
+            AvatarMask avatarMask = AssetDatabase.LoadAssetAtPath<AvatarMask>(ImportedUpperBodyMaskPath);
+
+            if (avatarMask != null)
+            {
+                return avatarMask;
+            }
+
+            avatarMask = new AvatarMask();
+
+            for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)
+            {
+                avatarMask.SetHumanoidBodyPartActive((AvatarMaskBodyPart)i, false);
+            }
+
+            avatarMask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.Body, true);
+            avatarMask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.Head, true);
+            avatarMask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftArm, true);
+            avatarMask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightArm, true);
+            avatarMask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftFingers, true);
+            avatarMask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightFingers, true);
+            avatarMask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftHandIK, true);
+            avatarMask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightHandIK, true);
+
+            AssetDatabase.CreateAsset(avatarMask, ImportedUpperBodyMaskPath);
+            return avatarMask;
+        }
+
+        private static string GetImportedAnimatorControllerPath(CombatProxyVisualKind kind)
+        {
+            return ImportedAnimatorControllerPathPrefix + kind + ".controller";
+        }
+
+        private static ImportedEnemyAnimationProfile ResolveAnimationProfile(CombatProxyVisualKind kind)
+        {
+            string selectedVisualPrefabPath = GetSelectedHumanoidVisualPrefabPath(kind);
+
+            if (kind == CombatProxyVisualKind.EnemyMelee)
+            {
+                return ImportedEnemyAnimationProfile.OneHanded;
+            }
+
+            if (kind == CombatProxyVisualKind.EnemyMobile)
+            {
+                if (!string.IsNullOrEmpty(selectedVisualPrefabPath)
+                    && selectedVisualPrefabPath.IndexOf("Polearm", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return ImportedEnemyAnimationProfile.Polearm;
+                }
+
+                return ImportedEnemyAnimationProfile.TwoHanded;
+            }
+
+            if (kind == CombatProxyVisualKind.EnemyRanged)
+            {
+                return ImportedEnemyAnimationProfile.Ranged;
+            }
+
+            return ImportedEnemyAnimationProfile.Default;
+        }
+
+        private static string[] GetIdleClipCandidatePaths(ImportedEnemyAnimationProfile profile)
+        {
+            switch (profile)
+            {
+                case ImportedEnemyAnimationProfile.OneHanded:
+                    return OneHandedIdleClipCandidatePaths;
+                case ImportedEnemyAnimationProfile.Polearm:
+                    return PolearmIdleClipCandidatePaths;
+                case ImportedEnemyAnimationProfile.TwoHanded:
+                    return TwoHandedIdleClipCandidatePaths;
+                case ImportedEnemyAnimationProfile.Ranged:
+                    return RangedIdleClipCandidatePaths;
+                default:
+                    return DefaultIdleClipCandidatePaths;
+            }
+        }
+
+        private static string[] GetHoldClipCandidatePaths(ImportedEnemyAnimationProfile profile)
+        {
+            switch (profile)
+            {
+                case ImportedEnemyAnimationProfile.OneHanded:
+                    return OneHandedHoldClipCandidatePaths;
+                case ImportedEnemyAnimationProfile.Polearm:
+                    return PolearmHoldClipCandidatePaths;
+                case ImportedEnemyAnimationProfile.TwoHanded:
+                    return TwoHandedHoldClipCandidatePaths;
+                default:
+                    return System.Array.Empty<string>();
+            }
+        }
+
+        private static string[] GetWalkClipCandidatePaths(ImportedEnemyAnimationProfile profile)
+        {
+            switch (profile)
+            {
+                case ImportedEnemyAnimationProfile.OneHanded:
+                    return OneHandedWalkClipCandidatePaths;
+                default:
+                    return WalkClipCandidatePaths;
+            }
+        }
+
+        private static string[] GetRunClipCandidatePaths(ImportedEnemyAnimationProfile profile)
+        {
+            switch (profile)
+            {
+                case ImportedEnemyAnimationProfile.OneHanded:
+                    return OneHandedRunClipCandidatePaths;
+                default:
+                    return RunClipCandidatePaths;
+            }
         }
 
         private static string[] GetCandidatePaths(CombatProxyVisualKind kind)
@@ -301,7 +594,7 @@ namespace CampusRPG.Editor
             }
         }
 
-        private static void StripImportedVisualComponents(GameObject visualRoot)
+        private static void StripImportedVisualComponents(GameObject visualRoot, Animator preservedAnimator)
         {
             if (visualRoot == null)
             {
@@ -312,6 +605,11 @@ namespace CampusRPG.Editor
 
             for (int i = 0; i < animators.Length; i++)
             {
+                if (animators[i] == preservedAnimator)
+                {
+                    continue;
+                }
+
                 Object.DestroyImmediate(animators[i]);
             }
 
@@ -398,7 +696,7 @@ namespace CampusRPG.Editor
 
         private static Avatar FindAvatar(GameObject visualRoot)
         {
-            Animator animator = visualRoot != null ? visualRoot.GetComponentInChildren<Animator>(true) : null;
+            Animator animator = FindAvatarAnimator(visualRoot);
 
             if (animator != null && animator.avatar != null && animator.avatar.isValid)
             {
@@ -406,6 +704,28 @@ namespace CampusRPG.Editor
             }
 
             return LoadFirstAvailableAvatar(EnemyAvatarCandidatePaths);
+        }
+
+        private static Animator FindAvatarAnimator(GameObject visualRoot)
+        {
+            if (visualRoot == null)
+            {
+                return null;
+            }
+
+            Animator[] animators = visualRoot.GetComponentsInChildren<Animator>(true);
+
+            for (int i = 0; i < animators.Length; i++)
+            {
+                Animator animator = animators[i];
+
+                if (animator != null && animator.avatar != null && animator.avatar.isValid)
+                {
+                    return animator;
+                }
+            }
+
+            return animators.Length > 0 ? animators[0] : null;
         }
 
         private static Avatar LoadFirstAvailableAvatar(string[] candidatePaths)
@@ -506,7 +826,7 @@ namespace CampusRPG.Editor
                 return false;
             }
 
-            float desiredLift = actorRoot.position.y - minY;
+            float desiredLift = actorRoot.position.y - minY - ImportedGroundingInset;
 
             if (Mathf.Abs(desiredLift) <= 0.0001f)
             {

@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   cat >&2 <<'EOF'
-Usage: Tools/unity-cli/unity-license-warmup [--project-path <path>] [--editor-log <path>] [--wait-timeout <seconds>] [--keep-hub]
+Usage: Tools/unity-cli/unity-license-warmup [--project-path <path>] [--editor-log <path>] [--wait-timeout <seconds>] [--open-hub] [--keep-hub]
 EOF
   exit 1
 }
@@ -14,6 +14,7 @@ PROJECT_VERSION_FILE="$DEFAULT_PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
 EDITOR_LOG="$HOME/Library/Logs/Unity/Editor.log"
 WAIT_TIMEOUT=90
 KEEP_HUB=0
+OPEN_HUB=0
 REQUIRE_PROJECT_LOAD=1
 
 if [ ! -f "$PROJECT_VERSION_FILE" ]; then
@@ -40,6 +41,10 @@ while [ $# -gt 0 ]; do
       ;;
     --keep-hub)
       KEEP_HUB=1
+      shift
+      ;;
+    --open-hub)
+      OPEN_HUB=1
       shift
       ;;
     *)
@@ -100,6 +105,15 @@ find_first_match() {
 START_LINE=1
 READY_PROJECT_LINE=""
 READY_LICENSE_LINE=""
+
+if [ "$OPEN_HUB" -eq 1 ]; then
+  if command -v open >/dev/null 2>&1; then
+    echo "Launching Unity Hub for licensing warmup"
+    open -a "Unity Hub" >/dev/null 2>&1 || echo "Warning: Unity Hub did not launch via open -a." >&2
+  else
+    echo "Warning: macOS open command unavailable; skipping Unity Hub launch." >&2
+  fi
+fi
 
 EXISTING_EDITOR_PID=$(project_editor_pid)
 if [ -n "$EXISTING_EDITOR_PID" ]; then

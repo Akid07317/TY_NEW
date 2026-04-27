@@ -150,6 +150,52 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
+        public void ResolveAttackRecoverySeconds_ExtendsSwordArts_ToKeepFollowThroughReadable()
+        {
+            AttackDefinitionSO attack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+
+            try
+            {
+                SetPrivateField(attack, "animationStateName", "SwordArt_FallingStar");
+                SetPrivateField(attack, "startupSeconds", 0.16f);
+                SetPrivateField(attack, "activeSeconds", 0.14f);
+                SetPrivateField(attack, "recoverySeconds", 0.42f);
+                SetPrivateField(attack, "animationDurationSeconds", 1.05f);
+
+                float resolvedRecovery = PlayerCombatRuntimeUtility.ResolveAttackRecoverySeconds(attack);
+
+                Assert.AreEqual(0.66f, resolvedRecovery, 0.0001f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(attack);
+            }
+        }
+
+        [Test]
+        public void ResolveAttackRecoverySeconds_ExtendsFastSwordArts_WithoutForcingFullClip()
+        {
+            AttackDefinitionSO attack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+
+            try
+            {
+                SetPrivateField(attack, "animationStateName", "SwordArt_MoonSever");
+                SetPrivateField(attack, "startupSeconds", 0.1f);
+                SetPrivateField(attack, "activeSeconds", 0.1f);
+                SetPrivateField(attack, "recoverySeconds", 0.26f);
+                SetPrivateField(attack, "animationDurationSeconds", 0.72f);
+
+                float resolvedRecovery = PlayerCombatRuntimeUtility.ResolveAttackRecoverySeconds(attack);
+
+                Assert.AreEqual(0.5f, resolvedRecovery, 0.0001f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(attack);
+            }
+        }
+
+        [Test]
         public void ShouldSnapProxyWeaponFollow_ReturnsTrue_DuringImmediateFollowWindow()
         {
             bool shouldSnap = PlayerCombatRuntimeUtility.ShouldSnapProxyWeaponFollow(

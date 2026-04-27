@@ -99,6 +99,20 @@ namespace CampusRPG.AI
             MoveInstantly(transform.position + (normalizedDirection * moveDistance));
         }
 
+        public void AdvanceAlongDirection(Vector3 direction, float distance)
+        {
+            direction.y = 0f;
+
+            if (distance <= 0f || direction.sqrMagnitude <= Mathf.Epsilon)
+            {
+                return;
+            }
+
+            Vector3 normalizedDirection = direction.normalized;
+            transform.rotation = Quaternion.LookRotation(normalizedDirection, Vector3.up);
+            MoveInstantly(transform.position + (normalizedDirection * distance));
+        }
+
         public void FaceTarget(Transform target, float turnSpeed = 360f)
         {
             if (target == null)
@@ -129,7 +143,7 @@ namespace CampusRPG.AI
 
                 if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, sampleRadius, agent.areaMask))
                 {
-                    agent.Warp(hit.position);
+                    agent.Move(hit.position - transform.position);
                     agent.isStopped = true;
                     return;
                 }

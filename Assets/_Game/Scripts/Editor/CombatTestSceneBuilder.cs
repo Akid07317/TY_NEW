@@ -23,7 +23,9 @@ namespace CampusRPG.Editor
         private const string RootMenu = "CampusRPG/Setup/Build CombatTest Scene";
         private const string ForceRebuildMenu = "CampusRPG/Setup/Build CombatTest Scene (Force Rebuild)";
         private const string RepairPrefabMenu = "CampusRPG/Setup/Repair CombatTest Prefab Wiring";
+        private const string RepairEnemyPrefabMenu = "CampusRPG/Setup/Repair CombatTest Enemy Prefab Wiring";
         private const string RepairSceneNavMeshMenu = "CampusRPG/Setup/Repair CombatTest Scene NavMesh";
+        private const string RepairSceneLightingMenu = "CampusRPG/Setup/Repair CombatTest Scene Lighting";
         private const string ApplyImportedVisualMenu = "CampusRPG/Setup/Local Preview/Apply Imported Player Visuals To CombatTest Player Prefab";
         private const string ApplyImportedEnemyVisualMenu = "CampusRPG/Setup/Local Preview/Apply Imported Enemy Avatar Chain To CombatTest Enemy Prefabs";
         private const string ScenePath = "Assets/_Game/Scenes/CombatTest.unity";
@@ -38,6 +40,20 @@ namespace CampusRPG.Editor
         private const string Light01Path = "Assets/_Game/Data/Combat/SO_Attack_Light_01.asset";
         private const string Light02Path = "Assets/_Game/Data/Combat/SO_Attack_Light_02.asset";
         private const string Light03Path = "Assets/_Game/Data/Combat/SO_Attack_Light_03.asset";
+        private const float CombatTestDirectionalLightIntensity = 0.85f;
+        private const float CombatTestAmbientIntensity = 0.7f;
+        private const float CombatTestReflectionIntensity = 0.75f;
+        private const float PlayerAnimationCrossFadeSeconds = 0.035f;
+        private const float PlayerAnimationLocomotionDampSeconds = 0.05f;
+        private const float PlayerHitStunSeconds = 0.08f;
+        private const float EnemyAnimationCrossFadeSeconds = 0.05f;
+        private const float EnemyAnimationLocomotionDampSeconds = 0.04f;
+        private const float EnemyCapsuleRadius = 0.5f;
+        private const float EnemyCapsuleHeight = 2f;
+        private const float EnemyCapsuleCenterY = 1f;
+        private const float EnemyAgentBaseOffset = 0f;
+        private const float EnemyAttackRangePadding = 0.08f;
+        private const float EnemyAttackMaxHitAngle = 45f;
         private const string HeavyPath = "Assets/_Game/Data/Combat/SO_Attack_Heavy_01.asset";
         private const string DodgeFollowUpPath = "Assets/_Game/Data/Combat/SO_Attack_DodgeFollowUp.asset";
         private const string CounterPath = "Assets/_Game/Data/Combat/SO_Attack_Counter.asset";
@@ -74,9 +90,7 @@ namespace CampusRPG.Editor
             RuntimeAnimatorController playerAnimatorController = CombatTestAssetGenerator.EnsurePlayerCombatAnimationAssets();
             bool repairedAnyPrefab = false;
             repairedAnyPrefab |= RepairPlayerPrefab(PlayerPrefabPath, playerAnimatorController);
-            repairedAnyPrefab |= RepairEnemyPrefab(EnemyMeleePrefabPath);
-            repairedAnyPrefab |= RepairEnemyPrefab(EnemyMobilePrefabPath);
-            repairedAnyPrefab |= RepairEnemyPrefab(EnemyRangedPrefabPath);
+            repairedAnyPrefab |= RepairCombatTestEnemyPrefabs();
 
             if (!repairedAnyPrefab)
             {
@@ -87,6 +101,22 @@ namespace CampusRPG.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("CombatTest prefab wiring repaired: duplicate required components removed, player animation relay reconnected, and the player/enemy proxy baselines were restored.");
+        }
+
+        [MenuItem(RepairEnemyPrefabMenu)]
+        public static void RepairCombatTestEnemyPrefabWiring()
+        {
+            bool repairedAnyPrefab = RepairCombatTestEnemyPrefabs();
+
+            if (!repairedAnyPrefab)
+            {
+                Debug.LogWarning("CombatTest enemy prefab repair skipped because no target prefabs were found.");
+                return;
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("CombatTest enemy prefab wiring repaired: proxy baseline restored and enemy physical footing aligned.");
         }
 
         [MenuItem(RepairSceneNavMeshMenu)]
@@ -106,6 +136,43 @@ namespace CampusRPG.Editor
                 built
                     ? "CombatTest scene NavMesh rebuilt and saved."
                     : "CombatTest scene NavMesh repair completed, but no baked NavMesh data was produced.");
+        }
+
+        [MenuItem(RepairSceneLightingMenu)]
+        public static void RepairCombatTestSceneLighting()
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+            {
+                Debug.LogWarning("CombatTest scene lighting repair skipped because the scene asset does not exist yet.");
+                return;
+            }
+
+            Scene scene = EditorSceneManager.GetActiveScene();
+
+            if (!scene.IsValid() || scene.path != ScenePath)
+            {
+                scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            }
+
+            GameObject lightObject = GameObject.Find("Directional Light");
+
+            if (lightObject == null)
+            {
+                lightObject = new GameObject("Directional Light");
+                lightObject.transform.rotation = Quaternion.Euler(45f, -35f, 0f);
+            }
+
+            Light directionalLight = lightObject.GetComponent<Light>();
+
+            if (directionalLight == null)
+            {
+                directionalLight = lightObject.AddComponent<Light>();
+            }
+
+            ApplyCombatTestLightingPreset(directionalLight);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, ScenePath);
+            Debug.Log("CombatTest scene lighting repaired for readable local preview playback.");
         }
 
         [MenuItem(ApplyImportedVisualMenu)]
@@ -128,7 +195,13 @@ namespace CampusRPG.Editor
 
             try
             {
+                PlayerCharacter playerCharacter = GetOrAddComponent<PlayerCharacter>(player);
+                PlayerCombatController playerCombatController = GetOrAddComponent<PlayerCombatController>(player);
+                PlayerStateMachine playerStateMachine = GetOrAddComponent<PlayerStateMachine>(player);
+                PlayerMotor playerMotor = GetOrAddComponent<PlayerMotor>(player);
                 Animator animator = GetOrAddComponent<Animator>(player);
+                PlayerCombatAnimationRelay animationRelay = GetOrAddComponent<PlayerCombatAnimationRelay>(player);
+                DamageableReceiver damageableReceiver = GetOrAddComponent<DamageableReceiver>(player);
                 RuntimeAnimatorController playerAnimatorController = CombatTestAssetGenerator.EnsurePlayerCombatAnimationAssetsForLocalPreview();
 
                 if (playerAnimatorController == null)
@@ -144,7 +217,16 @@ namespace CampusRPG.Editor
 
                 ConfigurePlayerAnimator(animator, playerAnimatorController);
                 CombatProxyVisualUtility.Apply(player, CombatProxyVisualKind.Player);
-                ConfigurePlayerWeaponPresentation(GetOrAddComponent<PlayerCombatAnimationRelay>(player), player);
+                CombatImportedPlayerVisualUtility.SyncImportedWeaponPreview(player, animator);
+                ConfigurePlayerCombatAnimationRelay(
+                    animationRelay,
+                    playerCharacter,
+                    playerCombatController,
+                    playerStateMachine,
+                    playerMotor,
+                    animator);
+                SetFloat(damageableReceiver, "playerHitStunSeconds", PlayerHitStunSeconds);
+                ConfigurePlayerWeaponPresentation(animationRelay, player);
 
                 PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             }
@@ -163,28 +245,18 @@ namespace CampusRPG.Editor
         {
             bool foundAnyPrefab = false;
             bool appliedAnyVisual = false;
-            RuntimeAnimatorController enemyAnimatorController = CombatImportedEnemyVisualUtility.EnsureImportedAvatarPreviewController();
-
-            if (enemyAnimatorController == null)
-            {
-                Debug.LogWarning("Imported enemy Avatar preview could not build a local preview AnimatorController. Verify the supported local animation sources are installed first.");
-                return;
-            }
 
             appliedAnyVisual |= TryApplyImportedEnemyAvatarPreview(
                 EnemyMeleePrefabPath,
                 CombatProxyVisualKind.EnemyMelee,
-                enemyAnimatorController,
                 ref foundAnyPrefab);
             appliedAnyVisual |= TryApplyImportedEnemyAvatarPreview(
                 EnemyMobilePrefabPath,
                 CombatProxyVisualKind.EnemyMobile,
-                enemyAnimatorController,
                 ref foundAnyPrefab);
             appliedAnyVisual |= TryApplyImportedEnemyAvatarPreview(
                 EnemyRangedPrefabPath,
                 CombatProxyVisualKind.EnemyRanged,
-                enemyAnimatorController,
                 ref foundAnyPrefab);
 
             if (!foundAnyPrefab)
@@ -242,9 +314,8 @@ namespace CampusRPG.Editor
 
             GameObject lightObject = new GameObject("Directional Light");
             Light directionalLight = lightObject.AddComponent<Light>();
-            directionalLight.type = LightType.Directional;
-            directionalLight.intensity = 1.2f;
             lightObject.transform.rotation = Quaternion.Euler(45f, -35f, 0f);
+            ApplyCombatTestLightingPreset(directionalLight);
 
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
             ground.name = "Ground";
@@ -289,6 +360,7 @@ namespace CampusRPG.Editor
             PlayerCharacter playerCharacter = player.GetComponent<PlayerCharacter>();
             LockOnTargetSelector lockOnTargetSelector = player.GetComponent<LockOnTargetSelector>();
             CombatDebugHUD debugHud = new GameObject("CombatDebugHUD").AddComponent<CombatDebugHUD>();
+            SwordArtHudPresenter swordArtHud = new GameObject("SwordArtHUD").AddComponent<SwordArtHudPresenter>();
             GameObject checkpointFlow = new GameObject("CheckpointFlow");
             CheckpointRestoreCoordinator checkpointCoordinator = checkpointFlow.AddComponent<CheckpointRestoreCoordinator>();
             SaveService saveService = checkpointFlow.GetComponent<SaveService>();
@@ -311,6 +383,8 @@ namespace CampusRPG.Editor
             SetObjectReference(cameraController, "inputReader", inputReader);
             SetObjectReference(debugHud, "playerCharacter", playerCharacter);
             SetObjectReference(debugHud, "lockOnTargetSelector", lockOnTargetSelector);
+            SetObjectReference(debugHud, "swordArtHudPresenter", swordArtHud);
+            SetObjectReference(swordArtHud, "playerCharacter", playerCharacter);
             SetObjectReference(checkpointCoordinator, "player", playerCharacter);
             SetObjectReference(checkpointCoordinator, "saveService", saveService);
             SetObjectReference(checkpointCoordinator, "checkpointService", checkpointService);
@@ -401,18 +475,13 @@ namespace CampusRPG.Editor
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(Light01Path),
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(Light02Path),
                 AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(Light03Path));
+            SetSwordArts(playerCombatController, CombatTestAssetGenerator.EnsureCombatTestSwordArtAssets());
             SetBool(playerCombatController, "prototypeGrantDodgeFollowUpOnAnyDodge", false);
 
             SetObjectReference(attackExecutor, "attackOrigin", attackOrigin);
             SetLayerMask(attackExecutor, "targetMask", ~0);
             SetObjectReference(hitboxController, "attackExecutor", attackExecutor);
-            SetObjectReference(animationRelay, "playerCharacter", playerCharacter);
-            SetObjectReference(animationRelay, "combatController", playerCombatController);
-            SetObjectReference(animationRelay, "stateMachine", playerStateMachine);
-            SetObjectReference(animationRelay, "motor", playerMotor);
-            SetObjectReference(animationRelay, "animator", animator);
-            SetFloat(animationRelay, "dodgeAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerDodgeAnimationDuration());
-            SetFloat(animationRelay, "hitAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerHitAnimationDuration());
+            ConfigurePlayerCombatAnimationRelay(animationRelay, playerCharacter, playerCombatController, playerStateMachine, playerMotor, animator);
             ConfigurePlayerAnimator(animator, playerAnimatorController);
 
             SetObjectReference(skillController, "owner", playerCharacter);
@@ -425,6 +494,7 @@ namespace CampusRPG.Editor
 
             SetObjectReference(damageableReceiver, "health", health);
             SetObjectReference(damageableReceiver, "playerCharacter", playerCharacter);
+            SetFloat(damageableReceiver, "playerHitStunSeconds", PlayerHitStunSeconds);
             RestorePlayerVisualBaseline(player, animator);
             ConfigurePlayerWeaponPresentation(animationRelay, player);
 
@@ -442,10 +512,12 @@ namespace CampusRPG.Editor
             GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             enemy.name = prefabName;
 
+            CapsuleCollider capsuleCollider = enemy.GetComponent<CapsuleCollider>();
             NavMeshAgent agent = enemy.AddComponent<NavMeshAgent>();
             agent.angularSpeed = 720f;
             agent.acceleration = 30f;
             agent.stoppingDistance = stoppingDistance;
+            ConfigureEnemyPhysicalFooting(capsuleCollider, agent);
 
             EnemyBrain enemyBrain = enemy.AddComponent<EnemyBrain>();
             EnemyStateMachine enemyStateMachine = enemy.AddComponent<EnemyStateMachine>();
@@ -468,6 +540,8 @@ namespace CampusRPG.Editor
             SetObjectReference(enemyBrain, "health", health);
 
             SetObjectReference(enemyAttackController, "attackOrigin", attackOrigin);
+            SetFloat(enemyAttackController, "rangePadding", EnemyAttackRangePadding);
+            SetFloat(enemyAttackController, "maxHitAngle", EnemyAttackMaxHitAngle);
             SetObjectReference(damageableReceiver, "health", health);
             SetObjectReference(damageableReceiver, "enemyBrain", enemyBrain);
             SetObjectReference(lockOnTarget, "targetTransform", lockPoint);
@@ -527,14 +601,9 @@ namespace CampusRPG.Editor
                 SetObjectReference(playerCombatController, "attackExecutor", attackExecutor);
                 SetObjectReference(playerCombatController, "hitboxController", hitboxController);
                 SetObjectReference(playerCombatController, "animationRelay", animationRelay);
+                SetSwordArts(playerCombatController, CombatTestAssetGenerator.EnsureCombatTestSwordArtAssets());
 
-                SetObjectReference(animationRelay, "playerCharacter", playerCharacter);
-                SetObjectReference(animationRelay, "combatController", playerCombatController);
-                SetObjectReference(animationRelay, "stateMachine", playerStateMachine);
-                SetObjectReference(animationRelay, "motor", playerMotor);
-                SetObjectReference(animationRelay, "animator", animator);
-                SetFloat(animationRelay, "dodgeAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerDodgeAnimationDuration());
-                SetFloat(animationRelay, "hitAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerHitAnimationDuration());
+                ConfigurePlayerCombatAnimationRelay(animationRelay, playerCharacter, playerCombatController, playerStateMachine, playerMotor, animator);
                 SetObjectReference(attackExecutor, "attackOrigin", attackOrigin);
                 SetObjectReference(hitboxController, "attackExecutor", attackExecutor);
                 SetObjectReference(skillController, "owner", playerCharacter);
@@ -544,6 +613,7 @@ namespace CampusRPG.Editor
                 SetObjectReference(skillController, "castOrigin", castOrigin);
                 SetObjectReference(damageableReceiver, "health", health);
                 SetObjectReference(damageableReceiver, "playerCharacter", playerCharacter);
+                SetFloat(damageableReceiver, "playerHitStunSeconds", PlayerHitStunSeconds);
                 ConfigurePlayerAnimator(animator, playerAnimatorController);
                 changed |= RestorePlayerVisualBaseline(player, animator);
                 ConfigurePlayerWeaponPresentation(animationRelay, player);
@@ -569,6 +639,8 @@ namespace CampusRPG.Editor
             try
             {
                 bool changed = false;
+                CapsuleCollider capsuleCollider = EnsureSingleComponent<CapsuleCollider>(enemy, ref changed);
+                NavMeshAgent agent = EnsureSingleComponent<NavMeshAgent>(enemy, ref changed);
                 EnemyBrain enemyBrain = EnsureSingleComponent<EnemyBrain>(enemy, ref changed);
                 EnemyStateMachine enemyStateMachine = EnsureSingleComponent<EnemyStateMachine>(enemy, ref changed);
                 EnemySensing enemySensing = EnsureSingleComponent<EnemySensing>(enemy, ref changed);
@@ -587,9 +659,13 @@ namespace CampusRPG.Editor
                 SetObjectReference(enemyBrain, "attackController", enemyAttackController);
                 SetObjectReference(enemyBrain, "health", health);
                 SetObjectReference(enemyAttackController, "attackOrigin", attackOrigin);
+                SetFloat(enemyAttackController, "rangePadding", EnemyAttackRangePadding);
+                SetFloat(enemyAttackController, "maxHitAngle", EnemyAttackMaxHitAngle);
                 SetObjectReference(damageableReceiver, "health", health);
                 SetObjectReference(damageableReceiver, "enemyBrain", enemyBrain);
                 SetObjectReference(lockOnTarget, "targetTransform", lockPoint);
+                SetLayerMask(enemySensing, "targetMask", ~0);
+                changed |= ConfigureEnemyPhysicalFooting(capsuleCollider, agent);
                 changed |= RestoreEnemyVisualBaseline(enemy);
                 changed |= CombatProxyVisualUtility.Apply(enemy, ResolveEnemyVisualKind(prefabPath));
                 ConfigureEnemyVisualPresentationRelay(enemy, enemyVisualPresentationRelay, enemyBrain, enemyStateMachine);
@@ -601,6 +677,15 @@ namespace CampusRPG.Editor
             {
                 PrefabUtility.UnloadPrefabContents(enemy);
             }
+        }
+
+        private static bool RepairCombatTestEnemyPrefabs()
+        {
+            bool repairedAnyPrefab = false;
+            repairedAnyPrefab |= RepairEnemyPrefab(EnemyMeleePrefabPath);
+            repairedAnyPrefab |= RepairEnemyPrefab(EnemyMobilePrefabPath);
+            repairedAnyPrefab |= RepairEnemyPrefab(EnemyRangedPrefabPath);
+            return repairedAnyPrefab;
         }
 
         private static void InstantiateCombatEnemy(GameObject prefab, string name, Vector3 position)
@@ -620,6 +705,84 @@ namespace CampusRPG.Editor
             enemy.name = name;
             enemy.transform.position = position;
             enemy.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+        }
+
+        private static bool ConfigureEnemyPhysicalFooting(CapsuleCollider capsuleCollider, NavMeshAgent agent)
+        {
+            bool changed = false;
+
+            if (capsuleCollider != null)
+            {
+                if (!Mathf.Approximately(capsuleCollider.radius, EnemyCapsuleRadius))
+                {
+                    capsuleCollider.radius = EnemyCapsuleRadius;
+                    changed = true;
+                }
+
+                if (!Mathf.Approximately(capsuleCollider.height, EnemyCapsuleHeight))
+                {
+                    capsuleCollider.height = EnemyCapsuleHeight;
+                    changed = true;
+                }
+
+                Vector3 center = capsuleCollider.center;
+
+                if (!Mathf.Approximately(center.x, 0f)
+                    || !Mathf.Approximately(center.y, EnemyCapsuleCenterY)
+                    || !Mathf.Approximately(center.z, 0f))
+                {
+                    capsuleCollider.center = new Vector3(0f, EnemyCapsuleCenterY, 0f);
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    EditorUtility.SetDirty(capsuleCollider);
+                }
+            }
+
+            if (agent != null)
+            {
+                bool agentChanged = false;
+
+                if (!Mathf.Approximately(agent.radius, EnemyCapsuleRadius))
+                {
+                    agent.radius = EnemyCapsuleRadius;
+                    agentChanged = true;
+                }
+
+                if (!Mathf.Approximately(agent.height, EnemyCapsuleHeight))
+                {
+                    agent.height = EnemyCapsuleHeight;
+                    agentChanged = true;
+                }
+
+                if (!Mathf.Approximately(agent.baseOffset, EnemyAgentBaseOffset))
+                {
+                    agent.baseOffset = EnemyAgentBaseOffset;
+                    agentChanged = true;
+                }
+
+                if (!Mathf.Approximately(agent.angularSpeed, 720f))
+                {
+                    agent.angularSpeed = 720f;
+                    agentChanged = true;
+                }
+
+                if (!Mathf.Approximately(agent.acceleration, 30f))
+                {
+                    agent.acceleration = 30f;
+                    agentChanged = true;
+                }
+
+                if (agentChanged)
+                {
+                    EditorUtility.SetDirty(agent);
+                    changed = true;
+                }
+            }
+
+            return changed;
         }
 
         private static void ConfigureEnemyVisualPresentationRelay(
@@ -657,6 +820,30 @@ namespace CampusRPG.Editor
             EditorUtility.SetDirty(animator);
         }
 
+        private static void ConfigurePlayerCombatAnimationRelay(
+            PlayerCombatAnimationRelay relay,
+            PlayerCharacter playerCharacter,
+            PlayerCombatController playerCombatController,
+            PlayerStateMachine playerStateMachine,
+            PlayerMotor playerMotor,
+            Animator animator)
+        {
+            if (relay == null)
+            {
+                return;
+            }
+
+            SetObjectReference(relay, "playerCharacter", playerCharacter);
+            SetObjectReference(relay, "combatController", playerCombatController);
+            SetObjectReference(relay, "stateMachine", playerStateMachine);
+            SetObjectReference(relay, "motor", playerMotor);
+            SetObjectReference(relay, "animator", animator);
+            SetFloat(relay, "crossFadeSeconds", PlayerAnimationCrossFadeSeconds);
+            SetFloat(relay, "locomotionDampSeconds", PlayerAnimationLocomotionDampSeconds);
+            SetFloat(relay, "dodgeAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerDodgeAnimationDuration());
+            SetFloat(relay, "hitAnimationDurationSeconds", CombatTestAssetGenerator.GetPlayerHitAnimationDuration());
+        }
+
         private static void ConfigureEnemyCombatAnimationRelay(
             EnemyCombatAnimationRelay relay,
             EnemyBrain enemyBrain,
@@ -671,6 +858,8 @@ namespace CampusRPG.Editor
             SetObjectReference(relay, "enemyBrain", enemyBrain);
             SetObjectReference(relay, "stateMachine", enemyStateMachine);
             SetObjectReference(relay, "animator", animator);
+            SetFloat(relay, "crossFadeSeconds", EnemyAnimationCrossFadeSeconds);
+            SetFloat(relay, "locomotionDampSeconds", EnemyAnimationLocomotionDampSeconds);
         }
 
         private static bool RestoreEnemyVisualBaseline(GameObject enemy)
@@ -713,7 +902,6 @@ namespace CampusRPG.Editor
         private static bool TryApplyImportedEnemyAvatarPreview(
             string prefabPath,
             CombatProxyVisualKind visualKind,
-            RuntimeAnimatorController enemyAnimatorController,
             ref bool foundAnyPrefab)
         {
             if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) == null)
@@ -722,6 +910,14 @@ namespace CampusRPG.Editor
             }
 
             foundAnyPrefab = true;
+            RuntimeAnimatorController enemyAnimatorController = CombatImportedEnemyVisualUtility.EnsureImportedAvatarPreviewController(visualKind);
+
+            if (enemyAnimatorController == null)
+            {
+                Debug.LogWarning($"Imported enemy Avatar preview could not build a local preview AnimatorController for {visualKind}. Verify the supported local animation sources are installed first.");
+                return false;
+            }
+
             GameObject enemy = PrefabUtility.LoadPrefabContents(prefabPath);
 
             try
@@ -736,7 +932,9 @@ namespace CampusRPG.Editor
                     return false;
                 }
 
-                ConfigureEnemyImportedAnimator(animator, enemyAnimatorController);
+                Animator importedAnimator = CombatImportedEnemyVisualUtility.FindImportedPreviewAnimator(enemy);
+                Animator drivenAnimator = importedAnimator != null ? importedAnimator : animator;
+                ConfigureEnemyImportedAnimator(drivenAnimator, enemyAnimatorController);
 
                 EnemyVisualPresentationRelay relay = GetOrAddComponent<EnemyVisualPresentationRelay>(enemy);
                 EnemyBrain enemyBrain = GetOrAddComponent<EnemyBrain>(enemy);
@@ -744,7 +942,7 @@ namespace CampusRPG.Editor
                 EnemyCombatAnimationRelay importedAnimationRelay = GetOrAddComponent<EnemyCombatAnimationRelay>(enemy);
                 relay.enabled = false;
                 EditorUtility.SetDirty(relay);
-                ConfigureEnemyCombatAnimationRelay(importedAnimationRelay, enemyBrain, enemyStateMachine, animator);
+                ConfigureEnemyCombatAnimationRelay(importedAnimationRelay, enemyBrain, enemyStateMachine, drivenAnimator);
                 PrefabUtility.SaveAsPrefabAsset(enemy, prefabPath);
                 return true;
             }
@@ -823,6 +1021,18 @@ namespace CampusRPG.Editor
             SetCombatTestNavigationStatic(target);
         }
 
+        private static void ApplyCombatTestLightingPreset(Light directionalLight)
+        {
+            if (directionalLight != null)
+            {
+                directionalLight.type = LightType.Directional;
+                directionalLight.intensity = CombatTestDirectionalLightIntensity;
+            }
+
+            RenderSettings.ambientIntensity = CombatTestAmbientIntensity;
+            RenderSettings.reflectionIntensity = CombatTestReflectionIntensity;
+        }
+
         private static void SetAttackCombo(PlayerCombatController controller, params AttackDefinitionSO[] attacks)
         {
             SerializedObject serializedObject = new SerializedObject(controller);
@@ -832,6 +1042,21 @@ namespace CampusRPG.Editor
             for (int i = 0; i < attacks.Length; i++)
             {
                 comboProperty.GetArrayElementAtIndex(i).objectReferenceValue = attacks[i];
+            }
+
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(controller);
+        }
+
+        private static void SetSwordArts(PlayerCombatController controller, params SwordArtDefinitionSO[] swordArts)
+        {
+            SerializedObject serializedObject = new SerializedObject(controller);
+            SerializedProperty swordArtsProperty = serializedObject.FindProperty("swordArts");
+            swordArtsProperty.arraySize = swordArts.Length;
+
+            for (int i = 0; i < swordArts.Length; i++)
+            {
+                swordArtsProperty.GetArrayElementAtIndex(i).objectReferenceValue = swordArts[i];
             }
 
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
