@@ -10,8 +10,10 @@ namespace CampusRPG.Editor
     public static class CombatImportedEnemyVisualUtility
     {
         public const string ImportedVisualRootName = "ImportedEnemyVisualRoot";
+        public const string ImportedRoleMarkerRootName = "ImportedEnemyRoleMarkerRoot";
 
         private const string ProxyRootName = "CombatProxyVisualRoot";
+        private const string MaterialsFolder = "Assets/_Game/Materials";
         private const string LocalPreviewAnimationFolder = "Assets/_Game/Animations/Characters/CombatTest/LocalPreview";
         private const string ImportedAnimatorControllerPathPrefix = LocalPreviewAnimationFolder + "/AC_Enemy_ImportedPreview_";
         private const string ImportedUpperBodyMaskPath = LocalPreviewAnimationFolder + "/AM_Enemy_ImportedUpperBody.mask";
@@ -32,17 +34,17 @@ namespace CampusRPG.Editor
 
         private static readonly string[] EnemyMobileVisualPrefabCandidatePaths =
         {
-            "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Sword and Shield.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Polearm.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Dual Wield.prefab",
+            "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Sword and Shield.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red.prefab"
         };
 
         private static readonly string[] EnemyRangedVisualPrefabCandidatePaths =
         {
-            "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Sword and Shield.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Basic Motions/Prefabs/Human_BasicMotionsDummy_M.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanF_Dummy_Red.prefab",
+            "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Sword and Shield.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red.prefab"
         };
 
@@ -336,6 +338,7 @@ namespace CampusRPG.Editor
             visualAnimator.applyRootMotion = false;
             visualAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             visualAnimator.updateMode = AnimatorUpdateMode.Normal;
+            changed |= AddImportedRoleMarkers(visualInstance.transform, kind);
             EditorUtility.SetDirty(visualAnimator);
 
             if (rootAnimator != null)
@@ -429,6 +432,128 @@ namespace CampusRPG.Editor
             }
 
             return changed;
+        }
+
+        private static bool AddImportedRoleMarkers(Transform visualRoot, CombatProxyVisualKind kind)
+        {
+            if (visualRoot == null)
+            {
+                return false;
+            }
+
+            bool changed = false;
+            Transform previousMarkerRoot = visualRoot.Find(ImportedRoleMarkerRootName);
+
+            if (previousMarkerRoot != null)
+            {
+                Object.DestroyImmediate(previousMarkerRoot.gameObject);
+                changed = true;
+            }
+
+            Material primaryMaterial = LoadRoleMarkerMaterial(kind, false);
+            Material accentMaterial = LoadRoleMarkerMaterial(kind, true);
+            Transform markerRoot = CreateTransformChild(
+                visualRoot,
+                ImportedRoleMarkerRootName,
+                Vector3.zero,
+                Quaternion.identity,
+                Vector3.one);
+
+            switch (kind)
+            {
+                case CombatProxyVisualKind.EnemyMelee:
+                    CreatePrimitive(markerRoot, "MeleeShoulderLeft", PrimitiveType.Cube, new Vector3(-0.34f, 1.32f, 0.02f), Quaternion.identity, new Vector3(0.22f, 0.16f, 0.24f), primaryMaterial);
+                    CreatePrimitive(markerRoot, "MeleeShoulderRight", PrimitiveType.Cube, new Vector3(0.34f, 1.32f, 0.02f), Quaternion.identity, new Vector3(0.22f, 0.16f, 0.24f), primaryMaterial);
+                    CreatePrimitive(markerRoot, "MeleeBlade", PrimitiveType.Cube, new Vector3(0.38f, 1.1f, 0.46f), Quaternion.Euler(0f, -8f, 76f), new Vector3(0.08f, 0.08f, 0.86f), accentMaterial);
+                    break;
+                case CombatProxyVisualKind.EnemyMobile:
+                    CreatePrimitive(markerRoot, "MobileFinLeft", PrimitiveType.Cube, new Vector3(-0.4f, 1f, 0.04f), Quaternion.Euler(0f, 0f, -32f), new Vector3(0.12f, 0.42f, 0.08f), accentMaterial);
+                    CreatePrimitive(markerRoot, "MobileFinRight", PrimitiveType.Cube, new Vector3(0.4f, 1f, 0.04f), Quaternion.Euler(0f, 0f, 32f), new Vector3(0.12f, 0.42f, 0.08f), accentMaterial);
+                    CreatePrimitive(markerRoot, "MobileTail", PrimitiveType.Cube, new Vector3(0f, 0.78f, -0.24f), Quaternion.identity, new Vector3(0.12f, 0.2f, 0.54f), primaryMaterial);
+                    break;
+                case CombatProxyVisualKind.EnemyRanged:
+                    CreatePrimitive(markerRoot, "FocusOrb", PrimitiveType.Sphere, new Vector3(0f, 1.12f, 0.5f), Quaternion.identity, new Vector3(0.2f, 0.2f, 0.2f), accentMaterial);
+                    CreatePrimitive(markerRoot, "Staff", PrimitiveType.Cylinder, new Vector3(0.36f, 1.02f, 0.16f), Quaternion.Euler(0f, 0f, 10f), new Vector3(0.05f, 0.62f, 0.05f), primaryMaterial);
+                    CreatePrimitive(markerRoot, "CasterPack", PrimitiveType.Cube, new Vector3(0f, 1.12f, -0.18f), Quaternion.identity, new Vector3(0.3f, 0.28f, 0.2f), accentMaterial);
+                    break;
+                default:
+                    Object.DestroyImmediate(markerRoot.gameObject);
+                    return changed;
+            }
+
+            EditorUtility.SetDirty(markerRoot.gameObject);
+            return true;
+        }
+
+        private static Material LoadRoleMarkerMaterial(CombatProxyVisualKind kind, bool accent)
+        {
+            return AssetDatabase.LoadAssetAtPath<Material>(GetRoleMarkerMaterialPath(kind, accent));
+        }
+
+        private static string GetRoleMarkerMaterialPath(CombatProxyVisualKind kind, bool accent)
+        {
+            string suffix = accent ? "Accent" : "Primary";
+
+            switch (kind)
+            {
+                case CombatProxyVisualKind.EnemyMelee:
+                    return MaterialsFolder + "/M_CombatProxy_EnemyMelee" + suffix + ".mat";
+                case CombatProxyVisualKind.EnemyMobile:
+                    return MaterialsFolder + "/M_CombatProxy_EnemyMobile" + suffix + ".mat";
+                case CombatProxyVisualKind.EnemyRanged:
+                    return MaterialsFolder + "/M_CombatProxy_EnemyRanged" + suffix + ".mat";
+                default:
+                    return MaterialsFolder + "/M_CombatProxy_EnemyMelee" + suffix + ".mat";
+            }
+        }
+
+        private static GameObject CreatePrimitive(
+            Transform parent,
+            string name,
+            PrimitiveType primitiveType,
+            Vector3 localPosition,
+            Quaternion localRotation,
+            Vector3 localScale,
+            Material material)
+        {
+            GameObject primitive = GameObject.CreatePrimitive(primitiveType);
+            primitive.name = name;
+            primitive.transform.SetParent(parent, false);
+            primitive.transform.localPosition = localPosition;
+            primitive.transform.localRotation = localRotation;
+            primitive.transform.localScale = localScale;
+
+            Collider collider = primitive.GetComponent<Collider>();
+
+            if (collider != null)
+            {
+                Object.DestroyImmediate(collider);
+            }
+
+            Renderer renderer = primitive.GetComponent<Renderer>();
+
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = material;
+                EditorUtility.SetDirty(renderer);
+            }
+
+            return primitive;
+        }
+
+        private static Transform CreateTransformChild(
+            Transform parent,
+            string name,
+            Vector3 localPosition,
+            Quaternion localRotation,
+            Vector3 localScale)
+        {
+            GameObject child = new GameObject(name);
+            child.transform.SetParent(parent, false);
+            child.transform.localPosition = localPosition;
+            child.transform.localRotation = localRotation;
+            child.transform.localScale = localScale;
+            return child.transform;
         }
 
         private static void AddClipState(AnimatorStateMachine stateMachine, string stateName, AnimationClip clip, float speed = 1f)

@@ -16,6 +16,10 @@ namespace CampusRPG.Tests.EditMode
         private const string EnemyRangedImportedPreviewControllerPath = LocalPreviewFolderPath + "/AC_Enemy_ImportedPreview_EnemyRanged.controller";
         private const string StableEnemyVisualPrefabPath =
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Sword and Shield.prefab";
+        private const string MobileEnemyVisualPrefabPath =
+            "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Polearm.prefab";
+        private const string RangedEnemyVisualPrefabPath =
+            "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Basic Motions/Prefabs/Human_BasicMotionsDummy_M.prefab";
         private static readonly string[] CommittedPreviewControllerPaths =
         {
             LocalPreviewFolderPath + "/AC_Enemy_ImportedPreview_EnemyMelee.controller",
@@ -51,22 +55,37 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
-        public void SelectedEnemyVisualPrefabs_PreferStableHumanoidSourceForLocomotion()
+        public void SelectedEnemyVisualPrefabs_PreferDistinctHumanoidSourcesForArchetypeReadability()
         {
-            if (!File.Exists(StableEnemyVisualPrefabPath))
+            if (!File.Exists(StableEnemyVisualPrefabPath)
+                || !File.Exists(MobileEnemyVisualPrefabPath)
+                || !File.Exists(RangedEnemyVisualPrefabPath))
             {
-                Assert.Ignore("The stable imported enemy humanoid preview source is not available in this workspace.");
+                Assert.Ignore("The distinct imported enemy humanoid preview sources are not available in this workspace.");
             }
 
             Assert.AreEqual(
                 StableEnemyVisualPrefabPath,
                 CombatImportedEnemyVisualUtility.GetSelectedHumanoidVisualPrefabPath(CombatProxyVisualKind.EnemyMelee));
             Assert.AreEqual(
-                StableEnemyVisualPrefabPath,
+                MobileEnemyVisualPrefabPath,
                 CombatImportedEnemyVisualUtility.GetSelectedHumanoidVisualPrefabPath(CombatProxyVisualKind.EnemyMobile));
             Assert.AreEqual(
-                StableEnemyVisualPrefabPath,
+                RangedEnemyVisualPrefabPath,
                 CombatImportedEnemyVisualUtility.GetSelectedHumanoidVisualPrefabPath(CombatProxyVisualKind.EnemyRanged));
+        }
+
+        [Test]
+        public void TryApplyHumanoidAvatarPreview_AddsDistinctArchetypeRoleMarkers()
+        {
+            if (!File.Exists(StableEnemyVisualPrefabPath))
+            {
+                Assert.Ignore("The stable imported enemy humanoid preview source is not available in this workspace.");
+            }
+
+            AssertImportedRoleMarker(CombatProxyVisualKind.EnemyMelee, "MeleeBlade");
+            AssertImportedRoleMarker(CombatProxyVisualKind.EnemyMobile, "MobileTail");
+            AssertImportedRoleMarker(CombatProxyVisualKind.EnemyRanged, "FocusOrb");
         }
 
         [Test]
@@ -288,6 +307,32 @@ namespace CampusRPG.Tests.EditMode
                 Assert.IsTrue(removed);
                 Assert.IsNull(enemy.transform.Find(CombatImportedEnemyVisualUtility.ImportedVisualRootName));
                 Assert.That(proxyRenderers, Has.All.Matches<Renderer>(renderer => renderer.enabled));
+            }
+            finally
+            {
+                Object.DestroyImmediate(enemy);
+            }
+        }
+
+        private static void AssertImportedRoleMarker(CombatProxyVisualKind kind, string expectedMarkerName)
+        {
+            GameObject enemy = new GameObject(kind + "PreviewRoot");
+
+            try
+            {
+                CombatProxyVisualUtility.Apply(enemy, kind);
+
+                bool applied = CombatImportedEnemyVisualUtility.TryApplyHumanoidAvatarPreview(enemy, kind, null);
+                Transform importedRoot = enemy.transform.Find(CombatImportedEnemyVisualUtility.ImportedVisualRootName);
+                Transform markerRoot = importedRoot != null
+                    ? importedRoot.Find(CombatImportedEnemyVisualUtility.ImportedRoleMarkerRootName)
+                    : null;
+
+                Assert.IsTrue(applied, kind.ToString());
+                Assert.IsNotNull(importedRoot, kind.ToString());
+                Assert.IsNotNull(markerRoot, kind.ToString());
+                Assert.IsNotNull(markerRoot.Find(expectedMarkerName), kind.ToString());
+                Assert.That(markerRoot.GetComponentsInChildren<Collider>(true), Is.Empty, kind.ToString());
             }
             finally
             {
