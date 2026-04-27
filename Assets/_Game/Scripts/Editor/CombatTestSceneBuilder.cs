@@ -813,10 +813,12 @@ namespace CampusRPG.Editor
                 return;
             }
 
+            animator.enabled = true;
             animator.runtimeAnimatorController = controller;
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             animator.updateMode = AnimatorUpdateMode.Normal;
+            animator.Rebind();
             EditorUtility.SetDirty(animator);
         }
 
@@ -925,7 +927,7 @@ namespace CampusRPG.Editor
                 RestoreEnemyVisualBaseline(enemy);
                 CombatProxyVisualUtility.Apply(enemy, visualKind);
 
-                Animator animator = GetOrAddComponent<Animator>(enemy);
+                Animator animator = enemy.GetComponent<Animator>();
 
                 if (!CombatImportedEnemyVisualUtility.TryApplyHumanoidAvatarPreview(enemy, visualKind, animator))
                 {
@@ -933,8 +935,13 @@ namespace CampusRPG.Editor
                 }
 
                 Animator importedAnimator = CombatImportedEnemyVisualUtility.FindImportedPreviewAnimator(enemy);
-                Animator drivenAnimator = importedAnimator != null ? importedAnimator : animator;
-                ConfigureEnemyImportedAnimator(drivenAnimator, enemyAnimatorController);
+                if (importedAnimator == null)
+                {
+                    Debug.LogWarning($"Imported enemy Avatar preview did not produce a driven visual Animator for {visualKind}.");
+                    return false;
+                }
+
+                ConfigureEnemyImportedAnimator(importedAnimator, enemyAnimatorController);
 
                 EnemyVisualPresentationRelay relay = GetOrAddComponent<EnemyVisualPresentationRelay>(enemy);
                 EnemyBrain enemyBrain = GetOrAddComponent<EnemyBrain>(enemy);
@@ -942,7 +949,7 @@ namespace CampusRPG.Editor
                 EnemyCombatAnimationRelay importedAnimationRelay = GetOrAddComponent<EnemyCombatAnimationRelay>(enemy);
                 relay.enabled = false;
                 EditorUtility.SetDirty(relay);
-                ConfigureEnemyCombatAnimationRelay(importedAnimationRelay, enemyBrain, enemyStateMachine, drivenAnimator);
+                ConfigureEnemyCombatAnimationRelay(importedAnimationRelay, enemyBrain, enemyStateMachine, importedAnimator);
                 PrefabUtility.SaveAsPrefabAsset(enemy, prefabPath);
                 return true;
             }

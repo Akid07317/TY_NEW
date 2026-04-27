@@ -12,6 +12,10 @@ namespace CampusRPG.Tests.EditMode
     {
         private const string LocalPreviewFolderPath = "Assets/_Game/Animations/Characters/CombatTest/LocalPreview";
         private const string EnemyImportedPreviewControllerPath = LocalPreviewFolderPath + "/AC_Enemy_ImportedPreview_EnemyMelee.controller";
+        private const string EnemyMobileImportedPreviewControllerPath = LocalPreviewFolderPath + "/AC_Enemy_ImportedPreview_EnemyMobile.controller";
+        private const string EnemyRangedImportedPreviewControllerPath = LocalPreviewFolderPath + "/AC_Enemy_ImportedPreview_EnemyRanged.controller";
+        private const string StableEnemyVisualPrefabPath =
+            "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Sword and Shield.prefab";
         private static readonly string[] CommittedPreviewControllerPaths =
         {
             LocalPreviewFolderPath + "/AC_Enemy_ImportedPreview_EnemyMelee.controller",
@@ -44,6 +48,25 @@ namespace CampusRPG.Tests.EditMode
             {
                 Assert.Ignore("No imported local-preview enemy AnimatorController assets are present in this workspace.");
             }
+        }
+
+        [Test]
+        public void SelectedEnemyVisualPrefabs_PreferStableHumanoidSourceForLocomotion()
+        {
+            if (!File.Exists(StableEnemyVisualPrefabPath))
+            {
+                Assert.Ignore("The stable imported enemy humanoid preview source is not available in this workspace.");
+            }
+
+            Assert.AreEqual(
+                StableEnemyVisualPrefabPath,
+                CombatImportedEnemyVisualUtility.GetSelectedHumanoidVisualPrefabPath(CombatProxyVisualKind.EnemyMelee));
+            Assert.AreEqual(
+                StableEnemyVisualPrefabPath,
+                CombatImportedEnemyVisualUtility.GetSelectedHumanoidVisualPrefabPath(CombatProxyVisualKind.EnemyMobile));
+            Assert.AreEqual(
+                StableEnemyVisualPrefabPath,
+                CombatImportedEnemyVisualUtility.GetSelectedHumanoidVisualPrefabPath(CombatProxyVisualKind.EnemyRanged));
         }
 
         [Test]
@@ -124,6 +147,12 @@ namespace CampusRPG.Tests.EditMode
                 Assert.Greater(antiAirState.speed, rangedAttackState.speed);
                 Assert.Less(chaseRollState.speed, mobileAttackState.speed);
                 Assert.Less(guardBreakState.speed, 1f);
+                AssertImportedControllerLocomotionUsesInPlaceClips(
+                    CombatProxyVisualKind.EnemyMobile,
+                    EnemyMobileImportedPreviewControllerPath);
+                AssertImportedControllerLocomotionUsesInPlaceClips(
+                    CombatProxyVisualKind.EnemyRanged,
+                    EnemyRangedImportedPreviewControllerPath);
             }
             finally
             {
@@ -131,6 +160,30 @@ namespace CampusRPG.Tests.EditMode
                 AssetDatabase.DeleteAsset(LocalPreviewFolderPath);
                 AssetDatabase.Refresh();
             }
+        }
+
+        private static void AssertImportedControllerLocomotionUsesInPlaceClips(
+            CombatProxyVisualKind visualKind,
+            string controllerPath)
+        {
+            RuntimeAnimatorController controller = CombatImportedEnemyVisualUtility.EnsureImportedAvatarPreviewController(visualKind);
+            AnimatorController animatorController = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
+
+            Assert.IsNotNull(controller, visualKind.ToString());
+            Assert.IsNotNull(animatorController, controllerPath);
+
+            AnimatorState locomotionState = FindState(
+                animatorController.layers[0].stateMachine,
+                EnemyCombatAnimationPlanUtility.LocomotionStateName);
+
+            Assert.IsNotNull(locomotionState, controllerPath);
+            Assert.IsInstanceOf<BlendTree>(locomotionState.motion, controllerPath);
+
+            BlendTree blendTree = (BlendTree)locomotionState.motion;
+
+            Assert.That(blendTree.children, Has.Length.EqualTo(3), controllerPath);
+            Assert.That(blendTree.children[1].motion.name, Does.Contain("1Hand_Up_Walk"), controllerPath);
+            Assert.That(blendTree.children[2].motion.name, Does.Contain("1Hand_Up_Run"), controllerPath);
         }
 
         [Test]
@@ -192,6 +245,53 @@ namespace CampusRPG.Tests.EditMode
                 AssetDatabase.DeleteAsset(EnemyImportedPreviewControllerPath);
                 AssetDatabase.DeleteAsset(LocalPreviewFolderPath);
                 AssetDatabase.Refresh();
+            }
+        }
+
+        [Test]
+        public void TryApplyHumanoidAvatarPreview_ConfiguresImportedAnimatorWithoutRootAnimator()
+        {
+            if (!CombatImportedEnemyVisualUtility.HasHumanoidVisualSource(CombatProxyVisualKind.EnemyMelee))
+            {
+                Assert.Ignore("No compatible imported enemy humanoid preview source is available in this workspace.");
+            }
+
+            GameObject enemy = new GameObject("EnemyPreviewRoot");
+
+            try
+            {
+                CombatProxyVisualUtility.Apply(enemy, CombatProxyVisualKind.EnemyMelee);
+
+                bool applied = CombatImportedEnemyVisualUtility.TryApplyHumanoidAvatarPreview(
+                    enemy,
+                    CombatProxyVisualKind.EnemyMelee,
+                    null);
+
+                Transform importedRoot = enemy.transform.Find(CombatImportedEnemyVisualUtility.ImportedVisualRootName);
+                Transform proxyRoot = enemy.transform.Find("CombatProxyVisualRoot");
+                Renderer[] proxyRenderers = proxyRoot != null ? proxyRoot.GetComponentsInChildren<Renderer>(true) : new Renderer[0];
+                Animator importedAnimator = CombatImportedEnemyVisualUtility.FindImportedPreviewAnimator(enemy);
+
+                Assert.IsTrue(applied);
+                Assert.IsNull(enemy.GetComponent<Animator>());
+                Assert.IsNotNull(importedRoot);
+                Assert.IsNotNull(importedAnimator);
+                Assert.IsTrue(importedAnimator.enabled);
+                Assert.IsNotNull(importedAnimator.avatar);
+                Assert.IsFalse(importedAnimator.applyRootMotion);
+                Assert.AreEqual(AnimatorCullingMode.AlwaysAnimate, importedAnimator.cullingMode);
+                Assert.AreEqual(AnimatorUpdateMode.Normal, importedAnimator.updateMode);
+                Assert.That(proxyRenderers, Has.All.Matches<Renderer>(renderer => !renderer.enabled));
+
+                bool removed = CombatImportedEnemyVisualUtility.RemoveImportedVisual(enemy, null);
+
+                Assert.IsTrue(removed);
+                Assert.IsNull(enemy.transform.Find(CombatImportedEnemyVisualUtility.ImportedVisualRootName));
+                Assert.That(proxyRenderers, Has.All.Matches<Renderer>(renderer => renderer.enabled));
+            }
+            finally
+            {
+                Object.DestroyImmediate(enemy);
             }
         }
 

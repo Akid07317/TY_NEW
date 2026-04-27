@@ -32,6 +32,7 @@ namespace CampusRPG.Editor
 
         private static readonly string[] EnemyMobileVisualPrefabCandidatePaths =
         {
+            "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Sword and Shield.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Polearm.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Dual Wield.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red.prefab"
@@ -39,6 +40,7 @@ namespace CampusRPG.Editor
 
         private static readonly string[] EnemyRangedVisualPrefabCandidatePaths =
         {
+            "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red - Sword and Shield.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Basic Motions/Prefabs/Human_BasicMotionsDummy_M.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanF_Dummy_Red.prefab",
             "Assets/Kevin Iglesias/Human Animations/Unity Demo Scenes/Human Melee Animations/Prefabs/Characters/HumanM_Dummy_Red.prefab"
@@ -93,6 +95,8 @@ namespace CampusRPG.Editor
 
         private static readonly string[] WalkClipCandidatePaths =
         {
+            "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_InPlace.fbx",
+            "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_B_InPlace.fbx",
             "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Forward.fbx",
             "Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Walk/HumanF@Walk01_Forward.fbx"
         };
@@ -109,6 +113,8 @@ namespace CampusRPG.Editor
 
         private static readonly string[] RunClipCandidatePaths =
         {
+            "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_InPlace.fbx",
+            "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_B_InPlace.fbx",
             "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Forward.fbx",
             "Assets/Kevin Iglesias/Human Animations/Animations/Female/Movement/Run/HumanF@Run01_Forward.fbx"
         };
@@ -274,7 +280,7 @@ namespace CampusRPG.Editor
 
         public static bool TryApplyHumanoidAvatarPreview(GameObject actor, CombatProxyVisualKind kind, Animator rootAnimator)
         {
-            if (actor == null || rootAnimator == null)
+            if (actor == null)
             {
                 return false;
             }
@@ -316,34 +322,41 @@ namespace CampusRPG.Editor
                 return changed;
             }
 
+            if (visualAnimator == null)
+            {
+                visualAnimator = visualInstance.AddComponent<Animator>();
+            }
+
             StripImportedVisualComponents(visualInstance, visualAnimator);
             changed |= AlignImportedVisualToGround(visualInstance, actor.transform);
             changed |= SetProxyRenderersEnabled(proxyRoot, false);
 
-            if (visualAnimator != null)
+            visualAnimator.enabled = true;
+            visualAnimator.avatar = avatar;
+            visualAnimator.applyRootMotion = false;
+            visualAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            visualAnimator.updateMode = AnimatorUpdateMode.Normal;
+            EditorUtility.SetDirty(visualAnimator);
+
+            if (rootAnimator != null)
             {
-                visualAnimator.avatar = avatar;
-                visualAnimator.applyRootMotion = false;
-                visualAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-                visualAnimator.updateMode = AnimatorUpdateMode.Normal;
-                EditorUtility.SetDirty(visualAnimator);
+                if (rootAnimator.avatar != null)
+                {
+                    rootAnimator.avatar = null;
+                    changed = true;
+                }
+
+                if (rootAnimator.runtimeAnimatorController != null)
+                {
+                    rootAnimator.runtimeAnimatorController = null;
+                    changed = true;
+                }
+
+                rootAnimator.enabled = false;
+
+                EditorUtility.SetDirty(rootAnimator);
             }
 
-            if (rootAnimator.avatar != null)
-            {
-                rootAnimator.avatar = null;
-                changed = true;
-            }
-
-            if (rootAnimator.runtimeAnimatorController != null)
-            {
-                rootAnimator.runtimeAnimatorController = null;
-                changed = true;
-            }
-
-            rootAnimator.enabled = false;
-
-            EditorUtility.SetDirty(rootAnimator);
             EditorUtility.SetDirty(visualInstance.transform);
             EditorUtility.SetDirty(visualInstance);
             return true;

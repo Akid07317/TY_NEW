@@ -7,9 +7,9 @@ namespace CampusRPG.AI
     [DisallowMultipleComponent]
     [RequireComponent(typeof(EnemyBrain))]
     [RequireComponent(typeof(EnemyStateMachine))]
-    [RequireComponent(typeof(Animator))]
     public sealed class EnemyCombatAnimationRelay : MonoBehaviour
     {
+        private const string ImportedVisualRootName = "ImportedEnemyVisualRoot";
         private static readonly int GroundSpeedHash = Animator.StringToHash(EnemyCombatAnimationPlanUtility.GroundSpeedParameterName);
         private static readonly int ResponseReadHash = Animator.StringToHash(EnemyCombatAnimationPlanUtility.ResponseReadParameterName);
         private static readonly int AntiAirReadHash = Animator.StringToHash(EnemyCombatAnimationPlanUtility.AntiAirReadParameterName);
@@ -29,6 +29,7 @@ namespace CampusRPG.AI
         private string currentAnimatorStateName = string.Empty;
         private int lastObservedStateRevision = -1;
         private int combatPoseLayerIndex = -1;
+        private Animator preparedAnimator;
 
         private void Awake()
         {
@@ -105,6 +106,16 @@ namespace CampusRPG.AI
                 stateMachine = GetComponent<EnemyStateMachine>();
             }
 
+            Animator importedAnimator = FindImportedPreviewAnimator();
+
+            if (importedAnimator != null
+                && (animator == null || animator.transform == transform || !CanSampleHumanoid(animator)))
+            {
+                animator = importedAnimator;
+                currentAnimatorStateName = string.Empty;
+                combatPoseLayerIndex = -1;
+            }
+
             if (animator == null)
             {
                 animator = GetComponent<Animator>();
@@ -115,7 +126,50 @@ namespace CampusRPG.AI
                 navMeshAgent = GetComponent<NavMeshAgent>();
             }
 
+            PrepareDrivenAnimator();
             return enemyBrain != null && stateMachine != null && animator != null;
+        }
+
+        private Animator FindImportedPreviewAnimator()
+        {
+            Transform importedVisualRoot = transform.Find(ImportedVisualRootName);
+            return importedVisualRoot != null
+                ? importedVisualRoot.GetComponentInChildren<Animator>(true)
+                : null;
+        }
+
+        private static bool CanSampleHumanoid(Animator candidate)
+        {
+            return candidate != null
+                && candidate.avatar != null
+                && candidate.avatar.isValid;
+        }
+
+        private void PrepareDrivenAnimator()
+        {
+            if (animator == null)
+            {
+                return;
+            }
+
+            animator.enabled = true;
+            animator.applyRootMotion = false;
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            animator.updateMode = AnimatorUpdateMode.Normal;
+
+            if (preparedAnimator == animator)
+            {
+                return;
+            }
+
+            preparedAnimator = animator;
+            currentAnimatorStateName = string.Empty;
+            combatPoseLayerIndex = -1;
+
+            if (animator.isActiveAndEnabled)
+            {
+                animator.Rebind();
+            }
         }
 
         private void ResolveCurrentAttackContext(
