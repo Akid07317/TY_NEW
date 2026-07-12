@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CampusRPG.AI;
 using CampusRPG.Character;
 using CampusRPG.Combat;
@@ -70,6 +71,7 @@ namespace CampusRPG.Editor
         private const string PlayerHitClipPath = PlayerAnimationRootFolder + "/AN_Player_Hit_CombatTest.anim";
         private const string PlayerGuardBreakClipPath = PlayerAnimationRootFolder + "/AN_Player_GuardBreak_CombatTest.anim";
         private const string PlayerDeathClipPath = PlayerAnimationRootFolder + "/AN_Player_Death_CombatTest.anim";
+        private const int MaxPlayerAttackVariantStates = 8;
         private const string PlayerLocomotionBlendTreeName = "BT_Player_Locomotion_CombatTest";
         private const string PlayerLocomotionStateName = "Locomotion";
         private const string PlayerBlockStateName = "Block";
@@ -101,6 +103,8 @@ namespace CampusRPG.Editor
         private const float PlayerHitClipImportedDuration = 0.26f;
         private const float PlayerGuardBreakClipFallbackDuration = 0.42f;
         private const float PlayerGuardBreakClipImportedDuration = 0.48f;
+        private const string GhostSamuraiAPoseRoot = "Assets/GhostSamurai_Animset/Animation/katana/APose";
+        private const string GhostSamuraiCommonRoot = "Assets/GhostSamurai_Animset/Animation/katana/Common";
         private static bool allowImportedPlayerAnimationPreviewBuild;
 
         [MenuItem(RootMenu)]
@@ -172,8 +176,12 @@ namespace CampusRPG.Editor
                 0.22f,
                 1.75f,
                 0.52f,
+                forwardMovement: 0.30f,
+                forwardMovementStartSeconds: 0.04f,
+                forwardMovementDurationSeconds: 0.13f,
                 movementSpeedScale: 0.78f,
-                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow,
+                animationDurationSeconds: 0.58f);
             AttackDefinitionSO light02 = CreateAttackAsset(
                 Light02Path,
                 "Light_02",
@@ -184,8 +192,12 @@ namespace CampusRPG.Editor
                 0.24f,
                 1.9f,
                 0.58f,
+                forwardMovement: 0.34f,
+                forwardMovementStartSeconds: 0.05f,
+                forwardMovementDurationSeconds: 0.13f,
                 movementSpeedScale: 0.76f,
-                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow,
+                animationDurationSeconds: 0.78f);
             AttackDefinitionSO light03 = CreateAttackAsset(
                 Light03Path,
                 "Light_03",
@@ -196,18 +208,26 @@ namespace CampusRPG.Editor
                 0.30f,
                 2.05f,
                 0.62f,
+                forwardMovement: 0.45f,
+                forwardMovementStartSeconds: 0.07f,
+                forwardMovementDurationSeconds: 0.17f,
                 movementSpeedScale: 0.72f,
-                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
+                hitboxActivationMode: AttackHitboxActivationMode.TimedWindow,
+                animationDurationSeconds: 0.98f);
             AttackDefinitionSO heavy = CreateAttackAsset(
                 HeavyPath,
                 "Heavy_01",
                 "Heavy Strike",
                 1.8f,
-                0.20f,
+                0.22f,
                 0.12f,
-                0.42f,
+                0.44f,
                 2.3f,
                 0.72f,
+                forwardMovement: 0.55f,
+                forwardMovementStartSeconds: 0.12f,
+                forwardMovementDurationSeconds: 0.22f,
+                forwardMovementCurve: CreateForwardMovementCurve(0.45f, 0.12f, 0.82f, 0.9f),
                 movementSpeedScale: 0.55f,
                 hitStopSeconds: 0.08f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
@@ -868,7 +888,7 @@ namespace CampusRPG.Editor
                 SwordArtContextTags.AfterBlock | SwordArtContextTags.AfterHeavy,
                 0.35f,
                 0.22f,
-                0f);
+                15f);
             ConfigureSwordArt(
                 fallingStar,
                 "SwordArt_FallingStar",
@@ -892,7 +912,7 @@ namespace CampusRPG.Editor
                 SwordArtContextTags.None,
                 0.28f,
                 0.16f,
-                0f);
+                12f);
 
             return new[] { sidewindCut, crossStep, risingCleave, ironGateBreak, fallingStar, moonSever };
         }
@@ -990,7 +1010,12 @@ namespace CampusRPG.Editor
                 2.25f,
                 0.8f,
                 forwardMovement: 0.55f,
+                forwardMovementStartSeconds: 0.08f,
+                forwardMovementDurationSeconds: 0.22f,
                 movementSpeedScale: 0.62f,
+                hitStopSeconds: 0.08f,
+                breaksGuard: true,
+                guardBreakHitStunSeconds: 0.16f,
                 hitboxActivationMode: AttackHitboxActivationMode.TimedWindow);
         }
 
@@ -1041,6 +1066,9 @@ namespace CampusRPG.Editor
             float range,
             float radius,
             float forwardMovement = 0.5f,
+            float forwardMovementStartSeconds = 0f,
+            float forwardMovementDurationSeconds = 0f,
+            AnimationCurve forwardMovementCurve = null,
             float movementSpeedScale = 1f,
             float hitStopSeconds = 0.05f,
             AttackHitboxActivationMode hitboxActivationMode = AttackHitboxActivationMode.TimedWindow,
@@ -1053,7 +1081,8 @@ namespace CampusRPG.Editor
             bool breaksGuard = false,
             float blockStunSeconds = 0f,
             float guardBreakHitStunSeconds = 0.12f,
-            EnemyTargetResponseType enemyTargetResponse = EnemyTargetResponseType.None)
+            EnemyTargetResponseType enemyTargetResponse = EnemyTargetResponseType.None,
+            float animationDurationSeconds = 0f)
         {
             AttackDefinitionSO asset = CreateOrLoadAsset<AttackDefinitionSO>(path);
             SerializedObject serializedObject = new SerializedObject(asset);
@@ -1064,11 +1093,16 @@ namespace CampusRPG.Editor
             serializedObject.FindProperty("startupSeconds").floatValue = startup;
             serializedObject.FindProperty("activeSeconds").floatValue = active;
             serializedObject.FindProperty("recoverySeconds").floatValue = recovery;
+            serializedObject.FindProperty("animationDurationSeconds").floatValue = animationDurationSeconds;
             serializedObject.FindProperty("hitStopSeconds").floatValue = hitStopSeconds;
             serializedObject.FindProperty("breaksGuard").boolValue = breaksGuard;
             serializedObject.FindProperty("blockStunSeconds").floatValue = blockStunSeconds;
             serializedObject.FindProperty("guardBreakHitStunSeconds").floatValue = guardBreakHitStunSeconds;
             serializedObject.FindProperty("forwardMovement").floatValue = forwardMovement;
+            serializedObject.FindProperty("forwardMovementStartSeconds").floatValue = forwardMovementStartSeconds;
+            serializedObject.FindProperty("forwardMovementDurationSeconds").floatValue = forwardMovementDurationSeconds;
+            serializedObject.FindProperty("forwardMovementCurve").animationCurveValue =
+                forwardMovementCurve ?? CreateForwardMovementCurve();
             serializedObject.FindProperty("movementSpeedScale").floatValue = movementSpeedScale;
             serializedObject.FindProperty("range").floatValue = range;
             serializedObject.FindProperty("radius").floatValue = radius;
@@ -1094,6 +1128,29 @@ namespace CampusRPG.Editor
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
             return asset;
+        }
+
+        private static AnimationCurve CreateForwardMovementCurve(
+            float firstTime = 0.35f,
+            float firstValue = 0.2f,
+            float secondTime = 0.75f,
+            float secondValue = 0.88f)
+        {
+            float firstSlope = ResolveCurveSlope(0f, 0f, firstTime, firstValue);
+            float middleSlope = ResolveCurveSlope(firstTime, firstValue, secondTime, secondValue);
+            float finalSlope = ResolveCurveSlope(secondTime, secondValue, 1f, 1f);
+
+            return new AnimationCurve(
+                new Keyframe(0f, 0f, firstSlope, firstSlope),
+                new Keyframe(firstTime, firstValue, firstSlope, middleSlope),
+                new Keyframe(secondTime, secondValue, middleSlope, finalSlope),
+                new Keyframe(1f, 1f, finalSlope, finalSlope));
+        }
+
+        private static float ResolveCurveSlope(float fromTime, float fromValue, float toTime, float toValue)
+        {
+            float duration = Mathf.Max(0.001f, toTime - fromTime);
+            return (toValue - fromValue) / duration;
         }
 
         private static RuntimeAnimatorController EnsurePlayerCombatAnimationAssets(bool allowImportedPlayerPreview, params AttackDefinitionSO[] attackDefinitions)
@@ -1209,6 +1266,11 @@ namespace CampusRPG.Editor
                     attackState.motion = attackClip;
 
                     AddReturnToLocomotionTransition(attackState, locomotionState);
+                    AddPlayerAttackVariantStates(
+                        stateMachine,
+                        locomotionState,
+                        attackDefinition,
+                        CreateOrUpdateAttackVariantClips(attackDefinition));
                 }
 
                 EditorUtility.SetDirty(stateMachine);
@@ -1259,16 +1321,11 @@ namespace CampusRPG.Editor
             Motion runBackwardLeftMotion,
             Motion runBackwardRightMotion)
         {
-            BlendTree blendTree = LoadBlendTreeAsset(PlayerLocomotionBlendTreeName);
-
-            if (blendTree == null)
+            BlendTree blendTree = new BlendTree
             {
-                blendTree = new BlendTree
-                {
-                    name = PlayerLocomotionBlendTreeName
-                };
-                AssetDatabase.AddObjectToAsset(blendTree, controller);
-            }
+                name = PlayerLocomotionBlendTreeName
+            };
+            AssetDatabase.AddObjectToAsset(blendTree, controller);
 
             blendTree.blendType = BlendTreeType.FreeformCartesian2D;
             blendTree.blendParameter = MoveXParameterName;
@@ -1291,23 +1348,6 @@ namespace CampusRPG.Editor
             };
             EditorUtility.SetDirty(blendTree);
             return blendTree;
-        }
-
-        private static BlendTree LoadBlendTreeAsset(string blendTreeName)
-        {
-            Object[] assets = AssetDatabase.LoadAllAssetsAtPath(PlayerAnimatorControllerPath);
-
-            for (int i = 0; i < assets.Length; i++)
-            {
-                BlendTree blendTree = assets[i] as BlendTree;
-
-                if (blendTree != null && string.Equals(blendTree.name, blendTreeName, global::System.StringComparison.Ordinal))
-                {
-                    return blendTree;
-                }
-            }
-
-            return null;
         }
 
         private static ChildMotion CreateCartesianBlendChild(Motion motion, float positionX, float positionY)
@@ -1443,35 +1483,43 @@ namespace CampusRPG.Editor
 
             for (int i = states.Length - 1; i >= 0; i--)
             {
+                DestroyStateMotionSubAssets(states[i].state);
                 stateMachine.RemoveState(states[i].state);
             }
         }
 
+        private static void DestroyStateMotionSubAssets(AnimatorState state)
+        {
+            if (state == null)
+            {
+                return;
+            }
+
+            DestroyMotionSubAsset(state.motion);
+            state.motion = null;
+        }
+
+        private static void DestroyMotionSubAsset(Motion motion)
+        {
+            if (motion is not BlendTree blendTree || !AssetDatabase.IsSubAsset(blendTree))
+            {
+                return;
+            }
+
+            ChildMotion[] children = blendTree.children;
+
+            for (int i = 0; i < children.Length; i++)
+            {
+                DestroyMotionSubAsset(children[i].motion);
+            }
+
+            Object.DestroyImmediate(blendTree, true);
+        }
+
         private static AnimationClip CreateOrUpdateAttackClip(AttackDefinitionSO attackDefinition)
         {
-            float duration = Mathf.Max(
-                0.12f,
-                attackDefinition.StartupSeconds + attackDefinition.ActiveSeconds + attackDefinition.RecoverySeconds);
-            float openTime = Mathf.Clamp(attackDefinition.StartupSeconds, 0f, Mathf.Max(0f, duration - 0.04f));
-            float minimumWindow = Mathf.Min(0.05f, Mathf.Max(0.01f, duration * 0.1f));
-            float closeTime = Mathf.Clamp(
-                attackDefinition.StartupSeconds + Mathf.Max(attackDefinition.ActiveSeconds, minimumWindow),
-                openTime + 0.01f,
-                Mathf.Max(openTime + 0.01f, duration - 0.001f));
-
-            AnimationEvent[] animationEvents =
-            {
-                new AnimationEvent
-                {
-                    functionName = "AnimationEvent_OpenAttackHitbox",
-                    time = openTime
-                },
-                new AnimationEvent
-                {
-                    functionName = "AnimationEvent_CloseAttackHitbox",
-                    time = closeTime
-                }
-            };
+            float duration = ResolveAttackGameplayDuration(attackDefinition);
+            AnimationEvent[] animationEvents = CreateAttackHitboxAnimationEvents(attackDefinition, duration);
 
             AnimationClip importedClip = TryLoadImportedPlayerClip(ResolveImportedAttackClipCandidatePaths(attackDefinition.AnimationStateName));
 
@@ -1492,13 +1540,165 @@ namespace CampusRPG.Editor
                 false,
                 animationEvents,
                 attackDefinition.AnimationStateName,
-                openTime,
-                closeTime);
+                ResolveAttackHitboxOpenTime(attackDefinition, duration),
+                ResolveAttackHitboxCloseTime(attackDefinition, duration));
+        }
+
+        private static AnimationClip[] CreateOrUpdateAttackVariantClips(AttackDefinitionSO attackDefinition)
+        {
+            if (!allowImportedPlayerAnimationPreviewBuild
+                || attackDefinition == null
+                || string.IsNullOrWhiteSpace(attackDefinition.AnimationStateName))
+            {
+                return System.Array.Empty<AnimationClip>();
+            }
+
+            AnimationClip[] importedClips = LoadImportedPlayerClips(
+                ResolveImportedAttackClipCandidatePaths(attackDefinition.AnimationStateName),
+                MaxPlayerAttackVariantStates);
+
+            if (importedClips.Length <= 1)
+            {
+                return System.Array.Empty<AnimationClip>();
+            }
+
+            float duration = ResolveAttackGameplayDuration(attackDefinition);
+            AnimationEvent[] animationEvents = CreateAttackHitboxAnimationEvents(attackDefinition, duration);
+            List<AnimationClip> variantClips = new List<AnimationClip>(importedClips.Length);
+
+            for (int i = 0; i < importedClips.Length; i++)
+            {
+                AnimationClip importedClip = importedClips[i];
+
+                if (importedClip == null)
+                {
+                    continue;
+                }
+
+                AnimationClip variantClip = CreateOrUpdateImportedClip(
+                    GetPlayerAttackVariantClipPath(attackDefinition.AnimationStateName, i + 1),
+                    importedClip,
+                    ResolveImportedAttackDuration(importedClip.length, duration),
+                    false,
+                    animationEvents);
+                ApplyImportedPreviewAttackTimingOverridesIfNeeded(attackDefinition, variantClip);
+
+                if (variantClip != null)
+                {
+                    variantClips.Add(variantClip);
+                }
+            }
+
+            return variantClips.ToArray();
+        }
+
+        private static void AddPlayerAttackVariantStates(
+            AnimatorStateMachine stateMachine,
+            AnimatorState locomotionState,
+            AttackDefinitionSO attackDefinition,
+            AnimationClip[] variantClips)
+        {
+            if (stateMachine == null
+                || locomotionState == null
+                || attackDefinition == null
+                || string.IsNullOrWhiteSpace(attackDefinition.AnimationStateName)
+                || variantClips == null
+                || variantClips.Length <= 1)
+            {
+                return;
+            }
+
+            int variantCount = Mathf.Min(variantClips.Length, MaxPlayerAttackVariantStates);
+
+            for (int i = 0; i < variantCount; i++)
+            {
+                if (variantClips[i] == null)
+                {
+                    continue;
+                }
+
+                AnimatorState variantState = stateMachine.AddState(
+                    PlayerCombatAnimationRelay.FormatAttackVariantStateName(attackDefinition.AnimationStateName, i + 1));
+                variantState.motion = variantClips[i];
+                AddReturnToLocomotionTransition(variantState, locomotionState);
+            }
+        }
+
+        private static float ResolveAttackGameplayDuration(AttackDefinitionSO attackDefinition)
+        {
+            return attackDefinition != null
+                ? Mathf.Max(0.12f, attackDefinition.StartupSeconds + attackDefinition.ActiveSeconds + attackDefinition.RecoverySeconds)
+                : 0.12f;
+        }
+
+        private static AnimationEvent[] CreateAttackHitboxAnimationEvents(AttackDefinitionSO attackDefinition, float duration)
+        {
+            if (attackDefinition == null)
+            {
+                return System.Array.Empty<AnimationEvent>();
+            }
+
+            return CreateAttackHitboxAnimationEvents(
+                attackDefinition.HitboxActivationMode,
+                ResolveAttackHitboxOpenTime(attackDefinition, duration),
+                ResolveAttackHitboxCloseTime(attackDefinition, duration));
+        }
+
+        private static float ResolveAttackHitboxOpenTime(AttackDefinitionSO attackDefinition, float duration)
+        {
+            return attackDefinition != null
+                ? Mathf.Clamp(attackDefinition.StartupSeconds, 0f, Mathf.Max(0f, duration - 0.04f))
+                : 0f;
+        }
+
+        private static float ResolveAttackHitboxCloseTime(AttackDefinitionSO attackDefinition, float duration)
+        {
+            if (attackDefinition == null)
+            {
+                return 0f;
+            }
+
+            float openTime = ResolveAttackHitboxOpenTime(attackDefinition, duration);
+            float minimumWindow = Mathf.Min(0.05f, Mathf.Max(0.01f, duration * 0.1f));
+            return Mathf.Clamp(
+                attackDefinition.StartupSeconds + Mathf.Max(attackDefinition.ActiveSeconds, minimumWindow),
+                openTime + 0.01f,
+                Mathf.Max(openTime + 0.01f, duration - 0.001f));
+        }
+
+        private static AnimationEvent[] CreateAttackHitboxAnimationEvents(
+            AttackHitboxActivationMode activationMode,
+            float openTime,
+            float closeTime)
+        {
+            if (activationMode != AttackHitboxActivationMode.AnimationEvent)
+            {
+                return System.Array.Empty<AnimationEvent>();
+            }
+
+            return new[]
+            {
+                new AnimationEvent
+                {
+                    functionName = "AnimationEvent_OpenAttackHitbox",
+                    time = openTime
+                },
+                new AnimationEvent
+                {
+                    functionName = "AnimationEvent_CloseAttackHitbox",
+                    time = closeTime
+                }
+            };
         }
 
         private static string GetPlayerAttackClipPath(string animationStateName)
         {
             return $"{PlayerAnimationRootFolder}/AN_Player_{animationStateName}_CombatTest.anim";
+        }
+
+        private static string GetPlayerAttackVariantClipPath(string animationStateName, int variantIndex)
+        {
+            return $"{PlayerAnimationRootFolder}/AN_Player_{PlayerCombatAnimationRelay.FormatAttackVariantStateName(animationStateName, variantIndex)}_CombatTest.anim";
         }
 
         private static AnimationClip CreateOrUpdatePlayerIdleClip()
@@ -1860,9 +2060,9 @@ namespace CampusRPG.Editor
                 case "Light_01":
                     return 0.58f;
                 case "Light_02":
-                    return 0.7f;
+                    return 0.78f;
                 case "Light_03":
-                    return 0.82f;
+                    return 0.98f;
                 case "Heavy_01":
                     return 1.02f;
                 case "DodgeFollowUp":
@@ -1901,6 +2101,11 @@ namespace CampusRPG.Editor
 
             for (int i = 0; i < candidatePaths.Length; i++)
             {
+                if (!CombatImportedPlayerVisualUtility.IsAnimationSourceAllowed(candidatePaths[i]))
+                {
+                    continue;
+                }
+
                 AnimationClip clip = LoadAnimationClipAsset(candidatePaths[i]);
 
                 if (clip != null)
@@ -1910,6 +2115,44 @@ namespace CampusRPG.Editor
             }
 
             return null;
+        }
+
+        private static AnimationClip[] LoadImportedPlayerClips(string[] candidatePaths, int maxCount)
+        {
+            if (!allowImportedPlayerAnimationPreviewBuild
+                || !CombatImportedPlayerVisualUtility.ShouldUseImportedPlayerSources
+                || !CombatImportedPlayerVisualUtility.HasPlayerVisualSource()
+                || candidatePaths == null)
+            {
+                return System.Array.Empty<AnimationClip>();
+            }
+
+            int limit = Mathf.Max(1, maxCount);
+            List<AnimationClip> clips = new List<AnimationClip>();
+
+            for (int i = 0; i < candidatePaths.Length; i++)
+            {
+                if (!CombatImportedPlayerVisualUtility.IsAnimationSourceAllowed(candidatePaths[i]))
+                {
+                    continue;
+                }
+
+                AnimationClip clip = LoadAnimationClipAsset(candidatePaths[i]);
+
+                if (clip == null || clips.Contains(clip))
+                {
+                    continue;
+                }
+
+                clips.Add(clip);
+
+                if (clips.Count >= limit)
+                {
+                    break;
+                }
+            }
+
+            return clips.ToArray();
         }
 
         private static AnimationClip LoadAnimationClipAsset(string assetPath)
@@ -1959,6 +2202,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/GhostSamurai_APose_Idle.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_Idle_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Idle.anim",
                 "Assets/DoubleL/One Hand Up/Movement/Idle/Idle/1Hand_Up_Stand_Idle_A_2.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@CombatIdle1H01.fbx",
@@ -1970,6 +2215,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Walk_F_Loop_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_Walk_Loop_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_F_InPlace.anim",
                 "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_InPlace.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Forward.fbx",
@@ -1981,6 +2228,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Walk_B_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeWalkB_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_B_InPlace.anim",
                 "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_B_InPlace.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Backward.fbx"
@@ -1991,6 +2240,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Walk_L_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeWalkL_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_L_InPlace.anim",
                 "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_L90_A_InPlace.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Left.fbx"
@@ -2001,6 +2252,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Walk_R_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeWalkR_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_R_InPlace.anim",
                 "Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_R90_A_InPlace.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Walk/HumanM@Walk01_Right.fbx"
@@ -2011,6 +2264,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Run_F_Loop_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_Run_Loop_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Run_F_InPlace.anim",
                 "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_InPlace.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Forward.fbx",
@@ -2022,6 +2277,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Run_B_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeRun_B_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Run_B_InPlace.anim",
                 "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_B_InPlace.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Backward.fbx"
@@ -2032,6 +2289,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Run_L_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeRun_L_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Run_L_InPlace.anim",
                 "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_L90_A_InPlace.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Left.fbx"
@@ -2042,6 +2301,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Run_R_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeRun_R_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Run_R_InPlace.anim",
                 "Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_R90_A_InPlace.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_Right.fbx"
@@ -2052,6 +2313,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Run_FL_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeRun_FL_Inplace.FBX",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_ForwardLeft.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_ForwardLeft.fbx"
             };
@@ -2061,6 +2324,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Run_FR_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeRun_FR_Inplace.FBX",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_ForwardRight.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_ForwardRight.fbx"
             };
@@ -2070,6 +2335,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Run_BL_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeRun_BL_Inplace.FBX",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_BackwardLeft.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_BackwardLeft.fbx"
             };
@@ -2079,6 +2346,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Strafe_Run_BR_Inplace.FBX",
+                GhostSamuraiCommonRoot + "/Inplace/GhostSamurai_Common_StrafeRun_BR_Inplace.FBX",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_BackwardRight.fbx",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Run/HumanM@Run01_BackwardRight.fbx"
             };
@@ -2088,6 +2357,7 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Jump_Loop_Inplace.FBX",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Fall01.fbx",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Other_Animations/Jump_Loop.anim",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B_InPlace.anim"
@@ -2098,6 +2368,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Defense/Inplace/GhostSamurai_DefenseR_Loop_Inplace.FBX",
+                GhostSamuraiAPoseRoot + "/Defense/Inplace/GhostSamurai_DefenseL_Loop_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Shield_Block_Idle.anim",
                 "Assets/DoubleL/One Hand Up/Sheild/Idle/1Hand_Up_Shield_Block_Idle_1.fbx",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Block_With_Hands"
@@ -2108,6 +2380,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Dodge/Inplace/GhostSamurai_APose_Dodge_F_Inplace.FBX",
+                GhostSamuraiAPoseRoot + "/Dodge/Inplace/GhostSamurai_APose_Avoid_F_Inplace.FBX",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Dodge_Sidestep",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B_InPlace.anim"
@@ -2118,6 +2392,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Dodge/Inplace/GhostSamurai_APose_Slide_F_Inplace.FBX",
+                GhostSamuraiAPoseRoot + "/Movement/Inplace/GhostSamurai_APose_Slide_Start_Inplace.FBX",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Dodge_Roll",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Roll_Forward",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx",
@@ -2129,6 +2405,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Dodge/Inplace/GhostSamurai_APose_Avoid_F_1_Inplace.FBX",
+                GhostSamuraiAPoseRoot + "/Dodge/Inplace/GhostSamurai_APose_Avoid_B_1_Inplace.FBX",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Dodge_Sidestep",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B_InPlace.anim"
@@ -2139,6 +2417,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Hit/Inplace/GhostSamurai_APose_Hit_F_Inplace.FBX",
+                GhostSamuraiAPoseRoot + "/Hit/Inplace/GhostSamurai_APose_Large_Hit_1_Inplace.FBX",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Hit_Reaction_Light",
                 "Assets/DoubleL/Demo/Anim/Hit_F_1_InPlace.anim",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@CombatDamage01.fbx"
@@ -2149,6 +2429,9 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Defense/Inplace/GhostSamurai_DefenseR_Broken_Inplace.FBX",
+                GhostSamuraiAPoseRoot + "/Defense/Inplace/GhostSamurai_DefenseL_Broken_Inplace.FBX",
+                GhostSamuraiAPoseRoot + "/Hit/Inplace/GhostSamurai_APose_Large_Hit_2_Inplace.FBX",
                 "Assets/DoubleL/Demo/Anim/OneHand_Up_Shield_Block_Hit_1_InPlace.anim",
                 "Assets/DoubleL/Demo/Anim/Hit_F_2_InPlace.anim",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Hit_Reaction_Heavy",
@@ -2161,6 +2444,8 @@ namespace CampusRPG.Editor
         {
             return new[]
             {
+                GhostSamuraiAPoseRoot + "/Die/Inplace/GhostSamurai_APose_Die01_Inplace.FBX",
+                GhostSamuraiAPoseRoot + "/Die/Inplace/GhostSamurai_APose_Die03_Inplace.FBX",
                 "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@Death01.fbx",
                 "Assets/ithappy/Creative_Characters_FREE/Animations/Animation_Mesh/Aminset_Basic.fbx#Death_Forward"
             };
@@ -2173,6 +2458,8 @@ namespace CampusRPG.Editor
                 case "Light_01":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack01_1_ALL_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack02_1_ALL_Inplace.FBX",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_1_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1_InPlace.anim",
@@ -2184,6 +2471,10 @@ namespace CampusRPG.Editor
                 case "Light_02":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack04_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack02_5_ALL_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack01_2_ALL_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack02_2_Inplace.FBX",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
@@ -2195,6 +2486,11 @@ namespace CampusRPG.Editor
                 case "Light_03":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_SPAttack02_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack06_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack01_3_ALL_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack03_3_ALL_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack03_3_Inplace.FBX",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_3_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim",
@@ -2208,6 +2504,8 @@ namespace CampusRPG.Editor
                 case "SwordArt_RisingCleave":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack03_4_ALL_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack06_Inplace.FBX",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_3_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim",
@@ -2220,6 +2518,8 @@ namespace CampusRPG.Editor
                 case "SwordArt_FallingStar":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_JumpAttack04_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Air_Attack03_Start_Inplace.FBX",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
@@ -2229,6 +2529,8 @@ namespace CampusRPG.Editor
                 case "SwordArt_CrossStep":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack02_4_ALL_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack02_4_Inplace.FBX",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
@@ -2239,6 +2541,8 @@ namespace CampusRPG.Editor
                 case "SwordArt_MoonSever":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_SPAttack03_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_SPAttack05_Inplace.FBX",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_R.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
@@ -2249,6 +2553,8 @@ namespace CampusRPG.Editor
                 case "SwordArt_SidewindCut":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Dodge/Inplace/GhostSamurai_APose_Dodge_Attack_F_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack02_1_ALL_Inplace.FBX",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_1_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1_InPlace.anim",
@@ -2260,6 +2566,8 @@ namespace CampusRPG.Editor
                 case "DodgeFollowUp_Enhanced":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Dodge/Inplace/GhostSamurai_APose_Dodge_Attack_B_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack02_2_ALL_Inplace.FBX",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_2_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_2_InPlace.anim",
@@ -2269,9 +2577,10 @@ namespace CampusRPG.Editor
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx"
                     };
                 case "Counter":
-                case "SwordArt_IronGateBreak":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Deflect/Inplace/GhostSamurai_LAttack_DeflectR_CounterExecution_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Defense/Inplace/GhostSamurai_DefenseR_Parry_Up_Execution_Inplace.FBX",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_1_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim",
@@ -2280,9 +2589,26 @@ namespace CampusRPG.Editor
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
                         "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx"
                     };
+                case "SwordArt_IronGateBreak":
+                    return new[]
+                    {
+                        GhostSamuraiAPoseRoot + "/Defense/Inplace/GhostSamurai_DefenseR_Parry_Up_Execution_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_SPAttack06_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_Attack03_4_ALL_Inplace.FBX",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_3_InPlace.fbx",
+                        "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim",
+                        "Assets/DoubleL/One Hand Up/Attack_B/InPlace/1Hand_Up_Attack_B_3_InPlace.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@Attack1H01_L.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/2H/HumanM@Attack2H01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx",
+                        "Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"
+                    };
                 case "Counter_Enhanced":
                     return new[]
                     {
+                        GhostSamuraiAPoseRoot + "/Deflect/Inplace/GhostSamurai_RAttack_DeflectL_CounterExecution_Inplace.FBX",
+                        GhostSamuraiAPoseRoot + "/Attack/Inplace/GhostSamurai_APose_SPAttack06_Inplace.FBX",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim",
                         "Assets/DoubleL/One Hand Up/Attack_A/InPlace/1Hand_Up_Attack_A_3_InPlace.fbx",
                         "Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_3_InPlace.anim",

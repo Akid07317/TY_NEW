@@ -1,0 +1,22 @@
+[Unit]
+Description=TY_NEW Dedicated Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tyserver
+Group=tyserver
+WorkingDirectory=/opt/ty-new-server
+ExecStart=/opt/ty-new-server/TYServer.x86_64 -batchmode -nographics --port 7777 --bind-address 0.0.0.0 --max-players 16 --room-id combat-test --network-port 7777 --network-bind-address 0.0.0.0 --network-player-prefab Multiplayer/PF_NetworkPlayerCombatTest --network-enemy-count 3 --enable-network-enemy-server-tick --network-enemy-server-tick-damage 10 --network-enemy-server-tick-death-delay-seconds 90 --health-port 7778 --health-bind-address 0.0.0.0 --target-fps 30 --tick-rate 30 --log-interval 10 -logFile /var/log/ty-new/server.log
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/ty-new-server /var/log/ty-new
+
+[Install]
+WantedBy=multi-user.target

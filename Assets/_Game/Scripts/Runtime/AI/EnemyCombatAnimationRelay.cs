@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CampusRPG.Combat;
 using UnityEngine;
 using UnityEngine.AI;
@@ -27,9 +28,21 @@ namespace CampusRPG.AI
 
         private Vector3 lastWorldPosition;
         private string currentAnimatorStateName = string.Empty;
+        private string currentAnimatorBaseStateName = string.Empty;
         private int lastObservedStateRevision = -1;
         private int combatPoseLayerIndex = -1;
         private Animator preparedAnimator;
+        private Transform importedVisualRoot;
+        private bool hasImportedVisualRootAnchor;
+        private Vector3 importedVisualRootAnchorLocalPosition;
+        private Quaternion importedVisualRootAnchorLocalRotation = Quaternion.identity;
+        private Vector3 importedVisualRootAnchorLocalScale = Vector3.one;
+        private Transform importedAnimatorTransform;
+        private bool hasImportedAnimatorTransformAnchor;
+        private Vector3 importedAnimatorAnchorLocalPosition;
+        private Quaternion importedAnimatorAnchorLocalRotation = Quaternion.identity;
+        private Vector3 importedAnimatorAnchorLocalScale = Vector3.one;
+        private readonly Dictionary<string, int> attackVariantCursorByStateName = new Dictionary<string, int>();
 
         private void Awake()
         {
@@ -44,8 +57,11 @@ namespace CampusRPG.AI
             EnsureReferences();
             lastWorldPosition = transform.position;
             currentAnimatorStateName = string.Empty;
+            currentAnimatorBaseStateName = string.Empty;
             lastObservedStateRevision = -1;
             combatPoseLayerIndex = -1;
+            ClearImportedPreviewAnchors();
+            attackVariantCursorByStateName.Clear();
         }
 
         private void Update()
@@ -70,16 +86,22 @@ namespace CampusRPG.AI
                 attackDefinition,
                 attackPhase,
                 attackProgress);
-            string animatorStateName = ResolvePlayableStateName(plan);
+            string animatorBaseStateName = ResolvePlayableBaseStateName(plan);
             int stateRevision = stateMachine != null ? stateMachine.StateRevision : -1;
             bool shouldRestartCurrentState = stateRevision != lastObservedStateRevision
-                && ShouldRestartClipOnStateReenter(animatorStateName);
+                && ShouldRestartClipOnStateReenter(animatorBaseStateName);
+            string animatorStateName = ResolveAnimatorStateNameForFrame(animatorBaseStateName, shouldRestartCurrentState);
 
             animator.SetFloat(GroundSpeedHash, plan.GroundSpeedNormalized, locomotionDampSeconds, Time.deltaTime);
             UpdateResponseReadParameters(plan, deltaTime);
-            UpdateCombatPoseLayer(animatorStateName, plan.GroundSpeedNormalized, deltaTime);
+            UpdateCombatPoseLayer(
+                animatorBaseStateName,
+                plan.GroundSpeedNormalized,
+                plan.ResponseReadNormalized,
+                deltaTime);
 
             if (!shouldRestartCurrentState
+                && string.Equals(currentAnimatorBaseStateName, animatorBaseStateName, System.StringComparison.Ordinal)
                 && string.Equals(currentAnimatorStateName, animatorStateName, System.StringComparison.Ordinal))
             {
                 lastObservedStateRevision = stateRevision;
@@ -87,11 +109,17 @@ namespace CampusRPG.AI
             }
 
             lastObservedStateRevision = stateRevision;
+            currentAnimatorBaseStateName = animatorBaseStateName;
             currentAnimatorStateName = animatorStateName;
             float transitionSeconds = shouldRestartCurrentState
                 ? Mathf.Min(Mathf.Max(0f, crossFadeSeconds), 0.04f)
                 : Mathf.Max(0f, crossFadeSeconds);
             animator.CrossFadeInFixedTime(currentAnimatorStateName, transitionSeconds, baseLayerIndex, 0f, 0f);
+        }
+
+        private void LateUpdate()
+        {
+            StabilizeImportedPreviewTransforms();
         }
 
         private bool EnsureReferences()
@@ -113,8 +141,11 @@ namespace CampusRPG.AI
             {
                 animator = importedAnimator;
                 currentAnimatorStateName = string.Empty;
+                currentAnimatorBaseStateName = string.Empty;
                 combatPoseLayerIndex = -1;
             }
+
+            PrepareImportedPreviewAnchors(importedAnimator);
 
             if (animator == null)
             {
@@ -132,10 +163,80 @@ namespace CampusRPG.AI
 
         private Animator FindImportedPreviewAnimator()
         {
-            Transform importedVisualRoot = transform.Find(ImportedVisualRootName);
-            return importedVisualRoot != null
-                ? importedVisualRoot.GetComponentInChildren<Animator>(true)
+            Transform visualRoot = transform.Find(ImportedVisualRootName);
+            return visualRoot != null
+                ? visualRoot.GetComponentInChildren<Animator>(true)
                 : null;
+        }
+
+        private void PrepareImportedPreviewAnchors(Animator importedAnimator)
+        {
+            Transform visualRoot = transform.Find(ImportedVisualRootName);
+
+            if (visualRoot != importedVisualRoot)
+            {
+                importedVisualRoot = visualRoot;
+                hasImportedVisualRootAnchor = false;
+            }
+
+            if (importedVisualRoot != null && !hasImportedVisualRootAnchor)
+            {
+                importedVisualRootAnchorLocalPosition = importedVisualRoot.localPosition;
+                importedVisualRootAnchorLocalRotation = importedVisualRoot.localRotation;
+                importedVisualRootAnchorLocalScale = importedVisualRoot.localScale;
+                hasImportedVisualRootAnchor = true;
+            }
+
+            Transform animatorTransform = importedAnimator != null
+                                           && importedVisualRoot != null
+                                           && importedAnimator.transform != importedVisualRoot
+                                           && importedAnimator.transform.IsChildOf(importedVisualRoot)
+                ? importedAnimator.transform
+                : null;
+
+            if (animatorTransform != importedAnimatorTransform)
+            {
+                importedAnimatorTransform = animatorTransform;
+                hasImportedAnimatorTransformAnchor = false;
+            }
+
+            if (importedAnimatorTransform != null && !hasImportedAnimatorTransformAnchor)
+            {
+                importedAnimatorAnchorLocalPosition = importedAnimatorTransform.localPosition;
+                importedAnimatorAnchorLocalRotation = importedAnimatorTransform.localRotation;
+                importedAnimatorAnchorLocalScale = importedAnimatorTransform.localScale;
+                hasImportedAnimatorTransformAnchor = true;
+            }
+        }
+
+        private void StabilizeImportedPreviewTransforms()
+        {
+            if (importedVisualRoot == null)
+            {
+                PrepareImportedPreviewAnchors(FindImportedPreviewAnimator());
+            }
+
+            if (importedVisualRoot != null && hasImportedVisualRootAnchor)
+            {
+                importedVisualRoot.localPosition = importedVisualRootAnchorLocalPosition;
+                importedVisualRoot.localRotation = importedVisualRootAnchorLocalRotation;
+                importedVisualRoot.localScale = importedVisualRootAnchorLocalScale;
+            }
+
+            if (importedAnimatorTransform != null && hasImportedAnimatorTransformAnchor)
+            {
+                importedAnimatorTransform.localPosition = importedAnimatorAnchorLocalPosition;
+                importedAnimatorTransform.localRotation = importedAnimatorAnchorLocalRotation;
+                importedAnimatorTransform.localScale = importedAnimatorAnchorLocalScale;
+            }
+        }
+
+        private void ClearImportedPreviewAnchors()
+        {
+            importedVisualRoot = null;
+            hasImportedVisualRootAnchor = false;
+            importedAnimatorTransform = null;
+            hasImportedAnimatorTransformAnchor = false;
         }
 
         private static bool CanSampleHumanoid(Animator candidate)
@@ -164,6 +265,7 @@ namespace CampusRPG.AI
 
             preparedAnimator = animator;
             currentAnimatorStateName = string.Empty;
+            currentAnimatorBaseStateName = string.Empty;
             combatPoseLayerIndex = -1;
 
             if (animator.isActiveAndEnabled)
@@ -190,7 +292,7 @@ namespace CampusRPG.AI
             attackProgress = 0f;
         }
 
-        private string ResolvePlayableStateName(EnemyCombatAnimationPlan plan)
+        private string ResolvePlayableBaseStateName(EnemyCombatAnimationPlan plan)
         {
             if (HasAnimatorState(plan.StateName))
             {
@@ -204,6 +306,73 @@ namespace CampusRPG.AI
             }
 
             return plan.StateName;
+        }
+
+        private string ResolveAnimatorStateNameForFrame(string baseStateName, bool shouldRestartCurrentState)
+        {
+            if (string.IsNullOrEmpty(baseStateName))
+            {
+                return baseStateName;
+            }
+
+            if (!shouldRestartCurrentState
+                && string.Equals(currentAnimatorBaseStateName, baseStateName, System.StringComparison.Ordinal)
+                && !string.IsNullOrEmpty(currentAnimatorStateName))
+            {
+                return currentAnimatorStateName;
+            }
+
+            return ResolveNextAttackVariantStateName(baseStateName);
+        }
+
+        private string ResolveNextAttackVariantStateName(string baseStateName)
+        {
+            if (!IsAttackStateName(baseStateName))
+            {
+                return baseStateName;
+            }
+
+            int variantCount = CountContiguousAttackVariantStates(baseStateName);
+
+            if (variantCount <= 0)
+            {
+                return baseStateName;
+            }
+
+            attackVariantCursorByStateName.TryGetValue(baseStateName, out int cursor);
+            int variantIndex = (cursor % variantCount) + 1;
+            attackVariantCursorByStateName[baseStateName] = (cursor + 1) % variantCount;
+            string variantStateName = FormatAttackVariantStateName(baseStateName, variantIndex);
+            return HasAnimatorState(variantStateName) ? variantStateName : baseStateName;
+        }
+
+        public static string FormatAttackVariantStateName(string baseStateName, int variantIndex)
+        {
+            int clampedIndex = Mathf.Max(1, variantIndex);
+            return clampedIndex < 10
+                ? baseStateName + "_0" + clampedIndex
+                : baseStateName + "_" + clampedIndex;
+        }
+
+        private int CountContiguousAttackVariantStates(string baseStateName)
+        {
+            const int MaxVariantProbeCount = 96;
+
+            for (int i = 1; i <= MaxVariantProbeCount; i++)
+            {
+                if (!HasAnimatorState(FormatAttackVariantStateName(baseStateName, i)))
+                {
+                    return i - 1;
+                }
+            }
+
+            return MaxVariantProbeCount;
+        }
+
+        private static bool IsAttackStateName(string stateName)
+        {
+            return !string.IsNullOrEmpty(stateName)
+                && stateName.StartsWith("Attack_", System.StringComparison.Ordinal);
         }
 
         private bool HasAnimatorState(string stateName)
@@ -276,7 +445,11 @@ namespace CampusRPG.AI
             return false;
         }
 
-        private void UpdateCombatPoseLayer(string stateName, float groundSpeedNormalized, float deltaTime)
+        private void UpdateCombatPoseLayer(
+            string stateName,
+            float groundSpeedNormalized,
+            float responseReadNormalized,
+            float deltaTime)
         {
             if (animator == null)
             {
@@ -293,15 +466,26 @@ namespace CampusRPG.AI
                 return;
             }
 
-            float targetWeight = ResolveCombatPoseLayerTargetWeight(stateName, groundSpeedNormalized);
+            float targetWeight = ResolveCombatPoseLayerTargetWeight(
+                stateName,
+                groundSpeedNormalized,
+                responseReadNormalized);
             float blendDuration = Mathf.Max(0.01f, crossFadeSeconds);
             float currentWeight = animator.GetLayerWeight(combatPoseLayerIndex);
             float nextWeight = Mathf.MoveTowards(currentWeight, targetWeight, deltaTime / blendDuration);
             animator.SetLayerWeight(combatPoseLayerIndex, nextWeight);
         }
 
-        public static float ResolveCombatPoseLayerTargetWeight(string stateName, float groundSpeedNormalized)
+        public static float ResolveCombatPoseLayerTargetWeight(
+            string stateName,
+            float groundSpeedNormalized,
+            float responseReadNormalized)
         {
+            if (Mathf.Clamp01(responseReadNormalized) > 0.001f)
+            {
+                return Mathf.Lerp(0.35f, 0.95f, Mathf.Clamp01(responseReadNormalized));
+            }
+
             if (!string.Equals(stateName, EnemyCombatAnimationPlanUtility.LocomotionStateName, System.StringComparison.Ordinal))
             {
                 return 0f;

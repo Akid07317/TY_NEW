@@ -30,6 +30,7 @@ namespace CampusRPG.Tests.EditMode
             "Assets/ithappy/",
             "Assets/JC_LP_MedievalCharacters_LITE/",
             "Assets/Free medieval weapons/",
+            "Assets/GhostSamurai_Animset/",
             "Assets/MYFG-Weapon Pack Lite/",
             "Assets/Polytope Studio/"
         };
@@ -62,8 +63,10 @@ namespace CampusRPG.Tests.EditMode
             Assert.AreEqual(Chapter01Ids.Encounters.Gatekeeper, GetPrivateField<string>(ritualCoreDoor, "requiredEncounterId"));
             Assert.AreEqual(string.Empty, GetPrivateField<string>(ritualCoreDoor, "requiredKeyItemId"));
             Assert.AreEqual(Chapter01Ids.KeyItems.GateSigil, GetPrivateField<string>(gateSigilPickup, "keyItemId"));
+            Assert.AreEqual(Chapter01Ids.Encounters.Interior, GetPrivateField<string>(gateSigilPickup, "requiredEncounterId"));
             Assert.IsFalse(GetPrivateField<bool>(gateSigilPickup, "completeChapterOnPickup"));
             Assert.AreEqual(Chapter01Ids.KeyItems.RitualCore, GetPrivateField<string>(ritualCorePickup, "keyItemId"));
+            Assert.AreEqual(Chapter01Ids.Encounters.Gatekeeper, GetPrivateField<string>(ritualCorePickup, "requiredEncounterId"));
             Assert.IsTrue(GetPrivateField<bool>(ritualCorePickup, "completeChapterOnPickup"));
             Assert.AreEqual(Chapter01Ids.Encounters.Gatekeeper, GetPrivateField<string>(ritualCoreBeacon, "requiredEncounterId"));
         }

@@ -2,6 +2,8 @@ using CampusRPG.Editor;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace CampusRPG.Tests.EditMode
@@ -97,6 +99,94 @@ namespace CampusRPG.Tests.EditMode
             {
                 Object.DestroyImmediate(actor);
                 AssetDatabase.DeleteAsset(PlayerLocalPreviewMaterialFolderPath);
+                AssetDatabase.Refresh();
+            }
+        }
+
+        [Test]
+        public void TryApply_UserOwnedGhostSamurai_UsesDeterministicBuiltinPalette()
+        {
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(CombatImportedPlayerVisualUtility.GhostSamuraiPlayerModelPath) == null
+                || AssetDatabase.LoadAssetAtPath<GameObject>(CombatImportedPlayerVisualUtility.GhostSamuraiPlayerWeaponPath) == null)
+            {
+                Assert.Ignore("GhostSamurai user-owned art sources are not available in this workspace.");
+            }
+
+            ImportedPlayerSourceProfile previousProfile = CombatImportedPlayerVisualUtility.SourceProfile;
+            bool paletteFolderExisted = AssetDatabase.IsValidFolder(
+                CombatImportedPlayerVisualUtility.UserOwnedGhostSamuraiPaletteFolder);
+            GameObject actor = new GameObject("UserOwnedGhostSamuraiPreviewRoot");
+            Animator animator = actor.AddComponent<Animator>();
+
+            try
+            {
+                CombatImportedPlayerVisualUtility.SourceProfile = ImportedPlayerSourceProfile.UserOwnedGhostSamurai;
+
+                Assert.IsTrue(CombatImportedPlayerVisualUtility.TryApply(actor, animator));
+
+                Transform importedRoot = actor.transform.Find("ImportedVisualRoot");
+                Assert.IsNotNull(importedRoot);
+                Assert.IsNotNull(animator.avatar);
+                Assert.IsTrue(animator.avatar.isValid);
+                Assert.IsTrue(animator.avatar.isHuman);
+
+                Transform weaponRoot = FindDeepChild(actor.transform, "ImportedWeaponVisualRoot");
+                Assert.IsNotNull(weaponRoot);
+                Assert.IsNotNull(weaponRoot.parent);
+                Assert.AreEqual(
+                    CombatImportedPlayerVisualUtility.GhostSamuraiRightHandWeaponAnchorName,
+                    weaponRoot.parent.name,
+                    "The GhostSamurai katana must use the source-authored right-hand weapon socket, not the generic Humanoid hand transform.");
+                Assert.IsTrue(
+                    CombatImportedPlayerVisualUtility.HasUserOwnedGhostSamuraiWeaponGripContract(actor),
+                    "The source-authored Weapon_r socket expects both attachment transforms to stay at identity.");
+
+                Renderer[] renderers = importedRoot.GetComponentsInChildren<Renderer>(true);
+                Assert.That(renderers, Is.Not.Empty);
+
+                HashSet<string> materialPaths = new HashSet<string>();
+                List<Color> colors = new List<Color>();
+
+                for (int rendererIndex = 0; rendererIndex < renderers.Length; rendererIndex++)
+                {
+                    Material[] materials = renderers[rendererIndex].sharedMaterials;
+                    Assert.That(materials, Is.Not.Empty, renderers[rendererIndex].name);
+
+                    for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                    {
+                        Material material = materials[materialIndex];
+                        Assert.IsNotNull(material, $"{renderers[rendererIndex].name} slot {materialIndex}");
+                        Assert.IsTrue(
+                            CombatImportedPlayerVisualUtility.IsUserOwnedGhostSamuraiPaletteMaterial(material),
+                            $"{renderers[rendererIndex].name} slot {materialIndex}: {AssetDatabase.GetAssetPath(material)}");
+                        Assert.IsNotNull(material.shader);
+                        Assert.IsTrue(material.shader.isSupported, material.shader.name);
+                        Assert.AreEqual("Standard", material.shader.name);
+                        Assert.IsNull(material.mainTexture, "The GhostSamurai source package contains no character textures; the internal palette must not fabricate a texture dependency.");
+
+                        materialPaths.Add(AssetDatabase.GetAssetPath(material));
+                        colors.Add(material.color);
+                    }
+                }
+
+                Assert.AreEqual(
+                    CombatImportedPlayerVisualUtility.UserOwnedGhostSamuraiExpectedPaletteMaterialCount,
+                    materialPaths.Count);
+                Assert.GreaterOrEqual(
+                    colors.Distinct().Count(),
+                    6,
+                    "The user-owned palette should visibly separate armor, cloth, eye accent, grip, guard, and blade roles.");
+            }
+            finally
+            {
+                CombatImportedPlayerVisualUtility.SourceProfile = previousProfile;
+                Object.DestroyImmediate(actor);
+
+                if (!paletteFolderExisted)
+                {
+                    AssetDatabase.DeleteAsset(CombatImportedPlayerVisualUtility.UserOwnedGhostSamuraiPaletteFolder);
+                }
+
                 AssetDatabase.Refresh();
             }
         }

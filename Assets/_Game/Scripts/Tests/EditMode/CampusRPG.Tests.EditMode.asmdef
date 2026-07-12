@@ -5,7 +5,10 @@
     "CampusRPG.Runtime",
     "CampusRPG.Runtime.Core",
     "CampusRPG.Runtime.Input",
+    "CampusRPG.Runtime.Multiplayer",
+    "CampusRPG.Runtime.Server",
     "CampusRPG.Editor",
+    "Unity.Netcode.Runtime",
     "Unity.InputSystem"
   ],
   "includePlatforms": [

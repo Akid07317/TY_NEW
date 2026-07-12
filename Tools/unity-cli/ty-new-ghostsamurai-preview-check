@@ -1,0 +1,75 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-ghostsamurai-preview-check [--startup-timeout <seconds>] [--results-dir <path>] [--keep-temp-clone]
+
+Runs the narrow local-preview GhostSamurai verification lane in a temporary clone.
+This first validates the generated GhostSamurai catalog/manifest mapping, then validates
+imported player/enemy preview selection and core SwordArt runtime contracts without
+requiring the current worktree to be restored to the public-safe proxy baseline.
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+RESULTS_DIR="/tmp"
+STARTUP_TIMEOUT=90
+KEEP_TEMP_CLONE=0
+ASSEMBLY_NAME="CampusRPG.Tests.EditMode"
+FILTER='GhostSamuraiCatalogManifestTests|CombatImportedPlayerAnimationSelectionTests|CombatImportedPlayerVisualUtilityTests|CombatImportedEnemyAvatarPreviewTests|PlayerCombatAnimationRelayTests|PlayerCombatControllerTests|PlayerCombatRuntimeUtilityTests|SwordArtResolverTests|CombatTestIronGateBreakContractTests|CombatTestMoonSeverContractTests|CombatTestAirHeavySwordArtContractTests|CombatTestFlankSwordArtContractTests|CombatTestPlayerLungeCaptureDriverTests|GhostSamuraiCombatEnemyReadCaptureDriverTests|GhostSamuraiBossReadCaptureDriverTests'
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --startup-timeout)
+      [ $# -ge 2 ] || usage
+      STARTUP_TIMEOUT=$2
+      shift 2
+      ;;
+    --results-dir)
+      [ $# -ge 2 ] || usage
+      RESULTS_DIR=$2
+      shift 2
+      ;;
+    --keep-temp-clone)
+      KEEP_TEMP_CLONE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+mkdir -p "$RESULTS_DIR"
+STAMP=$(date +%Y%m%d_%H%M%S)
+RESULTS_FILE="$RESULTS_DIR/TY_NEW_ghostsamurai_preview_${STAMP}.xml"
+TEST_LOG="$RESULTS_DIR/TY_NEW_ghostsamurai_preview_${STAMP}.log"
+
+python3 "$PROJECT_ROOT/Tools/ghostsamurai/generate_catalog.py" --check
+
+KEEP_ARGS=""
+if [ "$KEEP_TEMP_CLONE" -eq 1 ]; then
+  KEEP_ARGS="--keep-temp-clone"
+fi
+
+"$PROJECT_ROOT/Tools/unity-cli/unity-run-tests" EditMode \
+  --use-temp-clone \
+  --startup-timeout "$STARTUP_TIMEOUT" \
+  --assembly-names "$ASSEMBLY_NAME" \
+  --group-filter "$FILTER" \
+  --results "$RESULTS_FILE" \
+  --log "$TEST_LOG" \
+  $KEEP_ARGS
+
+cat <<EOF
+GhostSamurai local-preview verification completed.
+- project: $PROJECT_ROOT
+- test results: $RESULTS_FILE
+- test log: $TEST_LOG
+EOF

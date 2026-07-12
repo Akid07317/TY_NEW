@@ -12,6 +12,7 @@ namespace CampusRPG.Editor
             CombatImportedPlayerVisualUtility.UseImportedPlayerSourcesForLocalPreview = true;
             CombatTestAssetGenerator.RebuildPlayerCombatAnimationAssetsForLocalPreviewMenu();
             CombatTestSceneBuilder.ApplyImportedVisualsToCombatTestPlayerPrefab();
+            CombatTestSceneBuilder.RefreshCombatTestScenePrefabInstancesFromSources();
             CombatTestSceneBuilder.RepairCombatTestSceneLighting();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -25,6 +26,7 @@ namespace CampusRPG.Editor
             CombatTestAssetGenerator.RebuildPlayerCombatAnimationAssetsForLocalPreviewMenu();
             CombatTestSceneBuilder.ApplyImportedVisualsToCombatTestPlayerPrefab();
             CombatTestSceneBuilder.ApplyImportedEnemyAvatarChainToCombatTestEnemyPrefabs();
+            CombatTestSceneBuilder.RefreshCombatTestScenePrefabInstancesFromSources();
             CombatTestSceneBuilder.RepairCombatTestSceneLighting();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();

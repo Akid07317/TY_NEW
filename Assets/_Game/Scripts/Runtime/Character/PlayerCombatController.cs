@@ -25,6 +25,7 @@ namespace CampusRPG.Character
         [SerializeField] private float comboResetSeconds = 0.8f;
 
         private GaugeComponent gauges;
+        private ManaComponent mana;
         private int nextLightAttackIndex;
         private float comboResetTimer;
         private float counterWindowTimer;
@@ -101,6 +102,7 @@ namespace CampusRPG.Character
         private void Awake()
         {
             gauges = GetComponent<GaugeComponent>();
+            mana = GetComponent<ManaComponent>();
 
             if (attackExecutor == null)
             {
@@ -206,6 +208,17 @@ namespace CampusRPG.Character
             return TryResolveBufferedSwordArt(consumeOnSuccess: true, out swordArt, out attackDefinition);
         }
 
+        public bool CanAffordSwordArt(SwordArtDefinitionSO swordArt)
+        {
+            float resourceCost = GetSwordArtResourceCost(swordArt);
+            return resourceCost <= 0f || mana == null || mana.CurrentValue >= resourceCost;
+        }
+
+        public float GetSwordArtResourceCost(SwordArtDefinitionSO swordArt)
+        {
+            return swordArt != null ? swordArt.ResourceCost : 0f;
+        }
+
         public void NotifyAttackFinished(PlayerAttackRequest request)
         {
             RecordRecentSwordArt();
@@ -290,11 +303,23 @@ namespace CampusRPG.Character
 
         public bool ActivatePreparedHitboxFromAnimationEvent()
         {
+            if (currentAttackDefinition == null
+                || currentAttackDefinition.HitboxActivationMode != AttackHitboxActivationMode.AnimationEvent)
+            {
+                return false;
+            }
+
             return hitboxController != null && hitboxController.Activate();
         }
 
         public void ClearPreparedHitboxFromAnimationEvent()
         {
+            if (currentAttackDefinition == null
+                || currentAttackDefinition.HitboxActivationMode != AttackHitboxActivationMode.AnimationEvent)
+            {
+                return;
+            }
+
             hitboxController?.Clear();
         }
 
@@ -361,7 +386,31 @@ namespace CampusRPG.Character
             }
 
             attackDefinition = swordArt.AttackDefinition;
-            return attackDefinition != null;
+
+            if (attackDefinition == null)
+            {
+                return false;
+            }
+
+            if (!consumeOnSuccess)
+            {
+                return true;
+            }
+
+            float resourceCost = GetSwordArtResourceCost(swordArt);
+
+            if (resourceCost <= 0f || mana == null)
+            {
+                return true;
+            }
+
+            if (mana.TrySpend(resourceCost))
+            {
+                return true;
+            }
+
+            attackDefinition = null;
+            return false;
         }
 
         private void TickSwordArtPreview(float deltaTime)

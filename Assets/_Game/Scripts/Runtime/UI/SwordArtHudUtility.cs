@@ -67,6 +67,7 @@ namespace CampusRPG.UI
             {
                 return BuildPlan(
                     SwordArtHudMode.Current,
+                    combatController,
                     combatController.CurrentSwordArt,
                     combatController.CurrentSwordArtAttack,
                     "EXECUTING",
@@ -82,6 +83,7 @@ namespace CampusRPG.UI
                 string status = isCancelOpen ? "CHAIN OPEN" : $"CHAIN {secondsUntilCancelOpen:0.00}s";
                 return BuildPlan(
                     SwordArtHudMode.CancelWindow,
+                    combatController,
                     bufferedSwordArt,
                     bufferedAttack,
                     status,
@@ -92,6 +94,7 @@ namespace CampusRPG.UI
             {
                 return BuildPlan(
                     SwordArtHudMode.Preview,
+                    combatController,
                     combatController.PreviewSwordArt,
                     combatController.PreviewSwordArtAttack,
                     "READY",
@@ -102,6 +105,7 @@ namespace CampusRPG.UI
             {
                 return BuildPlan(
                     SwordArtHudMode.Recent,
+                    combatController,
                     combatController.RecentSwordArt,
                     combatController.RecentSwordArtAttack,
                     "RECENT",
@@ -113,6 +117,7 @@ namespace CampusRPG.UI
 
         private static SwordArtHudPlan BuildPlan(
             SwordArtHudMode mode,
+            PlayerCombatController combatController,
             SwordArtDefinitionSO swordArt,
             AttackDefinitionSO attackDefinition,
             string status,
@@ -128,7 +133,7 @@ namespace CampusRPG.UI
             return new SwordArtHudPlan(
                 mode,
                 title,
-                status,
+                ResolveStatus(mode, status, combatController, swordArt),
                 ResolveRoleLine(title),
                 ResolveInputHint(title),
                 progress01);
@@ -156,6 +161,31 @@ namespace CampusRPG.UI
             }
 
             return attackDefinition != null ? attackDefinition.DisplayName : string.Empty;
+        }
+
+        private static string ResolveStatus(
+            SwordArtHudMode mode,
+            string baseStatus,
+            PlayerCombatController combatController,
+            SwordArtDefinitionSO swordArt)
+        {
+            float resourceCost = combatController != null
+                ? combatController.GetSwordArtResourceCost(swordArt)
+                : 0f;
+
+            if (resourceCost <= 0f)
+            {
+                return baseStatus;
+            }
+
+            if ((mode == SwordArtHudMode.Preview || mode == SwordArtHudMode.CancelWindow)
+                && combatController != null
+                && !combatController.CanAffordSwordArt(swordArt))
+            {
+                return $"NEED {resourceCost:0} MP";
+            }
+
+            return $"{baseStatus} {resourceCost:0} MP";
         }
 
         private static string ResolveRoleLine(string displayName)

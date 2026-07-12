@@ -21,7 +21,8 @@ namespace CampusRPG.Tests.EditMode
             "Assets/Kevin Iglesias/",
             "Assets/DoubleL/",
             "Assets/ithappy/",
-            "Assets/JC_LP_MedievalCharacters_LITE/"
+            "Assets/JC_LP_MedievalCharacters_LITE/",
+            "Assets/GhostSamurai_Animset/"
         };
         private static readonly string[] EnemyPrefabPaths =
         {
@@ -116,6 +117,23 @@ namespace CampusRPG.Tests.EditMode
             "Assets/_Game/Animations/Characters/CombatTest/AN_Player_SwordArt_IronGateBreak_CombatTest.anim",
             "Assets/_Game/Animations/Characters/CombatTest/AN_Player_SwordArt_FallingStar_CombatTest.anim",
             "Assets/_Game/Animations/Characters/CombatTest/AN_Player_SwordArt_MoonSever_CombatTest.anim"
+        };
+        private static readonly string[] PlayerTimedWindowAttackAssetPaths =
+        {
+            LightAttackAssetPath,
+            Light02AttackAssetPath,
+            Light03AttackAssetPath,
+            HeavyAttackAssetPath,
+            DodgeFollowUpAttackAssetPath,
+            CounterAttackAssetPath,
+            EnhancedCounterAttackAssetPath,
+            EnhancedDodgeFollowUpAttackAssetPath,
+            SidewindCutAttackAssetPath,
+            CrossStepAttackAssetPath,
+            RisingCleaveAttackAssetPath,
+            IronGateBreakAttackAssetPath,
+            FallingStarAttackAssetPath,
+            MoonSeverAttackAssetPath
         };
 
         [Test]
@@ -248,20 +266,20 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
-        public void PlayerAttackClips_HaveHitboxAnimationEvents()
+        public void PlayerTimedWindowAttackClips_DoNotExposeHitboxAnimationEvents()
         {
+            Assert.AreEqual(PlayerTimedWindowAttackAssetPaths.Length, AttackClipPaths.Length);
+
             for (int i = 0; i < AttackClipPaths.Length; i++)
             {
+                AttackDefinitionSO attack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(PlayerTimedWindowAttackAssetPaths[i]);
                 AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(AttackClipPaths[i]);
 
+                Assert.IsNotNull(attack, PlayerTimedWindowAttackAssetPaths[i]);
+                Assert.AreEqual(AttackHitboxActivationMode.TimedWindow, attack.HitboxActivationMode, PlayerTimedWindowAttackAssetPaths[i]);
                 Assert.IsNotNull(clip, AttackClipPaths[i]);
                 Assert.Greater(clip.length, 0f, AttackClipPaths[i]);
-
-                AnimationEvent[] events = AnimationUtility.GetAnimationEvents(clip);
-
-                Assert.That(events, Has.Length.GreaterThanOrEqualTo(2), AttackClipPaths[i]);
-                Assert.That(events, Has.Some.Matches<AnimationEvent>(animationEvent => animationEvent.functionName == "AnimationEvent_OpenAttackHitbox"), AttackClipPaths[i]);
-                Assert.That(events, Has.Some.Matches<AnimationEvent>(animationEvent => animationEvent.functionName == "AnimationEvent_CloseAttackHitbox"), AttackClipPaths[i]);
+                AssertNoHitboxAnimationEvents(clip, AttackClipPaths[i]);
             }
         }
 
@@ -416,6 +434,15 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
+        public void PlayerBasicAttackAssets_UseDistributedForwardMovement()
+        {
+            AssertDistributedForwardMovement(LightAttackAssetPath, 0.30f, 0.04f, 0.13f);
+            AssertDistributedForwardMovement(Light02AttackAssetPath, 0.34f, 0.05f, 0.13f);
+            AssertDistributedForwardMovement(Light03AttackAssetPath, 0.45f, 0.07f, 0.17f);
+            AssertDistributedForwardMovement(HeavyAttackAssetPath, 0.55f, 0.12f, 0.22f);
+        }
+
+        [Test]
         public void PlayerAttackAssets_UseReadableHitStopTiers()
         {
             AttackDefinitionSO lightAttack = AssertAttackHitStop(LightAttackAssetPath, 0.05f);
@@ -496,12 +523,43 @@ namespace CampusRPG.Tests.EditMode
             return ImportedSourceRoots.Any(root => path.StartsWith(root));
         }
 
+        private static void AssertNoHitboxAnimationEvents(AnimationClip clip, string context)
+        {
+            AnimationEvent[] events = AnimationUtility.GetAnimationEvents(clip);
+
+            Assert.That(
+                events,
+                Has.None.Matches<AnimationEvent>(animationEvent => IsHitboxAnimationEvent(animationEvent)),
+                context);
+        }
+
+        private static bool IsHitboxAnimationEvent(AnimationEvent animationEvent)
+        {
+            return string.Equals(animationEvent.functionName, "AnimationEvent_OpenAttackHitbox", System.StringComparison.Ordinal)
+                || string.Equals(animationEvent.functionName, "AnimationEvent_CloseAttackHitbox", System.StringComparison.Ordinal);
+        }
+
         private static void AssertAttackMovementScale(string assetPath, float expected)
         {
             AttackDefinitionSO attack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(assetPath);
 
             Assert.IsNotNull(attack, assetPath);
             Assert.AreEqual(expected, attack.MovementSpeedScale, 0.001f, assetPath);
+        }
+
+        private static void AssertDistributedForwardMovement(
+            string assetPath,
+            float expectedForwardMovement,
+            float expectedStartSeconds,
+            float expectedDurationSeconds)
+        {
+            AttackDefinitionSO attack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(assetPath);
+
+            Assert.IsNotNull(attack, assetPath);
+            Assert.AreEqual(expectedForwardMovement, attack.ForwardMovement, 0.001f, assetPath);
+            Assert.AreEqual(expectedStartSeconds, attack.ForwardMovementStartSeconds, 0.001f, assetPath);
+            Assert.AreEqual(expectedDurationSeconds, attack.ForwardMovementDurationSeconds, 0.001f, assetPath);
+            Assert.IsTrue(attack.UsesDistributedForwardMovement, assetPath);
         }
 
         private static AttackDefinitionSO AssertAttackHitStop(string assetPath, float expected)
@@ -767,8 +825,8 @@ namespace CampusRPG.Tests.EditMode
             float heavyActiveEndSeconds = heavyAttack.StartupSeconds + heavyAttack.ActiveSeconds;
             float cancelWindowStartSeconds = Mathf.Max(0f, heavyRuntimeDuration - ironGateBreak.CancelWindowSeconds);
 
-            Assert.AreEqual(0.86f, heavyRuntimeDuration, 0.001f);
-            Assert.AreEqual(0.64f, cancelWindowStartSeconds, 0.001f);
+            Assert.AreEqual(0.90f, heavyRuntimeDuration, 0.001f);
+            Assert.AreEqual(0.68f, cancelWindowStartSeconds, 0.001f);
             Assert.GreaterOrEqual(cancelWindowStartSeconds - heavyActiveEndSeconds, 0.25f);
         }
 
@@ -931,11 +989,9 @@ namespace CampusRPG.Tests.EditMode
             Assert.Greater(clip.length, 0f, expectedClipPath);
             Assert.That(
                 AnimationUtility.GetAnimationEvents(clip),
-                Has.Some.Matches<AnimationEvent>(animationEvent => animationEvent.functionName == "AnimationEvent_OpenAttackHitbox"),
-                expectedClipPath);
-            Assert.That(
-                AnimationUtility.GetAnimationEvents(clip),
-                Has.Some.Matches<AnimationEvent>(animationEvent => animationEvent.functionName == "AnimationEvent_CloseAttackHitbox"),
+                Has.None.Matches<AnimationEvent>(animationEvent =>
+                    string.Equals(animationEvent.functionName, "AnimationEvent_OpenAttackHitbox", System.StringComparison.Ordinal)
+                    || string.Equals(animationEvent.functionName, "AnimationEvent_CloseAttackHitbox", System.StringComparison.Ordinal)),
                 expectedClipPath);
             Assert.IsNotNull(state, expectedStateName);
             Assert.IsNotNull(state.motion, expectedStateName);
@@ -1053,6 +1109,373 @@ namespace CampusRPG.Tests.EditMode
             }
 
             return null;
+        }
+    }
+
+    public sealed class CombatTestIronGateBreakContractTests
+    {
+        private const string IronGateBreakAttackAssetPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_IronGateBreak.asset";
+        private const string IronGateBreakSwordArtPath = "Assets/_Game/Data/Combat/SO_SwordArt_IronGateBreak.asset";
+
+        [Test]
+        public void IronGateBreakAttackAsset_UsesGuardBreakLungeContract()
+        {
+            AttackDefinitionSO attack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(IronGateBreakAttackAssetPath);
+
+            Assert.IsNotNull(attack);
+            Assert.AreEqual("Iron Gate Break", attack.DisplayName);
+            Assert.IsTrue(attack.BreaksGuard);
+            Assert.AreEqual(0.16f, attack.GuardBreakHitStunSeconds, 0.001f);
+            Assert.AreEqual(0.08f, attack.HitStopSeconds, 0.001f);
+            Assert.AreEqual(0.55f, attack.ForwardMovement, 0.001f);
+            Assert.AreEqual(0.08f, attack.ForwardMovementStartSeconds, 0.001f);
+            Assert.AreEqual(0.22f, attack.ForwardMovementDurationSeconds, 0.001f);
+            Assert.IsTrue(attack.UsesDistributedForwardMovement);
+            Assert.AreEqual(AttackHitboxShape.Box, attack.HitboxShape);
+            AssertVector3Approximately(new Vector3(0f, 0f, 1.125f), attack.HitboxLocalCenter, "HitboxLocalCenter");
+            AssertVector3Approximately(new Vector3(0.92f, 1f, 0.9f), attack.HitboxHalfExtents, "HitboxHalfExtents");
+        }
+
+        [Test]
+        public void IronGateBreakSwordArtAsset_UsesGuardPressureManaCost()
+        {
+            SwordArtDefinitionSO swordArt = AssetDatabase.LoadAssetAtPath<SwordArtDefinitionSO>(IronGateBreakSwordArtPath);
+
+            Assert.IsNotNull(swordArt);
+            Assert.AreEqual("Iron Gate Break", swordArt.DisplayName);
+            Assert.AreEqual(0.35f, swordArt.TriggerWindowSeconds, 0.001f);
+            Assert.AreEqual(0.22f, swordArt.CancelWindowSeconds, 0.001f);
+            Assert.AreEqual(15f, swordArt.ResourceCost, 0.001f);
+            Assert.IsNotNull(swordArt.AttackDefinition);
+            Assert.AreEqual(IronGateBreakAttackAssetPath, AssetDatabase.GetAssetPath(swordArt.AttackDefinition));
+        }
+
+        private static void AssertVector3Approximately(Vector3 expected, Vector3 actual, string label)
+        {
+            Assert.AreEqual(expected.x, actual.x, 0.001f, label + ".x");
+            Assert.AreEqual(expected.y, actual.y, 0.001f, label + ".y");
+            Assert.AreEqual(expected.z, actual.z, 0.001f, label + ".z");
+        }
+    }
+
+    public sealed class CombatTestMoonSeverContractTests
+    {
+        private const string MoonSeverAttackAssetPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_MoonSever.asset";
+        private const string MoonSeverSwordArtPath = "Assets/_Game/Data/Combat/SO_SwordArt_MoonSever.asset";
+        private const string FallingStarAttackAssetPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_FallingStar.asset";
+
+        [Test]
+        public void MoonSeverAttackAsset_UsesAirDodgeSlashContract()
+        {
+            AttackDefinitionSO attack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(MoonSeverAttackAssetPath);
+
+            Assert.IsNotNull(attack);
+            Assert.AreEqual("Moon Sever", attack.DisplayName);
+            Assert.AreEqual(0.10f, attack.StartupSeconds, 0.001f);
+            Assert.AreEqual(0.10f, attack.ActiveSeconds, 0.001f);
+            Assert.AreEqual(0.26f, attack.RecoverySeconds, 0.001f);
+            Assert.AreEqual(0.065f, attack.HitStopSeconds, 0.001f);
+            Assert.IsFalse(attack.BreaksGuard);
+            Assert.AreEqual(0.58f, attack.ForwardMovement, 0.001f);
+            Assert.AreEqual(0.72f, attack.MovementSpeedScale, 0.001f);
+            Assert.AreEqual(2.15f, attack.Range, 0.001f);
+            Assert.AreEqual(AttackHitboxShape.Box, attack.HitboxShape);
+            AssertVector3Approximately(new Vector3(0f, 0f, 1.075f), attack.HitboxLocalCenter, "HitboxLocalCenter");
+            AssertVector3Approximately(new Vector3(0.782f, 0.85f, 0.86f), attack.HitboxHalfExtents, "HitboxHalfExtents");
+        }
+
+        [Test]
+        public void MoonSeverSwordArtAsset_RequiresAirDodgeWindowAndUsesDistinctManaCost()
+        {
+            SwordArtDefinitionSO swordArt = AssetDatabase.LoadAssetAtPath<SwordArtDefinitionSO>(MoonSeverSwordArtPath);
+
+            Assert.IsNotNull(swordArt);
+            Assert.AreEqual("Moon Sever", swordArt.DisplayName);
+            Assert.AreEqual(SwordArtTriggerAction.LightAttack, swordArt.TriggerAction);
+            Assert.AreEqual(SwordArtDirectionMask.Any, swordArt.AcceptedDirections);
+            Assert.AreEqual(
+                SwordArtContextTags.Airborne | SwordArtContextTags.AfterDodge | SwordArtContextTags.AfterAirDodge,
+                swordArt.RequiredContextTags);
+            Assert.AreEqual(SwordArtContextTags.None, swordArt.AnyContextTags);
+            Assert.AreEqual(0.28f, swordArt.TriggerWindowSeconds, 0.001f);
+            Assert.AreEqual(0.16f, swordArt.CancelWindowSeconds, 0.001f);
+            Assert.AreEqual(12f, swordArt.ResourceCost, 0.001f);
+            Assert.IsNotNull(swordArt.AttackDefinition);
+            Assert.AreEqual(MoonSeverAttackAssetPath, AssetDatabase.GetAssetPath(swordArt.AttackDefinition));
+        }
+
+        [Test]
+        public void MoonSeverPreviewChain_RemainsDistinctFromFallingStar()
+        {
+            AttackDefinitionSO moonSeverAttack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(MoonSeverAttackAssetPath);
+            AttackDefinitionSO fallingStarAttack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(FallingStarAttackAssetPath);
+
+            Assert.IsNotNull(moonSeverAttack);
+            Assert.IsNotNull(fallingStarAttack);
+
+            MethodInfo candidateMethod = typeof(CombatTestAssetGenerator).GetMethod(
+                "ResolveImportedAttackClipCandidatePaths",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo durationOverrideMethod = typeof(CombatTestAssetGenerator).GetMethod(
+                "ResolveImportedPreviewAttackDurationOverride",
+                BindingFlags.Static | BindingFlags.NonPublic);
+
+            Assert.IsNotNull(candidateMethod);
+            Assert.IsNotNull(durationOverrideMethod);
+
+            string[] candidatePaths = candidateMethod.Invoke(null, new object[] { "SwordArt_MoonSever" }) as string[];
+            float moonSeverPreviewDuration = (float)durationOverrideMethod.Invoke(null, new object[] { "SwordArt_MoonSever" });
+            float fallingStarPreviewDuration = (float)durationOverrideMethod.Invoke(null, new object[] { "SwordArt_FallingStar" });
+
+            Assert.IsNotNull(candidatePaths);
+            Assert.That(candidatePaths, Is.Not.Empty);
+            Assert.AreEqual(
+                "Assets/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_SPAttack03_Inplace.FBX",
+                candidatePaths[0]);
+            Assert.That(
+                candidatePaths,
+                Has.Some.EqualTo("Assets/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_SPAttack05_Inplace.FBX"));
+            Assert.AreEqual(0.72f, moonSeverPreviewDuration, 0.001f);
+            Assert.AreEqual(1.05f, fallingStarPreviewDuration, 0.001f);
+            Assert.Less(moonSeverPreviewDuration, fallingStarPreviewDuration);
+            Assert.Less(moonSeverAttack.StartupSeconds, fallingStarAttack.StartupSeconds);
+            Assert.Less(moonSeverAttack.RecoverySeconds, fallingStarAttack.RecoverySeconds);
+            Assert.Less(moonSeverAttack.HitStopSeconds, fallingStarAttack.HitStopSeconds);
+        }
+
+        private static void AssertVector3Approximately(Vector3 expected, Vector3 actual, string label)
+        {
+            Assert.AreEqual(expected.x, actual.x, 0.001f, label + ".x");
+            Assert.AreEqual(expected.y, actual.y, 0.001f, label + ".y");
+            Assert.AreEqual(expected.z, actual.z, 0.001f, label + ".z");
+        }
+    }
+
+    public sealed class CombatTestAirHeavySwordArtContractTests
+    {
+        private const string RisingCleaveAttackAssetPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_RisingCleave.asset";
+        private const string FallingStarAttackAssetPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_FallingStar.asset";
+        private const string RisingCleaveSwordArtPath = "Assets/_Game/Data/Combat/SO_SwordArt_RisingCleave.asset";
+        private const string FallingStarSwordArtPath = "Assets/_Game/Data/Combat/SO_SwordArt_FallingStar.asset";
+
+        [Test]
+        public void RisingCleaveAssets_UseForwardAirChaseContract()
+        {
+            AttackDefinitionSO attack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(RisingCleaveAttackAssetPath);
+            SwordArtDefinitionSO swordArt = AssetDatabase.LoadAssetAtPath<SwordArtDefinitionSO>(RisingCleaveSwordArtPath);
+
+            Assert.IsNotNull(attack);
+            Assert.IsNotNull(swordArt);
+            Assert.AreEqual("Rising Cleave", attack.DisplayName);
+            Assert.AreEqual(0.18f, attack.StartupSeconds, 0.001f);
+            Assert.AreEqual(0.12f, attack.ActiveSeconds, 0.001f);
+            Assert.AreEqual(0.38f, attack.RecoverySeconds, 0.001f);
+            Assert.AreEqual(0.05f, attack.HitStopSeconds, 0.001f);
+            Assert.IsFalse(attack.BreaksGuard);
+            Assert.AreEqual(0.62f, attack.ForwardMovement, 0.001f);
+            Assert.AreEqual(0.58f, attack.MovementSpeedScale, 0.001f);
+            Assert.AreEqual(2.35f, attack.Range, 0.001f);
+            Assert.AreEqual(AttackHitboxShape.Box, attack.HitboxShape);
+            AssertVector3Approximately(new Vector3(0f, 0f, 1.175f), attack.HitboxLocalCenter, "Rising.HitboxLocalCenter");
+            AssertVector3Approximately(new Vector3(0.851f, 0.925f, 0.94f), attack.HitboxHalfExtents, "Rising.HitboxHalfExtents");
+
+            Assert.AreEqual("Rising Cleave", swordArt.DisplayName);
+            Assert.AreEqual(SwordArtTriggerAction.HeavyAttack, swordArt.TriggerAction);
+            Assert.AreEqual(SwordArtDirectionMask.Any, swordArt.AcceptedDirections);
+            Assert.AreEqual(SwordArtContextTags.None, swordArt.RequiredContextTags);
+            Assert.AreEqual(
+                SwordArtContextTags.ForwardInput | SwordArtContextTags.Airborne,
+                swordArt.AnyContextTags);
+            Assert.AreEqual(0.3f, swordArt.TriggerWindowSeconds, 0.001f);
+            Assert.AreEqual(0.2f, swordArt.CancelWindowSeconds, 0.001f);
+            Assert.AreEqual(0f, swordArt.ResourceCost, 0.001f);
+            Assert.IsNotNull(swordArt.AttackDefinition);
+            Assert.AreEqual(RisingCleaveAttackAssetPath, AssetDatabase.GetAssetPath(swordArt.AttackDefinition));
+        }
+
+        [Test]
+        public void FallingStarAssets_UseNeutralAirSlamContract()
+        {
+            AttackDefinitionSO attack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(FallingStarAttackAssetPath);
+            SwordArtDefinitionSO swordArt = AssetDatabase.LoadAssetAtPath<SwordArtDefinitionSO>(FallingStarSwordArtPath);
+
+            Assert.IsNotNull(attack);
+            Assert.IsNotNull(swordArt);
+            Assert.AreEqual("Falling Star", attack.DisplayName);
+            Assert.AreEqual(0.16f, attack.StartupSeconds, 0.001f);
+            Assert.AreEqual(0.14f, attack.ActiveSeconds, 0.001f);
+            Assert.AreEqual(0.42f, attack.RecoverySeconds, 0.001f);
+            Assert.AreEqual(0.09f, attack.HitStopSeconds, 0.001f);
+            Assert.IsFalse(attack.BreaksGuard);
+            Assert.AreEqual(0.38f, attack.ForwardMovement, 0.001f);
+            Assert.AreEqual(0.52f, attack.MovementSpeedScale, 0.001f);
+            Assert.AreEqual(2.05f, attack.Range, 0.001f);
+            Assert.AreEqual(AttackHitboxShape.Box, attack.HitboxShape);
+            AssertVector3Approximately(new Vector3(0f, 0f, 1.025f), attack.HitboxLocalCenter, "Falling.HitboxLocalCenter");
+            AssertVector3Approximately(new Vector3(0.989f, 1.075f, 0.86f), attack.HitboxHalfExtents, "Falling.HitboxHalfExtents");
+
+            Assert.AreEqual("Falling Star", swordArt.DisplayName);
+            Assert.AreEqual(SwordArtTriggerAction.HeavyAttack, swordArt.TriggerAction);
+            Assert.AreEqual(SwordArtDirectionMask.Neutral | SwordArtDirectionMask.Backward, swordArt.AcceptedDirections);
+            Assert.AreEqual(SwordArtContextTags.Airborne, swordArt.RequiredContextTags);
+            Assert.AreEqual(SwordArtContextTags.None, swordArt.AnyContextTags);
+            Assert.AreEqual(0.32f, swordArt.TriggerWindowSeconds, 0.001f);
+            Assert.AreEqual(0.18f, swordArt.CancelWindowSeconds, 0.001f);
+            Assert.AreEqual(0f, swordArt.ResourceCost, 0.001f);
+            Assert.IsNotNull(swordArt.AttackDefinition);
+            Assert.AreEqual(FallingStarAttackAssetPath, AssetDatabase.GetAssetPath(swordArt.AttackDefinition));
+        }
+
+        [Test]
+        public void AirHeavySwordArts_KeepForwardChaseAndNeutralSlamDistinct()
+        {
+            AttackDefinitionSO risingCleaveAttack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(RisingCleaveAttackAssetPath);
+            AttackDefinitionSO fallingStarAttack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(FallingStarAttackAssetPath);
+
+            Assert.IsNotNull(risingCleaveAttack);
+            Assert.IsNotNull(fallingStarAttack);
+
+            MethodInfo candidateMethod = typeof(CombatTestAssetGenerator).GetMethod(
+                "ResolveImportedAttackClipCandidatePaths",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo durationOverrideMethod = typeof(CombatTestAssetGenerator).GetMethod(
+                "ResolveImportedPreviewAttackDurationOverride",
+                BindingFlags.Static | BindingFlags.NonPublic);
+
+            Assert.IsNotNull(candidateMethod);
+            Assert.IsNotNull(durationOverrideMethod);
+
+            string[] risingCandidatePaths = candidateMethod.Invoke(null, new object[] { "SwordArt_RisingCleave" }) as string[];
+            string[] fallingCandidatePaths = candidateMethod.Invoke(null, new object[] { "SwordArt_FallingStar" }) as string[];
+            float risingPreviewDuration = (float)durationOverrideMethod.Invoke(null, new object[] { "SwordArt_RisingCleave" });
+            float fallingPreviewDuration = (float)durationOverrideMethod.Invoke(null, new object[] { "SwordArt_FallingStar" });
+
+            Assert.IsNotNull(risingCandidatePaths);
+            Assert.IsNotNull(fallingCandidatePaths);
+            Assert.That(risingCandidatePaths, Is.Not.Empty);
+            Assert.That(fallingCandidatePaths, Is.Not.Empty);
+            Assert.AreEqual(
+                "Assets/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack03_4_ALL_Inplace.FBX",
+                risingCandidatePaths[0]);
+            Assert.AreEqual(
+                "Assets/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_JumpAttack04_Inplace.FBX",
+                fallingCandidatePaths[0]);
+            Assert.AreEqual(1f, risingPreviewDuration, 0.001f);
+            Assert.AreEqual(1.05f, fallingPreviewDuration, 0.001f);
+            Assert.That(
+                risingCandidatePaths,
+                Has.Some.EqualTo("Assets/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Attack06_Inplace.FBX"));
+            Assert.That(
+                fallingCandidatePaths,
+                Has.Some.EqualTo("Assets/GhostSamurai_Animset/Animation/katana/APose/Attack/Inplace/GhostSamurai_APose_Air_Attack03_Start_Inplace.FBX"));
+            Assert.Greater(risingCleaveAttack.ForwardMovement, fallingStarAttack.ForwardMovement);
+            Assert.Greater(risingCleaveAttack.Range, fallingStarAttack.Range);
+            Assert.Less(risingCleaveAttack.RecoverySeconds, fallingStarAttack.RecoverySeconds);
+            Assert.Less(risingCleaveAttack.HitStopSeconds, fallingStarAttack.HitStopSeconds);
+            Assert.Greater(fallingStarAttack.HitboxHalfExtents.y, risingCleaveAttack.HitboxHalfExtents.y);
+        }
+
+        private static void AssertVector3Approximately(Vector3 expected, Vector3 actual, string label)
+        {
+            Assert.AreEqual(expected.x, actual.x, 0.001f, label + ".x");
+            Assert.AreEqual(expected.y, actual.y, 0.001f, label + ".y");
+            Assert.AreEqual(expected.z, actual.z, 0.001f, label + ".z");
+        }
+    }
+
+    public sealed class CombatTestFlankSwordArtContractTests
+    {
+        private const string SidewindCutAttackAssetPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_SidewindCut.asset";
+        private const string CrossStepAttackAssetPath = "Assets/_Game/Data/Combat/SO_Attack_SwordArt_CrossStep.asset";
+        private const string SidewindCutSwordArtPath = "Assets/_Game/Data/Combat/SO_SwordArt_SidewindCut.asset";
+        private const string CrossStepSwordArtPath = "Assets/_Game/Data/Combat/SO_SwordArt_CrossStep.asset";
+
+        [Test]
+        public void SidewindCutAssets_UseShortFlankFollowUpContract()
+        {
+            AttackDefinitionSO attack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(SidewindCutAttackAssetPath);
+            SwordArtDefinitionSO swordArt = AssetDatabase.LoadAssetAtPath<SwordArtDefinitionSO>(SidewindCutSwordArtPath);
+
+            Assert.IsNotNull(attack);
+            Assert.IsNotNull(swordArt);
+            Assert.AreEqual("Sidewind Cut", attack.DisplayName);
+            Assert.AreEqual(0.08f, attack.StartupSeconds, 0.001f);
+            Assert.AreEqual(0.10f, attack.ActiveSeconds, 0.001f);
+            Assert.AreEqual(0.25f, attack.RecoverySeconds, 0.001f);
+            Assert.AreEqual(0.72f, attack.ForwardMovement, 0.001f);
+            Assert.AreEqual(0.82f, attack.MovementSpeedScale, 0.001f);
+            Assert.AreEqual(2.05f, attack.Range, 0.001f);
+            Assert.AreEqual(AttackHitboxShape.Box, attack.HitboxShape);
+            AssertVector3Approximately(new Vector3(0f, 0f, 1.025f), attack.HitboxLocalCenter, "Sidewind.HitboxLocalCenter");
+            AssertVector3Approximately(new Vector3(0.759f, 0.825f, 0.82f), attack.HitboxHalfExtents, "Sidewind.HitboxHalfExtents");
+            Assert.IsFalse(attack.BreaksGuard);
+
+            Assert.AreEqual("Sidewind Cut", swordArt.DisplayName);
+            Assert.AreEqual(SwordArtTriggerAction.LightAttack, swordArt.TriggerAction);
+            Assert.AreEqual(SwordArtDirectionMask.Left | SwordArtDirectionMask.Right, swordArt.AcceptedDirections);
+            Assert.AreEqual(SwordArtContextTags.AfterDodge, swordArt.RequiredContextTags);
+            Assert.AreEqual(SwordArtContextTags.None, swordArt.AnyContextTags);
+            Assert.AreEqual(0.25f, swordArt.TriggerWindowSeconds, 0.001f);
+            Assert.AreEqual(0.18f, swordArt.CancelWindowSeconds, 0.001f);
+            Assert.AreEqual(0f, swordArt.ResourceCost, 0.001f);
+            Assert.IsNotNull(swordArt.AttackDefinition);
+            Assert.AreEqual(SidewindCutAttackAssetPath, AssetDatabase.GetAssetPath(swordArt.AttackDefinition));
+        }
+
+        [Test]
+        public void CrossStepAssets_UseLongerRollCounterContract()
+        {
+            AttackDefinitionSO attack = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(CrossStepAttackAssetPath);
+            SwordArtDefinitionSO swordArt = AssetDatabase.LoadAssetAtPath<SwordArtDefinitionSO>(CrossStepSwordArtPath);
+
+            Assert.IsNotNull(attack);
+            Assert.IsNotNull(swordArt);
+            Assert.AreEqual("Cross Step", attack.DisplayName);
+            Assert.AreEqual(0.09f, attack.StartupSeconds, 0.001f);
+            Assert.AreEqual(0.10f, attack.ActiveSeconds, 0.001f);
+            Assert.AreEqual(0.27f, attack.RecoverySeconds, 0.001f);
+            Assert.AreEqual(0.06f, attack.HitStopSeconds, 0.001f);
+            Assert.AreEqual(0.86f, attack.ForwardMovement, 0.001f);
+            Assert.AreEqual(0.84f, attack.MovementSpeedScale, 0.001f);
+            Assert.AreEqual(2.25f, attack.Range, 0.001f);
+            Assert.AreEqual(AttackHitboxShape.Box, attack.HitboxShape);
+            AssertVector3Approximately(new Vector3(0f, 0f, 1.125f), attack.HitboxLocalCenter, "CrossStep.HitboxLocalCenter");
+            AssertVector3Approximately(new Vector3(0.828f, 0.9f, 0.9f), attack.HitboxHalfExtents, "CrossStep.HitboxHalfExtents");
+            Assert.IsFalse(attack.BreaksGuard);
+
+            Assert.AreEqual("Cross Step", swordArt.DisplayName);
+            Assert.AreEqual(SwordArtTriggerAction.LightAttack, swordArt.TriggerAction);
+            Assert.AreEqual(SwordArtDirectionMask.Any, swordArt.AcceptedDirections);
+            Assert.AreEqual(
+                SwordArtContextTags.AfterDodge | SwordArtContextTags.AfterCombatRoll,
+                swordArt.RequiredContextTags);
+            Assert.AreEqual(SwordArtContextTags.None, swordArt.AnyContextTags);
+            Assert.AreEqual(0.30f, swordArt.TriggerWindowSeconds, 0.001f);
+            Assert.AreEqual(0.18f, swordArt.CancelWindowSeconds, 0.001f);
+            Assert.AreEqual(0f, swordArt.ResourceCost, 0.001f);
+            Assert.IsNotNull(swordArt.AttackDefinition);
+            Assert.AreEqual(CrossStepAttackAssetPath, AssetDatabase.GetAssetPath(swordArt.AttackDefinition));
+        }
+
+        [Test]
+        public void FlankSwordArts_KeepShortDodgeAndLongRollReadDistinct()
+        {
+            AttackDefinitionSO sidewindCut = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(SidewindCutAttackAssetPath);
+            AttackDefinitionSO crossStep = AssetDatabase.LoadAssetAtPath<AttackDefinitionSO>(CrossStepAttackAssetPath);
+
+            Assert.IsNotNull(sidewindCut);
+            Assert.IsNotNull(crossStep);
+            Assert.LessOrEqual(sidewindCut.StartupSeconds, crossStep.StartupSeconds);
+            Assert.Less(sidewindCut.RecoverySeconds, crossStep.RecoverySeconds);
+            Assert.Less(sidewindCut.ForwardMovement, crossStep.ForwardMovement);
+            Assert.Less(sidewindCut.Range, crossStep.Range);
+        }
+
+        private static void AssertVector3Approximately(Vector3 expected, Vector3 actual, string label)
+        {
+            Assert.AreEqual(expected.x, actual.x, 0.001f, label + ".x");
+            Assert.AreEqual(expected.y, actual.y, 0.001f, label + ".y");
+            Assert.AreEqual(expected.z, actual.z, 0.001f, label + ".z");
         }
     }
 }

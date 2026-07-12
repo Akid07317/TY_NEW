@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using CampusRPG.Camera;
 using CampusRPG.Character;
 using CampusRPG.AI;
+using CampusRPG.Combat;
 using CampusRPG.Composition;
 using CampusRPG.Core;
 using CampusRPG.Input;
@@ -23,6 +24,11 @@ namespace CampusRPG.Editor
         private const string RepairBaselineTraversalMenu = "CampusRPG/Setup/Repair Chapter01 Baseline And Traversal Wiring";
         private const string RepairSceneNavMeshMenu = "CampusRPG/Setup/Repair Chapter01 Scene NavMesh";
         private const string LegacyRepairTraversalMenu = "CampusRPG/Setup/Repair Chapter01 Traversal Wiring";
+        // Editor-only physical traversal aid: it never writes ChapterProgressService directly.
+        private const string TeleportCurrentObjectiveMenu = "CampusRPG/Debug/Chapter01/Teleport Player To Current Objective";
+        private const string DefeatActiveEncounterMenu = "CampusRPG/Debug/Chapter01/Defeat Active Encounter Through Damage";
+        private const string TeleportRitualCoreMenu = "CampusRPG/Debug/Chapter01/Teleport Player To Ritual Core";
+        private const string LogWalkthroughStateMenu = "CampusRPG/Debug/Chapter01/Log Walkthrough State";
         private const string ScenePath = "Assets/_Game/Scenes/Chapter01_Combined.unity";
         private const string ChapterProgressionPath = "Assets/_Game/Data/Chapter/SO_Chapter01_Progression.asset";
         private const string ChapterMapDefinitionPath = "Assets/_Game/Data/Chapter/SO_Chapter01_MapDefinition.asset";
@@ -106,6 +112,289 @@ namespace CampusRPG.Editor
         public static void RepairChapter01TraversalWiring()
         {
             RepairChapter01BaselineAndTraversalWiringInternal();
+        }
+
+        [MenuItem(TeleportRitualCoreMenu)]
+        public static void TeleportPlayerToRitualCore()
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("Chapter01 RitualCore teleport is only available while the scene is in Play Mode.");
+                return;
+            }
+
+            PlayerCharacter player = Object.FindAnyObjectByType<PlayerCharacter>();
+            GameObject ritualCore = GameObject.Find("Pickup_RitualCore");
+
+            if (player == null || ritualCore == null)
+            {
+                Debug.LogWarning("Chapter01 RitualCore teleport could not find the active player or pickup.");
+                return;
+            }
+
+            Vector3 targetPosition = ritualCore.transform.position;
+            targetPosition.y = 0.1f;
+
+            if (player.Motor != null)
+            {
+                player.Motor.WarpTo(targetPosition, player.transform.rotation);
+            }
+            else
+            {
+                player.transform.position = targetPosition;
+            }
+
+            Physics.SyncTransforms();
+            Debug.Log("Chapter01 walkthrough: player teleported to the RitualCore pickup for gating verification.");
+        }
+
+        [MenuItem(TeleportCurrentObjectiveMenu)]
+        public static void TeleportPlayerToCurrentObjective()
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("Chapter01 current-objective teleport is only available while the scene is in Play Mode.");
+                return;
+            }
+
+            PlayerCharacter player = Object.FindAnyObjectByType<PlayerCharacter>();
+            ChapterProgressService progressService = Object.FindAnyObjectByType<ChapterProgressService>();
+            CheckpointService checkpointService = Object.FindAnyObjectByType<CheckpointService>();
+
+            if (player == null || progressService == null || checkpointService == null)
+            {
+                Debug.LogWarning("Chapter01 current-objective teleport could not find the active player or progression services.");
+                return;
+            }
+
+            string targetName = ResolveCurrentWalkthroughTarget(progressService, checkpointService);
+
+            if (string.IsNullOrEmpty(targetName))
+            {
+                Debug.Log("Chapter01 walkthrough: no pending physical objective remains. " + BuildWalkthroughState(progressService, checkpointService));
+                return;
+            }
+
+            GameObject target = GameObject.Find(targetName);
+
+            if (target == null)
+            {
+                Debug.LogWarning("Chapter01 current-objective teleport could not find target '" + targetName + "'.");
+                return;
+            }
+
+            Vector3 targetPosition = target.transform.position;
+            targetPosition.y = 0.1f;
+
+            if (player.Motor != null)
+            {
+                player.Motor.WarpTo(targetPosition, player.transform.rotation);
+            }
+            else
+            {
+                player.transform.position = targetPosition;
+            }
+
+            Physics.SyncTransforms();
+            Debug.Log(
+                "Chapter01 walkthrough: player teleported to physical objective '"
+                + targetName
+                + "'. Progress is still owned by runtime triggers. "
+                + BuildWalkthroughState(progressService, checkpointService));
+        }
+
+        [MenuItem(LogWalkthroughStateMenu)]
+        public static void LogWalkthroughState()
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("Chapter01 walkthrough state is only available while the scene is in Play Mode.");
+                return;
+            }
+
+            PlayerCharacter player = Object.FindAnyObjectByType<PlayerCharacter>();
+            ChapterProgressService progressService = Object.FindAnyObjectByType<ChapterProgressService>();
+            CheckpointService checkpointService = Object.FindAnyObjectByType<CheckpointService>();
+
+            if (player == null || progressService == null || checkpointService == null)
+            {
+                Debug.LogWarning("Chapter01 walkthrough state could not find the active player or progression services.");
+                return;
+            }
+
+            Debug.Log(
+                "Chapter01 walkthrough state: player="
+                + player.transform.position
+                + ", "
+                + BuildWalkthroughState(progressService, checkpointService));
+        }
+
+        [MenuItem(DefeatActiveEncounterMenu)]
+        public static void DefeatActiveEncounterThroughDamage()
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("Chapter01 active-encounter damage is only available while the scene is in Play Mode.");
+                return;
+            }
+
+            PlayerCharacter player = Object.FindAnyObjectByType<PlayerCharacter>();
+            ChapterProgressService progressService = Object.FindAnyObjectByType<ChapterProgressService>();
+            CheckpointService checkpointService = Object.FindAnyObjectByType<CheckpointService>();
+
+            if (player != null && progressService != null && checkpointService != null)
+            {
+                string currentTargetName = ResolveCurrentWalkthroughTarget(progressService, checkpointService);
+                GameObject currentTarget = string.IsNullOrEmpty(currentTargetName)
+                    ? null
+                    : GameObject.Find(currentTargetName);
+                EncounterController currentEncounter = currentTarget != null
+                    ? currentTarget.GetComponent<EncounterController>()
+                    : null;
+
+                if (currentEncounter != null && !currentEncounter.IsCleared)
+                {
+                    Vector3 encounterPosition = currentTarget.transform.position;
+                    encounterPosition.y = 0.1f;
+
+                    if (player.Motor != null)
+                    {
+                        player.Motor.WarpTo(encounterPosition, player.transform.rotation);
+                    }
+                    else
+                    {
+                        player.transform.position = encounterPosition;
+                    }
+
+                    Physics.SyncTransforms();
+                    currentEncounter.ActivateEncounter();
+                }
+            }
+
+            EnemyEncounterMember[] activeMembers = Object.FindObjectsByType<EnemyEncounterMember>(
+                FindObjectsInactive.Exclude);
+            int defeatedCount = 0;
+
+            for (int i = 0; i < activeMembers.Length; i++)
+            {
+                EnemyEncounterMember member = activeMembers[i];
+
+                if (member == null || member.IsDefeated || !member.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                HealthComponent health = member.GetComponent<HealthComponent>();
+
+                if (health == null || health.IsDead)
+                {
+                    continue;
+                }
+
+                health.ReceiveDamage(
+                    health.MaxValue + 1000f,
+                    health.transform.position,
+                    player != null ? player.gameObject : null);
+                defeatedCount++;
+            }
+
+            Physics.SyncTransforms();
+            Debug.Log(
+                "Chapter01 walkthrough: applied lethal damage through HealthComponent to "
+                + defeatedCount
+                + " active encounter member(s). Encounter completion remains owned by EnemyEncounterMember death events.");
+        }
+
+        private static string ResolveCurrentWalkthroughTarget(
+            ChapterProgressService progressService,
+            CheckpointService checkpointService)
+        {
+            if (checkpointService.CurrentCheckpointId != Chapter01Ids.Checkpoints.Start
+                && !progressService.IsEncounterCleared(Chapter01Ids.Encounters.EntranceTutorial))
+            {
+                return "Checkpoint_CP01";
+            }
+
+            if (!progressService.IsEncounterCleared(Chapter01Ids.Encounters.EntranceTutorial))
+            {
+                return "Encounter_EN_A01_TUTORIAL";
+            }
+
+            if (!progressService.HasVisitedArea(Chapter01Ids.Areas.Courtyard))
+            {
+                return "TRG_Area02_Enter";
+            }
+
+            if (!progressService.IsEncounterCleared(Chapter01Ids.Encounters.Courtyard))
+            {
+                if (checkpointService.CurrentCheckpointId != Chapter01Ids.Checkpoints.Courtyard)
+                {
+                    return "Checkpoint_CP02";
+                }
+
+                return "Encounter_EN_A02_COURTYARD";
+            }
+
+            if (!progressService.HasVisitedArea(Chapter01Ids.Areas.Interior))
+            {
+                return "TRG_Area03_Enter";
+            }
+
+            if (!progressService.IsEncounterCleared(Chapter01Ids.Encounters.Interior))
+            {
+                return "Encounter_EN_A03_INTERIOR";
+            }
+
+            if (checkpointService.CurrentCheckpointId != Chapter01Ids.Checkpoints.Interior)
+            {
+                return "Checkpoint_CP03";
+            }
+
+            if (!progressService.HasKeyItem(Chapter01Ids.KeyItems.GateSigil))
+            {
+                return "Pickup_GateSigil";
+            }
+
+            if (!progressService.HasVisitedArea(Chapter01Ids.Areas.Boss))
+            {
+                return "TRG_Area04_Enter";
+            }
+
+            if (!progressService.IsEncounterCleared(Chapter01Ids.Encounters.Gatekeeper))
+            {
+                return "Encounter_EN_A04_GATEKEEPER";
+            }
+
+            if (!progressService.HasKeyItem(Chapter01Ids.KeyItems.RitualCore))
+            {
+                return "Pickup_RitualCore";
+            }
+
+            return string.Empty;
+        }
+
+        private static string BuildWalkthroughState(
+            ChapterProgressService progressService,
+            CheckpointService checkpointService)
+        {
+            return "area="
+                + progressService.CurrentAreaId
+                + ", checkpoint="
+                + checkpointService.CurrentCheckpointId
+                + ", cleared=[A01:"
+                + progressService.IsEncounterCleared(Chapter01Ids.Encounters.EntranceTutorial)
+                + ", A02:"
+                + progressService.IsEncounterCleared(Chapter01Ids.Encounters.Courtyard)
+                + ", A03:"
+                + progressService.IsEncounterCleared(Chapter01Ids.Encounters.Interior)
+                + ", A04:"
+                + progressService.IsEncounterCleared(Chapter01Ids.Encounters.Gatekeeper)
+                + "], items=[GateSigil:"
+                + progressService.HasKeyItem(Chapter01Ids.KeyItems.GateSigil)
+                + ", RitualCore:"
+                + progressService.HasKeyItem(Chapter01Ids.KeyItems.RitualCore)
+                + "], completed="
+                + progressService.IsChapterCompleted;
         }
 
         private static void RepairChapter01BaselineAndTraversalWiringInternal()
@@ -488,14 +777,16 @@ namespace CampusRPG.Editor
                 "Pickup_GateSigil",
                 new Vector3(0f, 0.8f, 64f),
                 chapterProgression.BossGateRequiredKeyItemId,
-                false);
+                false,
+                Chapter01Ids.Encounters.Interior);
             CreateKeyItemPickup(
                 area04.transform,
                 "Pickup_RitualCore",
                 new Vector3(0f, 0.8f, 88f),
                 chapterProgression.ChapterCompletionKeyItemId,
                 true,
-                Chapter01Ids.Encounters.Gatekeeper);
+                Chapter01Ids.Encounters.Gatekeeper,
+                true);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -1074,7 +1365,8 @@ namespace CampusRPG.Editor
             Vector3 position,
             string keyItemId,
             bool completeChapterOnPickup,
-            string requiredEncounterIdForBeacon = "")
+            string requiredEncounterId = "",
+            bool addRequirementBeacon = false)
         {
             GameObject pickup = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             pickup.name = name;
@@ -1085,12 +1377,13 @@ namespace CampusRPG.Editor
             collider.isTrigger = true;
             KeyItemPickup keyItemPickup = pickup.AddComponent<KeyItemPickup>();
             SetString(keyItemPickup, "keyItemId", keyItemId);
+            SetString(keyItemPickup, "requiredEncounterId", requiredEncounterId);
             SetBool(keyItemPickup, "completeChapterOnPickup", completeChapterOnPickup);
 
-            if (!string.IsNullOrWhiteSpace(requiredEncounterIdForBeacon))
+            if (addRequirementBeacon && !string.IsNullOrWhiteSpace(requiredEncounterId))
             {
                 KeyItemBeaconView keyItemBeaconView = pickup.AddComponent<KeyItemBeaconView>();
-                SetString(keyItemBeaconView, "requiredEncounterId", requiredEncounterIdForBeacon);
+                SetString(keyItemBeaconView, "requiredEncounterId", requiredEncounterId);
             }
         }
 

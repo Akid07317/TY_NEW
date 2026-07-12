@@ -187,21 +187,25 @@
 
 本表用于 `82/82 Passed` 组合回归之后的人工实机观察。自动化不能把“没有人工观察”当成“手感已经确认”，也不能因为想进入 P0.6 就默认新增动作。每行都先填 `观察结果`，再决定 `判定`。
 
+2026-07-11 口径补充：capture driver 分为两类。直接构造 attack / dodge 上下文的驱动只证明表现重放；通过 `InputSystem.QueueStateEvent` 注入完整 `KeyboardState` 的驱动，可以证明 InputReader -> 状态机 -> 伤害 / 计量技术链，但仍不等于物理键盘、人工反应时机或主观手感签字。camera gauntlet 只负责布置案例并记录遥测，永远输出 `manualSignoff=required automaticPass=false`。
+
 判定只使用三类：
 
 - `Pass`：动作、镜头和解法都能被稳定读懂，可以转向 `Chapter01` / Boss 闭环或发布前主线回归。
 - `Tune P0.5`：只需要调现有参数、现有 clip、现有镜头或反馈，不新增状态 / clip / 系统。
 - `Open P0.6`：观察结果证明现有合同无法表达需要，才允许开新动作、新状态、新 clip 或专属受击反馈。
 
+总体收口中的虚拟键盘全链路结果额外标为 `Technical Pass / Human Feel Pending`；它不会被折算成上面的主观 `Pass`。
+
 | 走查块 | 场景 | 必看动作 | 观察结果 | 判定 | 下一步 |
 |---|---|---|---|---|---|
-| 玩家承诺 | 平地单敌人 | `Light` 三段、`Heavy` 空挥/命中、尾段 buffer | 待实机填写 | 待定 | 若早按仍像自动连，先调 `inputBufferSeconds` 或测试合同 |
-| 防御轴 | 平地单敌人、双敌人 | `Guard` startup、成功格挡、startup 失败受击 | 待实机填写 | 待定 | 若格挡过强，仍优先调 `guardStartupSeconds` / feedback，不直接加 parry |
-| 闪避轴 | 墙边、柱子、窄通道 | 定向 dodge、后撤 dodge、成功闪避后 follow-up | 待实机填写 | 待定 | 若后撤被墙和镜头夹死，先调 dodge 距离 / camera obstacle |
-| 招式轴 | 平地、墙边、空中 heavy | `Sidewind Cut`、`Rising Cleave`、`Iron Gate Break` | 待实机填写 | 待定 | 若招式意图不清，先调前摇 / 位移 / hit stop；只有表达不出来再开 P0.6 |
-| 敌人解法 | 三类普通敌人与 Gatekeeper | 正面斩、快攻、远程弹、慢重击、横扫 | 待实机填写 | 待定 | 若玩家分不清该挡/闪/走，先调敌人前摇和追踪截止 |
-| 镜头障碍 | 墙贴背、柱子绕圈、角落、mantle 边缘 | 攻击、闪避、锁定移动同时观察镜头 | 待实机填写 | 待定 | 若遮挡影响读招，先调 camera obstacle / damping |
-| 反馈层级 | 轻击、重击、技能、格挡、玩家受击 | hit stop、SFX/VFX、HUD 提示、受击姿态 | 待实机填写 | 待定 | 若层级不清，先调现有反馈参数，不开新系统 |
+| 玩家承诺 | 平地单敌人 | `Light` 三段、`Heavy` 空挥/命中、尾段 buffer | Lunge Debug HUD 两轮完整重放 Light 空挥/命中、三段空挥/命中、Heavy 空挥/命中、锁定/非锁定、边距 Heavy 与贴墙 Light；HUD 与 Console 顺序一致，贴墙位移被截停 | `Pass` | 真实键鼠只需做一次短 smoke；没有证据要求改合同 |
+| 防御轴 | 平地单敌人、双敌人 | `Guard` startup、成功格挡、startup 失败受击 | CombatTest ordinary Guard 两拍通过虚拟 `<Keyboard>/leftCtrl` 走真实 InputReader 和伤害链：startup 拍 `HP 100->90`、Counter `0->0`、窗口 `False`；active 拍 `HP 100->100`、Counter `0->20`、窗口 `True`，两拍提交均硬匹配 `Enemy_Melee / Enemy_Melee`。Boss Gate Slam Guard 同类技术链为 `HP 100->74.4`，`AttackCommitted/block/guardStartup/activeGuard/guardBreak=True` | `Technical Pass / Human Feel Pending` | 技术链不再补 driver；仅在需要主观手感签字时用物理 Ctrl 观察时机、身体、SFX 与 camera 合层 |
+| 闪避轴 | 墙边、柱子、窄通道 | 定向 dodge、后撤 dodge、成功闪避后 follow-up | Flank / AirHeavy driver 已重放 GroundDodge、CombatRoll、AirDodge 与 follow-up；Boss Gate Slam Dodge 又以虚拟 `W+LeftShift` 走完整输入链，得到 `alignment=1.00`、`HP 100->100`、Agility `0->25`，且 `AttackCommitted/groundDodge/invulnerable/successfulDodge=True` | `Technical Pass / Human Feel Pending` | 障碍空间已纳入 camera 五案；物理 Shift 的手感、人工反应时机与成功穿招体感仍需人签字 |
+| 招式轴 | 平地、墙边、空中 heavy | `Sidewind Cut`、`Rising Cleave`、`Iron Gate Break` | Flank、AirHeavy、IronGateBreak Debug HUD 已重放 Sidewind Cut、Cross Step、Rising Cleave、Falling Star、Iron Gate Break 的 hit/whiff 与候选 HUD；Falling Star 执行姿态/命中点同屏可见 | `Pass` | AirDodge 输入可靠性仍归闪避轴，不顺带冒充通过 |
+| 敌人解法 | 三类普通敌人与 Gatekeeper | 正面斩、快攻、远程弹、慢重击、横扫 | Guard Swing、Feint Dash、Arc Bolt 的 `Tgt Atk:` / 身体语言已人工确认；BossTest 的 Sky Hook、Pursuit Slam、Gate Slam 与解法 cue 已重放，Gate Slam 的硬挡破防与定向闪避主解又完成虚拟键盘技术作答 | `Technical Pass / Human Feel Pending` | 技术主解不再补自动入口；仍不能据此声称玩家已经读懂或喜欢该节奏 |
+| 镜头障碍 | 墙贴背、柱子绕圈、窄廊、后左角落、mantle 边缘 | 攻击、闪避、锁定移动同时观察镜头 | `Chapter01CameraObstacleCaptureDriver` 五案已用真实 Game View 操作走过；五案均 `occupiedEver=False`，宽墙 / 绕柱 / 窄廊 / 墙角观测到静态障碍，mantle 案观测到 `PlayerMantleState`。窄廊 `sideFlips=1` 混有刻意往返输入，只是观察量；`targetInViewport` 只表示在视口，不表示无遮挡 | `Technical Pass / Human Feel Pending` | 未见穿入占用体或持续左右 ping-pong；仍保留人工镜头舒适度 / 构图签字，不把遥测自动判成体验 Pass |
+| 反馈层级 | 轻击、重击、技能、格挡、玩家受击 | hit stop、SFX/VFX、HUD 提示、受击姿态 | Light / Heavy / SwordArt HUD、Boss cue、telegraph 与攻击状态已同屏；Gate Slam 技术硬挡已触发真实伤害、GuardBreak 状态与提交链，但 bool / 数值不能证明玩家身体、SFX、camera impulse 的最终合层主观质量 | `Technical Pass / Human Feel Pending` | 只在人工 feel 签字时核对身体 / 声音 / 镜头层级；没有观察问题不新增系统 |
 
 ## 5. P0.5 合同表
 
@@ -229,7 +233,15 @@ P0.5 不先新增动作，而是先把现有动作写成可验收合同。第一
 | `Enemy_Gatekeeper_Burst` / `Gate Lance` 与 `Enemy_Gatekeeper_Arc` / `Core Bolt` | straight projectile speed `17` vs arc projectile speed `13`、arc height `1.20` | 前者考横移反应，后者考读弹道和空间 | 两者必须保持速度、弹道和前摇差异，避免 Boss 远程招同质化 |
 | `Enemy_Gatekeeper_SkyHook` / `Sky Hook` 与 `Enemy_Gatekeeper_RollCatcher` / `Pursuit Slam` | `Sky Hook` 标记 `AntiAir`，直线 projectile speed `20`；`Pursuit Slam` 标记 `ChaseRoll`，`0.28 / 0.12 / 0.44`，range `4.25`，forwardMovement `1.35` | 空中动作要用反空压回地面；长 roll 逃离要用延迟追击逼玩家确认时机 | UI 已有 `Anti-Air Incoming` / `Roll Catch Incoming` 专属 cue，追滚近战 ground / impact telegraph 会显示前压 lane，并已接轻量 camera impulse 与程序生成 SFX；实机仍重点看起手动作和命中/受击反馈是否足够清楚 |
 
+2026-07-10 Boss GUI 观察：Boss capture driver 原先只枚举 active `EnemyBrain`，而 `BossTest` 的未激活 Encounter 会先禁用 Gatekeeper，导致观察入口开场失败。驱动现已包含 inactive member 并先激活 Encounter；复跑后 `Sky Hook / Pursuit Slam / Gate Slam` 均按 `0.60 / 4.10 / 7.60s` 触发，Gate Slam 的 `Guard Break: dodge; guard breaks`、红色地面 telegraph、目标攻击行和 Boss 身体起手可见。
+
+2026-07-11 输入技术证据：`Gate Slam Guard` 使用完整虚拟 Ctrl `KeyboardState`，结果 `HP 100->74.4`，`AttackCommitted=True`、`block=True`、`guardStartup=True`、`activeGuard=True`、`guardBreak=True`；`Gate Slam Dodge` 使用虚拟 `W+LeftShift`，结果 `alignment=1.00`、`HP 100->100`、Agility `0->25`，`AttackCommitted=True`、`groundDodge=True`、`invulnerable=True`、`successfulDodge=True`。ordinary Guard 两拍同样通过 InputReader：startup 受击 `100->90` 且无 Counter / 窗口，active Guard 免伤并 `Counter +20`、窗口开启。三项都只标记虚拟 Input System 技术链通过，不等价于物理键盘或主观手感。
+
 ### 当前 camera obstacle gauntlet
+
+GUI 入口为 `CampusRPG/Debug/Chapter01/Start Camera Obstacle Gauntlet`，每案结束用 `Next Camera Obstacle Case`，最终用 `Stop Camera Obstacle Gauntlet`。驱动在开始时备份 `slot_auto_chapter01.json`，停止时已将 SHA-256 `2679d6163e71ca45cf640cbcc35c85ff4bf4a3a9bfca4ab3d822ce89598ac0d8` 逐字节恢复；同时恢复 player / camera / A03 encounter / 屏障 / 三敌运行态。所有 METRICS 都保留 `manualSignoff=required automaticPass=false`。
+
+2026-07-11 五案摘要：wide-wall `static=True minRetraction=0.621 occupied=False sideFlips=0`；pillar-orbit `static=True minRetraction=0.839 occupied=False sideFlips=0`；narrow-hall `static=True minRetraction=0.998 occupied=False sideFlips=1`；back-left-corner `static=True minRetraction=0.254 occupied=False sideFlips=0`；mantle-edge `PlayerMantleState static=False minRetraction=1.000 occupied=False sideFlips=0`。`targetInViewportThroughout` 只是 viewport bounds 指标；`maxFrameMotion` / `sideFlips` 会包含刻意移动，均不能单独判 Pass。
 
 | 场景 | 当前自动化覆盖 | 走查重点 |
 |---|---|---|
@@ -256,9 +268,11 @@ P0.5 不先新增动作，而是先把现有动作写成可验收合同。第一
 
 本轮 P0.5 已把 Guard 的“格挡姿态”和“有效防御判定”拆开：`PlayerStateMachine.IsBlocking` 仍服务动画和姿态，`HasActiveGuard` 才服务伤害防御。这样不会让一按下 block 就 frame-0 免伤，也不会为了防御判定去打断现有 block 动画表现。
 
-Guard 的成功/失败反馈底线也已经用 `DamageableReceiver.ReceiveDamage()` 真实路径锁住：有效格挡免伤、给 `+20` counter gauge 并打开 `0.80s` counter window；startup 期被打中会掉血，且不打开反击窗口。P0.6-A 打开最小防御压制语义：攻击定义可标记 `blockStunSeconds` 或 `breaksGuard`，前者让玩家短暂保持 block stun、延迟即时反击，后者让 `Gate Slam` 这类慢重击穿透硬挡并进入受击硬直。破防分支会把 `PlayerHitReactionType.GuardBreak` 传给状态机、动画 relay 和调试 HUD，动画 relay 会请求相机做 `0.18m / 0.16s` 的短促 impact impulse，并切到专属 `GuardBreak` Animator state，先形成可测、可显示、可感知的专属反馈接线。最新 GuardBreak 玩家受击反馈已经从普通 hit clamp 拆出：普通受击仍保持 `0.04s - 0.12s` 短反馈，破防使用 `0.10s - 0.24s` 窗口，`Gate Slam` 当前 `0.16s` hit stun 不再被普通受击上限截断；破防结束前也不会被 movement / jump / dodge / light / heavy / skill 立即取消。当前 `CombatTest` 的 `GuardBreak` state 已升级为专属 `AN_Player_GuardBreak_CombatTest` 选择链：local preview 优先尝试 `OneHand_Up_Shield_Block_Hit_1_InPlace`、`Hit_F_2_InPlace` 或 `Hit_Reaction_Heavy`，public-safe proxy baseline 则用 guard-drop / collapse 曲线，让硬挡失败不是普通 `Hit` 慢放；仍需 GUI 里硬挡 `Gate Slam`，确认真实绑定素材下身体反馈足够清楚。
+Guard 的成功/失败反馈底线也已经用 `DamageableReceiver.ReceiveDamage()` 真实路径锁住：有效格挡免伤、给 `+20` counter gauge 并打开 `0.80s` counter window；startup 期被打中会掉血，且不打开反击窗口。P0.6-A 打开最小防御压制语义：攻击定义可标记 `blockStunSeconds` 或 `breaksGuard`，前者让玩家短暂保持 block stun、延迟即时反击，后者让 `Gate Slam` 这类慢重击穿透硬挡并进入受击硬直。破防分支会把 `PlayerHitReactionType.GuardBreak` 传给状态机、动画 relay 和调试 HUD，动画 relay 会请求相机做 `0.18m / 0.16s` 的短促 impact impulse，并切到专属 `GuardBreak` Animator state，先形成可测、可显示、可感知的专属反馈接线。最新 GuardBreak 玩家受击反馈已经从普通 hit clamp 拆出：普通受击仍保持 `0.04s - 0.12s` 短反馈，破防使用 `0.10s - 0.24s` 窗口，`Gate Slam` 当前 `0.16s` hit stun 不再被普通受击上限截断；破防结束前也不会被 movement / jump / dodge / light / heavy / skill 立即取消。当前 `CombatTest` 的 `GuardBreak` state 已升级为专属 `AN_Player_GuardBreak_CombatTest` 选择链：local preview 优先尝试 `OneHand_Up_Shield_Block_Hit_1_InPlace`、`Hit_F_2_InPlace` 或 `Hit_Reaction_Heavy`，public-safe proxy baseline 则用 guard-drop / collapse 曲线。2026-07-11 虚拟 Ctrl 技术链已确认 Gate Slam 会真正掉血并进入 GuardBreak；正式绑定素材下的身体 / SFX / camera 合层仍只由人工 feel 签字。
 
 P0.7 开始不再冻结新动作：`CombatRoll`、`AirDodge` 和 guard-cancel roll 已进入运行时状态语义，并且已经接上专属 placeholder clip、air dodge 后一次性空中 SwordArt 追击、`Falling Star` 下砸、Gatekeeper `Sky Hook` 反空与 `Pursuit Slam` 追滚回应。`CombatRoll` 现在也有滚后轻击代价：滚中轻击只缓存一次，完整 recovery 后才接基础 Light 或专属 `Cross Step`，普通短闪侧向轻击则继续走 `Sidewind Cut`，两者不会混成同一个动作身份。P6.5-C 已补第一层读招反馈：反空/追滚有专属 cue 和颜色，追滚近战会画前压 lane；P5.5-A 又把 roll / air dodge / 下砸 / 破防 / 反空 / 追滚接进 `CombatDebugHUD` 短反馈行，方便实机走查时直接观察当前动作语义。P5.5-B 则把这些动作语义推进到轻量 camera impulse：roll / air dodge / 核心 SwordArt 和 Gatekeeper 反空/追滚 cue 都会给短促但不抢镜的镜头反馈。P5.5-C 进一步补了 public-safe procedural SFX：这些动作和回应会播放经过 `SO_AudioSettings` SFX 音量的 one-shot chirp。最新 Boss cue 会额外显示 response hint，把 `Sky Hook`、`Pursuit Slam`、破防重击和远程 projectile 的主解法直接写在短提示里，方便绑定素材走查时确认玩家是否能理解“该怎么答”。后续优先补敌人起手、命中/受击反馈、`Moon Sever` 和实机烟雾，而不是回到只调数值的保守路线。
+
+2026-07-11 边界更新：Boss driver 已能激活 inactive Encounter，并通过虚拟 Ctrl / `W+LeftShift` 验证 GuardBreak 与 successful dodge 技术链；物理键盘反应时机、`0.16s` 失控体感、SFX 与 camera impulse 的最终合层仍是人工主观边界。
 
 Dodge 同样已从 frame-0 i-frame 收成短启动合同：`dodgeInvulnerableStartupSeconds = 0.04s`，之后进入 `0.20s` 无敌帧；`DodgeFollowUp` 只在 `TryNotifySuccessfulDodge()` 真正登记成功闪避后打开，普通空闪不会白送追击。
 
@@ -283,9 +297,9 @@ Light combo 也从“整段动作都能排下一段”收成尾段输入合同�
 
 ## 7. 下一步建议
 
-P0 已完成底层收口，P0.7 已改为进攻型推进。后续按这个顺序扩：
+当前不再扩动作系统，按这个顺序完成总体收口：
 
-1. 给 Gatekeeper 反空/追滚补更明确起手动作或命中/受击反馈。
-2. 只有手感观察证明 `AirDodge` 追击表达仍单薄时，才继续 `Moon Sever`。
-3. 若 procedural chirp 实机显得太薄，再升级混音/冷却/空间衰减策略。
-4. 把 P0.7 / P6.5 / P5.5 动作回应加入 CombatTest 人工走查与最终组合 gate。
+1. ordinary Guard 与 Boss Guard / Dodge 的虚拟 Input System 技术链已通过，不再扩 capture driver；若发布前需要 feel 签字，只补一轮物理 Ctrl / Shift 的人工反应时机和合层观察。
+2. Chapter01 五案例 camera gauntlet 的技术烟雾、METRICS 与存档恢复已完成；保留舒适度 / 构图人工签字，不把遥测自动判成体验 Pass。
+3. C4 的 fresh XML，以及 C5 的 Windows 真机构建与 Mac 正式签名 / 公证归发布环境收口；当前 Mac 内部 RC 的 build / MainMenu launch smoke 已完成，不再混入动作合同判断。
+4. 只有人工实测出现明确问题才进入 `Tune P0.5`；没有观察证据时不新增状态、动作或系统。

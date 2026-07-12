@@ -7,7 +7,7 @@
 - 公开仓库默认基线始终是 `Assets/_Game/` 自包含的 proxy visuals + proxy / approved `_Game` 动画输出。
 - `Build CombatTest Scene`、`Repair CombatTest Prefab Wiring`、`Build Chapter01 Combined Scene` 这类标准构建链，必须在有没有第三方素材的机器上都产出同一套 public-repo-safe 结果。
 - `Repair Chapter01 Baseline And Traversal Wiring` 也属于标准收口链，职责是先恢复 `CombatTest` prefab 的 proxy baseline，再同步 `Chapter01` 场景接线，不允许把 local preview 结果固化回正式章节。
-- `Assets/Kevin Iglesias`、`Assets/DoubleL`、`Assets/ithappy`、`Assets/JC_LP_MedievalCharacters_LITE` 这类目录只允许作为本地 local preview 候选源，不能再被当作正式默认输入源。
+- `Assets/Kevin Iglesias`、`Assets/DoubleL`、`Assets/ithappy`、`Assets/JC_LP_MedievalCharacters_LITE`、`Assets/GhostSamurai_Animset` 这类目录只允许作为本地 local preview 候选源，不能再被当作正式默认输入源。
 - 敌人当前仍固定走 `CombatProxyVisualRoot` 代理外观基线；在补齐独立敌人 Animator / Avatar / 动画链之前，不启用 imported enemy 默认链。
 - 第三方原始资源目录不应直接提交到公开仓库；如果后续真要让某套角色或动作成为正式默认资源，应该先把可提交的净化结果落进 `_Game`，再由正式 builder 只读 `_Game`。
 - `ReleaseCandidatePreflightTests` 会检查发布场景依赖，正式场景不能直接依赖本清单中的 local-preview-only 目录或 `_Game/Animations/Characters/CombatTest/LocalPreview/` 生成物。
@@ -21,6 +21,7 @@
 | `Assets/ithappy/` | 玩家 local preview 走跑 / 闪避 / 受击 / 死亡动作候选源 | 否 | local preview only |
 | `Assets/JC_LP_MedievalCharacters_LITE/` | 玩家 local preview Humanoid 角色 prefab / Avatar 首选源 | 否 | local preview only |
 | `Assets/Free medieval weapons/` | 玩家 local preview 武器 prefab 首选源 | 否 | local preview only |
+| `Assets/GhostSamurai_Animset/` | 玩家 / Boss local preview 刀、格挡、弹反、闪避、受击、移动和弓动作候选源；招式映射见 [GhostSamurai 动作接入设计](GhostSamurai_Action_Integration_Plan.md) | 否 | local research preview only |
 | `Assets/MYFG-Weapon Pack Lite/` | 武器资源候选 | 否 | 当前未接入 `_Game` |
 | `Assets/Polytope Studio/` | 场景 / 美术资源候选 | 否 | 当前未接入 `_Game` |
 
@@ -51,12 +52,15 @@
 1. 导入本地素材，并保留上表目录名。
 2. 手动开启菜单 `CampusRPG/Setup/CombatTest/Prefer Imported Player Sources When Available`。
 3. 执行 `CampusRPG/Setup/Local Preview/Rebuild CombatTest Imported Player Animations`。
+   如果本机存在 `Assets/GhostSamurai_Animset/`，这一步会优先选用 GhostSamurai 的 katana / APose / Inplace 动作，再回退到 `DoubleL`、`Kevin Iglesias` 和 `ithappy`。
 4. 如需预览导入角色，再执行 `CampusRPG/Setup/Local Preview/Apply Imported Player Visuals To CombatTest Player Prefab`。
    当前会优先尝试 `Assets/JC_LP_MedievalCharacters_LITE/Prefabs/SM_MedievalMaleLite_01.prefab`；若不存在，再回退到 `Assets/Kevin Iglesias/` 下的兼容 Humanoid 角色。
    如果首选角色材质仍是 HDRP / 不受支持 shader，本地预览会自动在 `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/Materials/Player/` 下生成 built-in 兼容材质，避免玩家预览变成粉紫色。
    如果本机存在 `Assets/Free medieval weapons/Prefabs/Sword_OH.prefab`，这一步会优先把这把单手剑挂到 imported 右手骨；若缺失才回退到其他本地武器候选，并自动隐藏 proxy 剑体，只保留前向标记。
 5. 如果你要给敌人单独试 imported humanoid Avatar 链，手动执行 `CampusRPG/Setup/Local Preview/Apply Imported Enemy Avatar Chain To CombatTest Enemy Prefabs`。
    这条链会按 skinned mesh 的最低点自动贴地，避免 enemy 预览模型埋进地面；同时攻击状态每次重新进入时都会从头重播 attack clip，防止看起来像没有攻击动画。
+   如果你要继续看 `Gatekeeper` 的 `Sky Hook / Pursuit Slam / Gate Slam`，优先打开 `BossTest` 或含 `Boss_Gatekeeper` 的场景，再用 `CampusRPG/Setup/Local Preview/Start Boss Read Capture Driver/*` 或终端 `Tools/unity-cli/ty-new-ghostsamurai-observe-boss-reads`。这条观察链会在运行时把 imported enemy preview 挂到当前 boss 实例上，不需要把 `BossTest` 场景重建成提交基线以外的脏态。
+   如果你要专门对照 `CombatTest` 的 melee / mobile / ranged 三类敌人身体语言，执行 `CampusRPG/Setup/Local Preview/Start CombatTest Enemy Read Capture Driver/*` 或终端 `Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads`。默认观察链会在运行时把 imported enemy preview 临时挂到当前三类敌人实例上，并依次触发 `Guard Swing`、`Feint Dash` 与 `Arc Bolt`，不要求把 `CombatTest` scene 保存成 local-preview 脏态。若这轮要专门看 GhostSamurai Bow 的 `Anti-Air / Chase Roll / Guard Break` 三段读招，改用 `CampusRPG/Setup/Local Preview/Start CombatTest Enemy Read Capture Driver/Ranged Variants/*` 或终端 `Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads ranged-clean` / `ranged-scene`。
 6. 这一步会在 `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/` 下生成本地 AnimatorController；该目录只服务 local preview，不应提交。
 7. 预览结束后，执行 `CampusRPG/Setup/Repair CombatTest Prefab Wiring`，把 `PF_Player_CombatTest` 和三类敌人 prefab 一起恢复到 proxy baseline，并拆掉 enemy root 上的 `Animator/EnemyCombatAnimationRelay`。
 8. 如果 `CombatTest` 场景里的敌人再次提示 `no valid NavMesh`，执行 `CampusRPG/Setup/Repair CombatTest Scene NavMesh`，把当前场景的导航数据重新烘出来。
@@ -66,6 +70,13 @@
 - local preview 只是本机工作流，不是正式默认链。
 - 敌人 imported Avatar chain 目前仍是显式 local preview 分支，不是正式默认链。
 - 如果 local preview 改脏了 `PF_Player_CombatTest.prefab`、`AC_Player_CombatTest.controller`、`_Game/Animations/Characters/CombatTest/*`、`CombatTest.unity`、`Chapter01_Combined.unity`，提交前必须先回到 proxy baseline 再检查 diff。
+
+### 4.1 用户自有 GhostSamurai 美术候选
+
+- `ReleaseCandidateArtProfile.UserOwnedGhostSamurai` 是单独的内部试玩构建档位，不改变 public-safe 默认基线。
+- 该档位把人物模型、Humanoid Avatar、刀和玩家动作全部锁在 `Assets/GhostSamurai_Animset/`，禁止回退混用 JC / Kevin / DoubleL / ithappy。
+- 构建入口为 `Tools/unity-cli/ty-new-build-release art-mac` / `art-windows`，输出到 `Builds/ReleaseCandidate/UserOwnedArt/`；脚本强制使用临时克隆，构建结束后不把 imported prefab / 动画脏态带回主树。
+- 本机目录元数据可确认 `licenseType: Store` 来源标记，但没有找到独立 GhostSamurai EULA 文档；因此该档位当前只用于项目所有者内部人工验收，不能据此自动判定为可公开分发。
 
 ## 5. 提交规则
 
@@ -78,6 +89,7 @@
   - `Assets/ithappy/`
   - `Assets/JC_LP_MedievalCharacters_LITE/`
   - 任何由 local preview 直接带进正式输出、并仍然依赖上述目录的 `_Game` 资产
+  - `Assets/GhostSamurai_Animset/`
   - `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/` 下生成的 enemy local-preview AnimatorController
   - `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/Materials/Player/` 下生成的本地 player preview 兼容材质
   - 任何只是为了导入素材而顺手改出来、但当前 `_Game` 没实际使用的 `Packages/` / `ProjectSettings/` 变更
@@ -86,6 +98,7 @@
 
 - 当前正式默认基线应恢复为“proxy visuals + proxy / approved `_Game` animations”。
 - 第三方素材目录现在只应作为 local preview 候选源存在，不能再被描述成正式默认来源。
+- 用户自有 GhostSamurai 候选可以生成带真实人物/动作的内部包，但在完整授权凭证确认并完成 self-contained `_Game` 晋升前，不替代 public-safe RC。
 
 ## 7. 地图灰盒与 CC0 候选池
 

@@ -65,7 +65,9 @@ namespace CampusRPG.Character
 
         public override void Tick(float deltaTime)
         {
+            float previousElapsedSeconds = elapsedAttackSeconds;
             elapsedAttackSeconds += Mathf.Max(0f, deltaTime);
+            ApplyDistributedForwardMovement(previousElapsedSeconds, elapsedAttackSeconds);
             Owner.CombatController?.NotifyAttackTiming(elapsedAttackSeconds, totalAttackDurationSeconds);
 
             if (!isActiveWindowStarted)
@@ -158,7 +160,7 @@ namespace CampusRPG.Character
         private void BeginActiveWindow()
         {
             isActiveWindowStarted = true;
-            ApplyForwardMovement();
+            ApplyLegacyForwardMovement();
             Owner.CombatController?.HitboxController?.OpenActivationWindow();
 
             if (definition == null || definition.HitboxActivationMode == AttackHitboxActivationMode.AnimationEvent)
@@ -184,15 +186,36 @@ namespace CampusRPG.Character
             Owner.CombatController?.HitboxController?.CloseActivationWindow();
         }
 
-        private void ApplyForwardMovement()
+        private void ApplyLegacyForwardMovement()
         {
             if (hasAppliedForwardMovement || definition == null)
             {
                 return;
             }
 
+            if (definition.UsesDistributedForwardMovement)
+            {
+                hasAppliedForwardMovement = true;
+                return;
+            }
+
             hasAppliedForwardMovement = true;
             Owner.Motor?.AdvanceFacingDirection(definition.ForwardMovement);
+        }
+
+        private void ApplyDistributedForwardMovement(float previousElapsedSeconds, float currentElapsedSeconds)
+        {
+            float deltaDistance = PlayerCombatRuntimeUtility.ResolveAttackForwardMovementDelta(
+                definition,
+                previousElapsedSeconds,
+                currentElapsedSeconds);
+
+            if (deltaDistance <= 0f)
+            {
+                return;
+            }
+
+            Owner.Motor?.AdvanceFacingDirection(deltaDistance);
         }
 
         private static float ResolveRecoverySeconds(AttackDefinitionSO attackDefinition)

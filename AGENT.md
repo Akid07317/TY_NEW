@@ -49,7 +49,7 @@
 ### 批处理与自动化附加规则
 
 - 在 `macOS` 上执行 Unity `-batchmode`、测试或编辑器工具前，先确认 `Unity Hub` 已退出，避免旧版 `UnityLicensingClient` 抢占授权通信通道。
-- 若主工程 `/Users/don/TY_NEW` 已被本地 Unity 编辑器打开，自动化构建优先使用临时克隆目录执行，避免与人工编辑状态互相抢锁。
+- 若主工程 `<PROJECT_ROOT>` 已被本地 Unity 编辑器打开，自动化构建优先使用临时克隆目录执行，避免与人工编辑状态互相抢锁。
 - 命令行执行 Unity `-runTests` 时不要附带 `-quit`；当前 `com.unity.test-framework@1.6.0` 会在测试结束后自行退出，而 `-quit` 会让测试不启动。
 - 本地回归优先使用 `Tools/unity-cli/unity-run-tests`，避免测试参数漂移。
 - 自动化严禁裸跑没有墙钟超时的 Unity `-batchmode` / `-executeMethod` 命令。若必须执行编辑器方法，先确认同项目 GUI Editor 已退出或改用隔离副本，并给本次进程设置明确的最大等待时间；若日志在启动阶段长时间只停留在 licensing / Package Manager 之前，记录阻塞并停止等待。
@@ -89,3 +89,10 @@
 3. 它是否破坏当前模块化和可测试性？
 
 若第 1 条答案不明确，或第 2、3 条风险偏高，则默认不做。
+
+## 9. 工程纪律入口
+
+- 准备提交、发布验证、外部模型分析或大范围清理前，先阅读 `Docs/Engineering_Discipline.md`。
+- 每轮先运行 `Tools/unity-cli/ty-new-diff-audit`，把代码、测试、文档、Unity 序列化资产、local preview 和临时生成物分开看。
+- local preview 资产和 public-safe baseline 必须保持两条线：预览研究可以存在于本机，但提交/发布前必须能回到 proxy baseline，并用相应 baseline gate 证明。
+- 大量 `.anim` / `.prefab` / `.unity` YAML 不代表真实代码量；除非本轮明确是 approved generated asset promotion，否则不要和代码改动一起顺手提交。

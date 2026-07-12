@@ -3,6 +3,8 @@ using CampusRPG.Camera;
 using CampusRPG.Character;
 using CampusRPG.Combat;
 using NUnit.Framework;
+using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine;
 
 namespace CampusRPG.Tests.EditMode
@@ -62,6 +64,53 @@ namespace CampusRPG.Tests.EditMode
             Assert.AreEqual(
                 PlayerCombatAnimationRelay.AirDodgeStateName,
                 PlayerCombatAnimationRelay.ResolveEvasiveActionStateName(PlayerEvasiveActionType.AirDodge));
+        }
+
+        [Test]
+        public void FormatAttackVariantStateName_UsesStableTwoDigitSuffix()
+        {
+            Assert.AreEqual("Light_01_01", PlayerCombatAnimationRelay.FormatAttackVariantStateName("Light_01", 1));
+            Assert.AreEqual("SwordArt_MoonSever_12", PlayerCombatAnimationRelay.FormatAttackVariantStateName("SwordArt_MoonSever", 12));
+        }
+
+        [Test]
+        public void ResolveNextAttackVariantStateName_RotatesThroughAvailableVariants()
+        {
+            const string TempControllerPath = "Assets/_Game/Animations/Characters/CombatTest/TMP_PlayerVariantRelay.controller";
+            AssetDatabase.DeleteAsset(TempControllerPath);
+
+            GameObject playerObject = null;
+
+            try
+            {
+                AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(TempControllerPath);
+                controller.layers[0].stateMachine.AddState("Light_01_01");
+                controller.layers[0].stateMachine.AddState("Light_01_02");
+                playerObject = new GameObject("Player");
+                Animator animator = playerObject.AddComponent<Animator>();
+                animator.runtimeAnimatorController = controller;
+                PlayerCombatAnimationRelay relay = playerObject.AddComponent<PlayerCombatAnimationRelay>();
+                SetPrivateField(relay, "animator", animator);
+
+                MethodInfo resolveMethod = typeof(PlayerCombatAnimationRelay).GetMethod(
+                    "ResolveNextAttackVariantStateName",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+
+                Assert.IsNotNull(resolveMethod);
+                Assert.AreEqual("Light_01_01", resolveMethod.Invoke(relay, new object[] { "Light_01" }));
+                Assert.AreEqual("Light_01_02", resolveMethod.Invoke(relay, new object[] { "Light_01" }));
+                Assert.AreEqual("Light_01_01", resolveMethod.Invoke(relay, new object[] { "Light_01" }));
+                Assert.AreEqual("Heavy_01", resolveMethod.Invoke(relay, new object[] { "Heavy_01" }));
+            }
+            finally
+            {
+                if (playerObject != null)
+                {
+                    Object.DestroyImmediate(playerObject);
+                }
+
+                AssetDatabase.DeleteAsset(TempControllerPath);
+            }
         }
 
         [Test]

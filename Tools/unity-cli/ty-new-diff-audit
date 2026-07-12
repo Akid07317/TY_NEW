@@ -1,0 +1,267 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-diff-audit [--top <count>] [--fail-on-warning]
+
+Prints a read-only Git diff hygiene report for TY_NEW. It separates code,
+tests, docs, Unity serialized assets, local-preview material, and generated
+noise so large Unity YAML changes do not hide the real review surface.
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+TOP_COUNT=12
+FAIL_ON_WARNING=0
+WARNINGS=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --top)
+      [ $# -ge 2 ] || usage
+      TOP_COUNT=$2
+      shift 2
+      ;;
+    --fail-on-warning)
+      FAIL_ON_WARNING=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+cd "$PROJECT_ROOT"
+
+section() {
+  printf '\n== %s ==\n' "$1"
+}
+
+warn() {
+  WARNINGS=$((WARNINGS + 1))
+  printf 'WARNING: %s\n' "$1"
+}
+
+diff_summary() {
+  LABEL=$1
+  shift
+
+  if [ $# -gt 0 ]; then
+    git diff --numstat -- "$@"
+  else
+    git diff --numstat
+  fi | awk -v label="$LABEL" '
+    NF >= 3 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ {
+      files += 1
+      additions += $1
+      deletions += $2
+      next
+    }
+    NF >= 3 && ($1 == "-" || $2 == "-") {
+      binary += 1
+    }
+    END {
+      printf "%-32s files=%d additions=%d deletions=%d net=%d binary=%d\n",
+        label, files, additions, deletions, additions - deletions, binary
+    }'
+}
+
+count_untracked() {
+  git ls-files --others --exclude-standard | awk '
+    /\.cs$/ || /\.py$/ || /^Tools\/unity-cli\// {
+      code += 1
+      next
+    }
+    /\.md$/ {
+      docs += 1
+      next
+    }
+    /\.(anim|controller|asset|prefab|unity|mat|meta)$/ {
+      unity += 1
+      next
+    }
+    /__pycache__/ || /\.pyc$/ || /\.DS_Store$/ {
+      temp += 1
+      next
+    }
+    {
+      other += 1
+    }
+    END {
+      printf "untracked_code_files=%d\n", code
+      printf "untracked_doc_files=%d\n", docs
+      printf "untracked_unity_yaml_or_meta_files=%d\n", unity
+      printf "untracked_temp_files=%d\n", temp
+      printf "untracked_other_files=%d\n", other
+    }'
+}
+
+sum_numstat_additions() {
+  git diff --numstat -- "$@" | awk '
+    NF >= 3 && $1 ~ /^[0-9]+$/ {
+      additions += $1
+      deletions += $2
+      files += 1
+    }
+    END {
+      printf "%d %d %d\n", files, additions, deletions
+    }'
+}
+
+section "Repository"
+printf 'root=%s\n' "$PROJECT_ROOT"
+git status --short | awk '
+  /^ M|^M |^MM|^A |^ D|^D |^R |^C / { tracked += 1; next }
+  /^\?\?/ { untracked += 1; next }
+  { other += 1 }
+  END {
+    printf "tracked_changed_entries=%d\n", tracked
+    printf "untracked_entries=%d\n", untracked
+    printf "other_status_entries=%d\n", other
+  }'
+
+section "Tracked Diff Summary"
+diff_summary "all tracked"
+diff_summary "code/scripts" \
+  '*.cs' \
+  'Tools/unity-cli/*' \
+  'Tools/ghostsamurai/*' \
+  ':(exclude)**/*.md' \
+  ':(exclude)**/*.meta' \
+  ':(exclude)**/__pycache__/**'
+diff_summary "runtime C#" \
+  'Assets/_Game/Scripts/Runtime/*.cs' \
+  'Assets/_Game/Scripts/Runtime/**/*.cs'
+diff_summary "editor C#" \
+  'Assets/_Game/Scripts/Editor/*.cs'
+diff_summary "test C#" \
+  'Assets/_Game/Scripts/Tests/*.cs' \
+  'Assets/_Game/Scripts/Tests/**/*.cs'
+diff_summary "docs" \
+  '*.md' \
+  'Docs/*.md' \
+  'Assets/_Game/*.md' \
+  'Tools/**/*.md'
+diff_summary "unity serialized assets" \
+  '*.anim' \
+  '*.controller' \
+  '*.asset' \
+  '*.prefab' \
+  '*.unity' \
+  '*.mat'
+diff_summary "CombatTest animations" \
+  'Assets/_Game/Animations/Characters/CombatTest/*.anim'
+
+section "Largest Unity Serialized Changes"
+git diff --numstat -- \
+  '*.anim' \
+  '*.controller' \
+  '*.asset' \
+  '*.prefab' \
+  '*.unity' \
+  '*.mat' |
+  awk 'NF >= 3 && $1 ~ /^[0-9]+$/ {
+    path = $3
+    for (i = 4; i <= NF; i++) {
+      path = path " " $i
+    }
+    printf "%d\t+%d/-%d\t%s\n", $1 + $2, $1, $2, path
+  }' |
+  sort -nr |
+  head -n "$TOP_COUNT"
+
+section "Untracked Summary"
+count_untracked
+
+section "Local Preview Roots"
+for root in \
+  'Assets/GhostSamurai_Animset' \
+  'Assets/Kevin Iglesias' \
+  'Assets/DoubleL' \
+  'Assets/ithappy' \
+  'Assets/JC_LP_MedievalCharacters_LITE' \
+  'Assets/Free medieval weapons' \
+  'Assets/MYFG-Weapon Pack Lite' \
+  'Assets/Polytope Studio' \
+  'Assets/_Game/Animations/Characters/CombatTest/LocalPreview'
+do
+  if [ -e "$root" ]; then
+    TRACKED_COUNT=$(git ls-files -- "$root" | wc -l | awk '{print $1}')
+    if git check-ignore -q "$root" 2>/dev/null; then
+      IGNORED=yes
+    else
+      IGNORED=no
+    fi
+    printf '%-72s present=yes tracked_files=%s ignored=%s\n' "$root" "$TRACKED_COUNT" "$IGNORED"
+  else
+    printf '%-72s present=no\n' "$root"
+  fi
+done
+
+section "Warnings"
+set -- $(sum_numstat_additions 'Assets/_Game/Animations/Characters/CombatTest/*.anim')
+COMBAT_ANIM_FILES=$1
+COMBAT_ANIM_ADDITIONS=$2
+COMBAT_ANIM_DELETIONS=$3
+
+if [ "$COMBAT_ANIM_ADDITIONS" -gt 100000 ]; then
+  warn "CombatTest animation YAML is very large: files=$COMBAT_ANIM_FILES additions=$COMBAT_ANIM_ADDITIONS deletions=$COMBAT_ANIM_DELETIONS. Treat this as local-preview or explicitly approved generated content before staging."
+fi
+
+set -- $(sum_numstat_additions '*.cs' 'Tools/unity-cli/*' 'Tools/ghostsamurai/*' ':(exclude)**/*.md' ':(exclude)**/*.meta' ':(exclude)**/__pycache__/**')
+CODE_FILES=$1
+CODE_ADDITIONS=$2
+CODE_DELETIONS=$3
+if [ "$CODE_ADDITIONS" -gt 3000 ]; then
+  warn "Code/script tracked diff is broad: files=$CODE_FILES additions=$CODE_ADDITIONS deletions=$CODE_DELETIONS. Prefer splitting by runtime/editor/tests/docs when preparing a review or commit."
+fi
+
+TEMP_UNTRACKED=$(git ls-files --others --exclude-standard | awk '/__pycache__/ || /\.pyc$/ || /\.DS_Store$/ {count += 1} END {print count + 0}')
+if [ "$TEMP_UNTRACKED" -gt 0 ]; then
+  warn "Generated temp artifacts are visible to Git: count=$TEMP_UNTRACKED. Update ignores or remove before staging."
+fi
+
+for root in \
+  'Assets/GhostSamurai_Animset' \
+  'Assets/Kevin Iglesias' \
+  'Assets/DoubleL' \
+  'Assets/ithappy' \
+  'Assets/JC_LP_MedievalCharacters_LITE' \
+  'Assets/Free medieval weapons' \
+  'Assets/MYFG-Weapon Pack Lite' \
+  'Assets/Polytope Studio' \
+  'Assets/_Game/Animations/Characters/CombatTest/LocalPreview'
+do
+  TRACKED_COUNT=$(git ls-files -- "$root" | wc -l | awk '{print $1}')
+  if [ "$TRACKED_COUNT" -gt 0 ]; then
+    warn "Local-preview-only root has tracked files: $root tracked_files=$TRACKED_COUNT. Confirm this is intentional before public-safe submit/release."
+  fi
+done
+
+ROOT_SCENES=$(git ls-files --others --exclude-standard | awk '/^Assets\/[^\/]+\.unity$/ {count += 1} END {print count + 0}')
+if [ "$ROOT_SCENES" -gt 0 ]; then
+  warn "Untracked scene files exist directly under Assets/: count=$ROOT_SCENES. Confirm they are intentional before staging."
+fi
+
+if [ "$WARNINGS" -eq 0 ]; then
+  echo "No diff hygiene warnings."
+fi
+
+section "Recommended Next Gate"
+cat <<'EOF'
+- Code/runtime change: run the narrow matching EditMode/PlayMode tests with Tools/unity-cli/unity-run-tests.
+- GhostSamurai/local-preview research: run Tools/unity-cli/ty-new-ghostsamurai-preview-check.
+- Public-safe submit/release proof after preview work: run Tools/unity-cli/ty-new-ghostsamurai-baseline-check or the broader release gate.
+- Large .anim/.prefab/.unity changes: do not stage them with code unless this is an explicit generated-asset promotion.
+EOF
+
+if [ "$FAIL_ON_WARNING" -eq 1 ] && [ "$WARNINGS" -gt 0 ]; then
+  exit 2
+fi

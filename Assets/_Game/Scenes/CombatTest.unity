@@ -598,26 +598,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 549989439120567154, guid: e45b1ee3fd65244949d40e039efb1d99, type: 3}
-      propertyPath: inputReader
-      value: 
-      objectReference: {fileID: 1824392094}
-    - target: {fileID: 549989439120567154, guid: e45b1ee3fd65244949d40e039efb1d99, type: 3}
-      propertyPath: cameraTransform
-      value: 
-      objectReference: {fileID: 1978190878}
-    - target: {fileID: 549989439120567154, guid: e45b1ee3fd65244949d40e039efb1d99, type: 3}
-      propertyPath: cameraController
-      value: 
-      objectReference: {fileID: 1978190877}
-    - target: {fileID: 1753309315433807489, guid: e45b1ee3fd65244949d40e039efb1d99, type: 3}
-      propertyPath: inputReader
-      value: 
-      objectReference: {fileID: 1824392094}
-    - target: {fileID: 1753309315433807489, guid: e45b1ee3fd65244949d40e039efb1d99, type: 3}
-      propertyPath: cameraTransform
-      value: 
-      objectReference: {fileID: 1978190878}
     - target: {fileID: 5350621351796418438, guid: e45b1ee3fd65244949d40e039efb1d99, type: 3}
       propertyPath: m_Name
       value: Player

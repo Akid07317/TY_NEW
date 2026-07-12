@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CampusRPG.Camera;
 using CampusRPG.Combat;
 using CampusRPG.Composition;
@@ -63,6 +64,7 @@ namespace CampusRPG.Character
         private bool proxyWeaponDefaultsCaptured;
         private bool proxyWeaponSnappedToAnchor;
         private float immediateProxyWeaponFollowTimer;
+        private readonly Dictionary<string, int> attackVariantCursorByStateName = new Dictionary<string, int>();
 
         public float DodgeAnimationDurationSeconds => Mathf.Max(0.01f, dodgeAnimationDurationSeconds);
 
@@ -73,6 +75,11 @@ namespace CampusRPG.Character
         public float HitAnimationDurationSeconds => Mathf.Max(0.01f, hitAnimationDurationSeconds);
 
         public PlayerHitReactionType CurrentHitReactionType { get; private set; } = PlayerHitReactionType.Standard;
+
+        private void OnEnable()
+        {
+            attackVariantCursorByStateName.Clear();
+        }
 
         private void Awake()
         {
@@ -189,7 +196,8 @@ namespace CampusRPG.Character
                 return;
             }
 
-            animator.CrossFadeInFixedTime(attackDefinition.AnimationStateName, Mathf.Max(0f, crossFadeSeconds), baseLayerIndex);
+            string stateName = ResolveNextAttackVariantStateName(attackDefinition.AnimationStateName);
+            animator.CrossFadeInFixedTime(stateName, Mathf.Max(0f, crossFadeSeconds), baseLayerIndex);
         }
 
         public void AnimationEvent_OpenAttackHitbox()
@@ -295,6 +303,70 @@ namespace CampusRPG.Character
                 PlayerEvasiveActionType.AirDodge => AirDodgeStateName,
                 _ => GroundDodgeStateName
             };
+        }
+
+        public static string FormatAttackVariantStateName(string baseStateName, int variantIndex)
+        {
+            int clampedIndex = Mathf.Max(1, variantIndex);
+            return clampedIndex < 10
+                ? baseStateName + "_0" + clampedIndex
+                : baseStateName + "_" + clampedIndex;
+        }
+
+        private string ResolveNextAttackVariantStateName(string baseStateName)
+        {
+            if (string.IsNullOrWhiteSpace(baseStateName))
+            {
+                return baseStateName;
+            }
+
+            int variantCount = CountContiguousAttackVariantStates(baseStateName);
+
+            if (variantCount <= 0)
+            {
+                return baseStateName;
+            }
+
+            attackVariantCursorByStateName.TryGetValue(baseStateName, out int cursor);
+            int variantIndex = (cursor % variantCount) + 1;
+            attackVariantCursorByStateName[baseStateName] = (cursor + 1) % variantCount;
+            string variantStateName = FormatAttackVariantStateName(baseStateName, variantIndex);
+            return HasAnimatorState(variantStateName) ? variantStateName : baseStateName;
+        }
+
+        private int CountContiguousAttackVariantStates(string baseStateName)
+        {
+            const int MaxVariantProbeCount = 32;
+
+            for (int i = 1; i <= MaxVariantProbeCount; i++)
+            {
+                if (!HasAnimatorState(FormatAttackVariantStateName(baseStateName, i)))
+                {
+                    return i - 1;
+                }
+            }
+
+            return MaxVariantProbeCount;
+        }
+
+        private bool HasAnimatorState(string stateName)
+        {
+            if (animator == null
+                || string.IsNullOrWhiteSpace(stateName)
+                || baseLayerIndex < 0
+                || baseLayerIndex >= animator.layerCount)
+            {
+                return false;
+            }
+
+            if (animator.HasState(baseLayerIndex, Animator.StringToHash(stateName)))
+            {
+                return true;
+            }
+
+            string layerName = animator.GetLayerName(baseLayerIndex);
+            return !string.IsNullOrEmpty(layerName)
+                && animator.HasState(baseLayerIndex, Animator.StringToHash(layerName + "." + stateName));
         }
 
         public float ResolveEvasiveAnimationDurationSeconds(PlayerEvasiveActionType actionType)

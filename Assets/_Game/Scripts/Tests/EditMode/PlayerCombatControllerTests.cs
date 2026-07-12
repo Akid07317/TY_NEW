@@ -97,6 +97,48 @@ namespace CampusRPG.Tests
         }
 
         [Test]
+        public void TimedWindowAttack_IgnoresHitboxAnimationEvents()
+        {
+            GameObject attacker = new GameObject("PlayerCombat");
+            AttackExecutor executor = attacker.AddComponent<AttackExecutor>();
+            HitboxController hitboxController = attacker.AddComponent<HitboxController>();
+            PlayerCombatController controller = attacker.AddComponent<PlayerCombatController>();
+            GameObject target = CreateTarget("Target", new Vector3(0f, 0f, 1.1f));
+            AttackDefinitionSO attack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+
+            try
+            {
+                SetPrivateField(executor, "attackOrigin", attacker.transform);
+                SetPrivateField(hitboxController, "attackExecutor", executor);
+                SetPrivateField(controller, "attackExecutor", executor);
+                SetPrivateField(controller, "hitboxController", hitboxController);
+                SetPrivateField(attack, "damageMultiplier", 1f);
+                SetPrivateField(attack, "hitboxShape", AttackHitboxShape.Box);
+                SetPrivateField(attack, "hitboxLocalCenter", new Vector3(0f, 0f, 1.1f));
+                SetPrivateField(attack, "hitboxHalfExtents", new Vector3(0.45f, 0.45f, 0.45f));
+                SetPrivateField(attack, "hitboxActivationMode", AttackHitboxActivationMode.TimedWindow);
+
+                hitboxController.Prepare(attack, 12f, attacker);
+                controller.NotifyAttackStarted(attack);
+                hitboxController.OpenActivationWindow();
+
+                Assert.IsFalse(controller.ActivatePreparedHitboxFromAnimationEvent());
+                Assert.AreEqual(0f, target.GetComponent<TestDamageable>().TotalDamageReceived);
+
+                controller.ClearPreparedHitboxFromAnimationEvent();
+
+                Assert.IsTrue(hitboxController.Activate());
+                Assert.AreEqual(12f, target.GetComponent<TestDamageable>().TotalDamageReceived);
+            }
+            finally
+            {
+                Object.DestroyImmediate(attack);
+                Object.DestroyImmediate(target);
+                Object.DestroyImmediate(attacker);
+            }
+        }
+
+        [Test]
         public void TryPreviewSwordArt_ResolvesCandidateAttack_WithoutChangingBaseAttackChain()
         {
             GameObject gameObject = new GameObject("PlayerCombat");
@@ -223,6 +265,109 @@ namespace CampusRPG.Tests
             {
                 Object.DestroyImmediate(sidewindCut);
                 Object.DestroyImmediate(sidewindAttack);
+                Object.DestroyImmediate(lightAttack);
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void TryConsumeBufferedSwordArt_SpendsMana_WhenSwordArtIsAffordable()
+        {
+            GameObject gameObject = new GameObject("PlayerCombat");
+            gameObject.AddComponent<AttackExecutor>();
+            gameObject.AddComponent<HitboxController>();
+            ManaComponent mana = gameObject.AddComponent<ManaComponent>();
+
+            AttackDefinitionSO lightAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+            AttackDefinitionSO gateBreakAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+            SwordArtDefinitionSO gateBreak = ScriptableObject.CreateInstance<SwordArtDefinitionSO>();
+
+            try
+            {
+                PlayerCombatController controller = gameObject.AddComponent<PlayerCombatController>();
+                SetPrivateField(controller, "mana", mana);
+                SetPrivateField(controller, "lightAttackCombo", new[] { lightAttack });
+                SetPrivateField(gateBreak, "artId", "Iron_Gate_Break");
+                SetPrivateField(gateBreak, "displayName", "Iron Gate Break");
+                SetPrivateField(gateBreak, "attackDefinition", gateBreakAttack);
+                SetPrivateField(gateBreak, "triggerAction", SwordArtTriggerAction.HeavyAttack);
+                SetPrivateField(gateBreak, "acceptedDirections", SwordArtDirectionMask.Any);
+                SetPrivateField(gateBreak, "anyContextTags", SwordArtContextTags.AfterHeavy);
+                SetPrivateField(gateBreak, "triggerWindowSeconds", 0.35f);
+                SetPrivateField(gateBreak, "resourceCost", 15f);
+                SetPrivateField(controller, "swordArts", new[] { gateBreak });
+                mana.SetMax(100f, refillCurrent: true);
+
+                controller.BufferSwordArtCommand(
+                    SwordArtTriggerAction.HeavyAttack,
+                    SwordArtInputDirection.Neutral,
+                    SwordArtContextTags.AfterHeavy);
+
+                Assert.IsTrue(controller.CanAffordSwordArt(gateBreak));
+                Assert.IsTrue(controller.TryConsumeBufferedSwordArt(out SwordArtDefinitionSO consumedArt, out AttackDefinitionSO consumedAttack));
+                Assert.AreSame(gateBreak, consumedArt);
+                Assert.AreSame(gateBreakAttack, consumedAttack);
+                Assert.AreEqual(85f, mana.CurrentValue, 0.001f);
+                Assert.IsFalse(controller.HasBufferedSwordArtCommand);
+            }
+            finally
+            {
+                Object.DestroyImmediate(gateBreak);
+                Object.DestroyImmediate(gateBreakAttack);
+                Object.DestroyImmediate(lightAttack);
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void TryConsumeBufferedSwordArt_ReturnsFalseWithoutEnoughMana_AndKeepsPreviewReadable()
+        {
+            GameObject gameObject = new GameObject("PlayerCombat");
+            gameObject.AddComponent<AttackExecutor>();
+            gameObject.AddComponent<HitboxController>();
+            ManaComponent mana = gameObject.AddComponent<ManaComponent>();
+
+            AttackDefinitionSO lightAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+            AttackDefinitionSO moonSeverAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+            SwordArtDefinitionSO moonSever = ScriptableObject.CreateInstance<SwordArtDefinitionSO>();
+
+            try
+            {
+                PlayerCombatController controller = gameObject.AddComponent<PlayerCombatController>();
+                SetPrivateField(controller, "mana", mana);
+                SetPrivateField(controller, "lightAttackCombo", new[] { lightAttack });
+                SetPrivateField(moonSever, "artId", "Moon_Sever");
+                SetPrivateField(moonSever, "displayName", "Moon Sever");
+                SetPrivateField(moonSever, "attackDefinition", moonSeverAttack);
+                SetPrivateField(moonSever, "triggerAction", SwordArtTriggerAction.LightAttack);
+                SetPrivateField(moonSever, "acceptedDirections", SwordArtDirectionMask.Any);
+                SetPrivateField(
+                    moonSever,
+                    "requiredContextTags",
+                    SwordArtContextTags.Airborne | SwordArtContextTags.AfterDodge | SwordArtContextTags.AfterAirDodge);
+                SetPrivateField(moonSever, "triggerWindowSeconds", 0.28f);
+                SetPrivateField(moonSever, "resourceCost", 12f);
+                SetPrivateField(controller, "swordArts", new[] { moonSever });
+                mana.SetMax(100f, refillCurrent: true);
+                mana.SetCurrent(5f);
+
+                Assert.IsTrue(controller.TryRecordSwordArtPreviewCommand(
+                    SwordArtTriggerAction.LightAttack,
+                    SwordArtInputDirection.Neutral,
+                    SwordArtContextTags.Airborne | SwordArtContextTags.AfterDodge | SwordArtContextTags.AfterAirDodge));
+                Assert.IsFalse(controller.CanAffordSwordArt(moonSever));
+
+                Assert.IsFalse(controller.TryConsumeBufferedSwordArt(out SwordArtDefinitionSO blockedArt, out AttackDefinitionSO blockedAttack));
+                Assert.AreSame(moonSever, blockedArt);
+                Assert.IsNull(blockedAttack);
+                Assert.IsFalse(controller.HasBufferedSwordArtCommand);
+                Assert.IsTrue(controller.HasSwordArtPreview);
+                Assert.AreEqual(5f, mana.CurrentValue, 0.001f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(moonSever);
+                Object.DestroyImmediate(moonSeverAttack);
                 Object.DestroyImmediate(lightAttack);
                 Object.DestroyImmediate(gameObject);
             }

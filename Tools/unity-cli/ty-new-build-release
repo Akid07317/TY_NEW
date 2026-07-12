@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   cat >&2 <<'EOF'
-Usage: Tools/unity-cli/ty-new-build-release <validate|mac|windows> [--use-temp-clone] [--clone-root <path>] [--wall-timeout <seconds>] [--log <path>]
+Usage: Tools/unity-cli/ty-new-build-release <validate|mac|windows|art-validate|art-mac|art-windows> [--use-temp-clone] [--clone-root <path>] [--wall-timeout <seconds>] [--log <path>] [--keep-temp-clone] [--licensing-ipc <name>] [--hub-licensing] [--editor-mode]
 
 Runs the TY_NEW release-candidate build editor methods with an outer wall-clock
 timeout. Use validate before real package builds when you only need to check
@@ -17,12 +17,19 @@ PROJECT_VERSION_FILE="$PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
 PROJECT_NAME=$(basename "$PROJECT_ROOT")
 PROJECT_ROOT_TO_RUN="$PROJECT_ROOT"
 CLONE_ROOT="${TMPDIR:-/tmp}"
+CLONE_PATH=""
 USE_TEMP_CLONE=0
 CAN_INSPECT_PROCESSES=1
 WALL_TIMEOUT=900
 UNITY_PID=""
 STAMP=$(date +%Y%m%d_%H%M%S)
 LOG_FILE=""
+KEEP_TEMP_CLONE=0
+RELEASE_OUTPUT_NOTE=""
+ART_CANDIDATE=0
+LICENSING_IPC=${UNITY_LICENSING_IPC:-}
+HUB_LICENSING=0
+EDITOR_MODE=0
 
 if [ $# -lt 1 ]; then
   usage
@@ -43,6 +50,21 @@ case "$ACTION" in
   windows)
     EXECUTE_METHOD="CampusRPG.Editor.ReleaseCandidateBuildUtility.BuildWindowsReleaseCandidate"
     DEFAULT_TIMEOUT=1800
+    ;;
+  art-validate)
+    EXECUTE_METHOD="CampusRPG.Editor.ReleaseCandidateBuildUtility.ValidateUserOwnedArtCandidate"
+    DEFAULT_TIMEOUT=600
+    ART_CANDIDATE=1
+    ;;
+  art-mac)
+    EXECUTE_METHOD="CampusRPG.Editor.ReleaseCandidateBuildUtility.BuildMacOSUserOwnedArtCandidate"
+    DEFAULT_TIMEOUT=1800
+    ART_CANDIDATE=1
+    ;;
+  art-windows)
+    EXECUTE_METHOD="CampusRPG.Editor.ReleaseCandidateBuildUtility.BuildWindowsUserOwnedArtCandidate"
+    DEFAULT_TIMEOUT=1800
+    ART_CANDIDATE=1
     ;;
   -h|--help)
     usage
@@ -76,6 +98,23 @@ while [ $# -gt 0 ]; do
       LOG_FILE=$2
       shift 2
       ;;
+    --keep-temp-clone)
+      KEEP_TEMP_CLONE=1
+      shift
+      ;;
+    --licensing-ipc)
+      [ $# -ge 2 ] || usage
+      LICENSING_IPC=$2
+      shift 2
+      ;;
+    --hub-licensing)
+      HUB_LICENSING=1
+      shift
+      ;;
+    --editor-mode)
+      EDITOR_MODE=1
+      shift
+      ;;
     -h|--help)
       usage
       ;;
@@ -85,6 +124,17 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+if [ "$ART_CANDIDATE" -eq 1 ]; then
+  USE_TEMP_CLONE=1
+fi
+
+if [ "$EDITOR_MODE" -eq 1 ] || [ "$HUB_LICENSING" -eq 1 ] || [ -n "$LICENSING_IPC" ]; then
+  if [ "$EDITOR_MODE" -ne 1 ] || [ "$HUB_LICENSING" -ne 1 ] || [ -z "$LICENSING_IPC" ]; then
+    echo "Release build licensing recovery requires --editor-mode --hub-licensing --licensing-ipc <name> together." >&2
+    exit 2
+  fi
+fi
 
 if [ ! -f "$PROJECT_VERSION_FILE" ]; then
   echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
@@ -104,16 +154,37 @@ create_temp_clone() {
     exit 1
   fi
 
-  rsync -a \
-    --exclude '.git/' \
-    --exclude 'Library/' \
-    --exclude 'Logs/' \
-    --exclude 'Temp/' \
-    --exclude 'obj/' \
-    --exclude 'Build/' \
-    --exclude 'Builds/' \
-    --exclude '.DS_Store' \
-    "$PROJECT_ROOT/" "$CLONE_PATH/"
+  if [ "$ART_CANDIDATE" -eq 1 ]; then
+    rsync -a \
+      --exclude '.git/' \
+      --exclude 'Library/' \
+      --exclude 'Logs/' \
+      --exclude 'Temp/' \
+      --exclude 'obj/' \
+      --exclude 'Build/' \
+      --exclude 'Builds/' \
+      --exclude '.DS_Store' \
+      --exclude 'Assets/Kevin Iglesias/' \
+      --exclude 'Assets/DoubleL/' \
+      --exclude 'Assets/ithappy/' \
+      --exclude 'Assets/JC_LP_MedievalCharacters_LITE/' \
+      --exclude 'Assets/Free medieval weapons/' \
+      --exclude 'Assets/MYFG-Weapon Pack Lite/' \
+      --exclude 'Assets/Polytope Studio/' \
+      --exclude 'Assets/LocalPreviewTools/' \
+      "$PROJECT_ROOT/" "$CLONE_PATH/"
+  else
+    rsync -a \
+      --exclude '.git/' \
+      --exclude 'Library/' \
+      --exclude 'Logs/' \
+      --exclude 'Temp/' \
+      --exclude 'obj/' \
+      --exclude 'Build/' \
+      --exclude 'Builds/' \
+      --exclude '.DS_Store' \
+      "$PROJECT_ROOT/" "$CLONE_PATH/"
+  fi
 
   PROJECT_ROOT_TO_RUN="$CLONE_PATH"
 }
@@ -121,11 +192,56 @@ create_temp_clone() {
 cleanup_child() {
   if [ -n "$UNITY_PID" ] && kill -0 "$UNITY_PID" >/dev/null 2>&1; then
     kill "$UNITY_PID" >/dev/null 2>&1 || true
+
+    CLEANUP_ELAPSED=0
+    while kill -0 "$UNITY_PID" >/dev/null 2>&1 && [ "$CLEANUP_ELAPSED" -lt 10 ]; do
+      sleep 1
+      CLEANUP_ELAPSED=$((CLEANUP_ELAPSED + 1))
+    done
+
+    if kill -0 "$UNITY_PID" >/dev/null 2>&1; then
+      echo "Unity release build did not exit after SIGTERM; sending SIGKILL." >&2
+      kill -KILL "$UNITY_PID" >/dev/null 2>&1 || true
+    fi
+
     wait "$UNITY_PID" >/dev/null 2>&1 || true
+  fi
+
+  UNITY_PID=""
+}
+
+cleanup_temp_clone() {
+  if [ "$KEEP_TEMP_CLONE" -eq 1 ]; then
+    [ -n "$CLONE_PATH" ] && echo "Preserved temporary clone: $CLONE_PATH"
+    return 0
+  fi
+
+  if [ -n "$CLONE_PATH" ] && [ -d "$CLONE_PATH" ]; then
+    rm -rf "$CLONE_PATH" >/dev/null 2>&1 || true
+    echo "Removed temporary clone: $CLONE_PATH"
   fi
 }
 
-trap cleanup_child INT TERM
+cleanup_all() {
+  cleanup_child
+  cleanup_temp_clone
+}
+
+copy_release_outputs_from_clone() {
+  if [ "$PROJECT_ROOT_TO_RUN" = "$PROJECT_ROOT" ]; then
+    return 0
+  fi
+
+  if [ ! -d "$PROJECT_ROOT_TO_RUN/Builds/ReleaseCandidate" ]; then
+    return 0
+  fi
+
+  mkdir -p "$PROJECT_ROOT/Builds"
+  rsync -a "$PROJECT_ROOT_TO_RUN/Builds/ReleaseCandidate/" "$PROJECT_ROOT/Builds/ReleaseCandidate/"
+  RELEASE_OUTPUT_NOTE="Release outputs copied to: $PROJECT_ROOT/Builds/ReleaseCandidate"
+}
+
+trap cleanup_all INT TERM EXIT
 
 if ! ps -axo comm= >/dev/null 2>&1; then
   CAN_INSPECT_PROCESSES=0
@@ -134,8 +250,12 @@ if ! ps -axo comm= >/dev/null 2>&1; then
 fi
 
 if [ "$CAN_INSPECT_PROCESSES" -eq 1 ] && ps -axo comm= 2>/dev/null | grep -Fx "Unity Hub" >/dev/null 2>&1; then
-  echo "Unity Hub is running. Quit Unity Hub before running release build automation on macOS." >&2
-  exit 1
+  if [ "$EDITOR_MODE" -eq 1 ] && [ "$HUB_LICENSING" -eq 1 ]; then
+    echo "Unity Hub is running and will provide the requested Editor-mode licensing channel."
+  else
+    echo "Unity Hub is running. Quit Unity Hub before running batchmode release build automation on macOS." >&2
+    exit 1
+  fi
 fi
 
 if [ "$USE_TEMP_CLONE" -eq 1 ]; then
@@ -161,13 +281,30 @@ echo "Running release build action: $ACTION"
 echo "Project: $PROJECT_ROOT_TO_RUN"
 echo "Log: $LOG_FILE"
 echo "Timeout: ${WALL_TIMEOUT}s"
+if [ "$EDITOR_MODE" -eq 1 ]; then
+  echo "Editor mode: enabled"
+  echo "Hub licensing: enabled"
+  echo "Licensing IPC: $LICENSING_IPC"
+fi
 
-"$UNITY_EDITOR" \
-  -batchmode \
-  -quit \
-  -projectPath "$PROJECT_ROOT_TO_RUN" \
-  -executeMethod "$EXECUTE_METHOD" \
-  -logFile "$LOG_FILE" &
+if [ "$EDITOR_MODE" -eq 1 ]; then
+  "$UNITY_EDITOR" \
+    -quit \
+    -useHub \
+    -hubIPC \
+    -cloudEnvironment production \
+    -licensingIpc "$LICENSING_IPC" \
+    -projectPath "$PROJECT_ROOT_TO_RUN" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+else
+  "$UNITY_EDITOR" \
+    -batchmode \
+    -quit \
+    -projectPath "$PROJECT_ROOT_TO_RUN" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+fi
 
 UNITY_PID=$!
 ELAPSED=0
@@ -197,12 +334,17 @@ if [ "$EXIT_CODE" -ne 0 ]; then
   exit "$EXIT_CODE"
 fi
 
+copy_release_outputs_from_clone
+
 cat <<EOF
 TY_NEW release build action completed: $ACTION
 Project used: $PROJECT_ROOT_TO_RUN
 Log: $LOG_FILE
+${RELEASE_OUTPUT_NOTE}
 
 Expected package outputs when a real build action is used:
 - Builds/ReleaseCandidate/Mac/TY_NEW.app
 - Builds/ReleaseCandidate/Windows/TY_NEW.exe
+- Builds/ReleaseCandidate/UserOwnedArt/Mac/TY_NEW.app
+- Builds/ReleaseCandidate/UserOwnedArt/Windows/TY_NEW.exe
 EOF

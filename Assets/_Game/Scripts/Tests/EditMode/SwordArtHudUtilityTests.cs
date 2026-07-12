@@ -52,6 +52,7 @@ namespace CampusRPG.Tests.EditMode
         public void Build_ReportsBufferedCancelWindowBeforeGenericPreview()
         {
             GameObject playerObject = new GameObject("Player");
+            ManaComponent mana = playerObject.AddComponent<ManaComponent>();
             AttackDefinitionSO heavyAttack = CreateAttack("Heavy Slash", "Heavy_01");
             AttackDefinitionSO ironGateAttack = CreateAttack("Iron Gate Hit", "SwordArt_IronGateBreak");
             SwordArtDefinitionSO ironGateBreak = CreateSwordArt("Iron Gate Break", ironGateAttack);
@@ -63,8 +64,10 @@ namespace CampusRPG.Tests.EditMode
                 SetPrivateField(ironGateBreak, "acceptedDirections", SwordArtDirectionMask.Any);
                 SetPrivateField(ironGateBreak, "anyContextTags", SwordArtContextTags.AfterHeavy);
                 SetPrivateField(ironGateBreak, "cancelWindowSeconds", 0.25f);
+                SetPrivateField(ironGateBreak, "resourceCost", 15f);
                 SetPrivateField(combatController, "swordArts", new[] { ironGateBreak });
                 SetPrivateField(combatController, "currentAttackDefinition", heavyAttack);
+                mana.SetMax(100f, refillCurrent: true);
                 combatController.NotifyAttackTiming(0.6f, 0.8f);
                 combatController.BufferSwordArtCommand(
                     SwordArtTriggerAction.HeavyAttack,
@@ -75,7 +78,7 @@ namespace CampusRPG.Tests.EditMode
 
                 Assert.AreEqual(SwordArtHudMode.CancelWindow, plan.Mode);
                 Assert.AreEqual("Iron Gate Break", plan.Title);
-                Assert.AreEqual("CHAIN OPEN", plan.Status);
+                Assert.AreEqual("CHAIN OPEN 15 MP", plan.Status);
                 Assert.AreEqual("Guard pressure", plan.Detail);
                 Assert.AreEqual("Guard/Heavy + Heavy", plan.InputHint);
             }
@@ -92,20 +95,23 @@ namespace CampusRPG.Tests.EditMode
         public void Build_ShowsPreviewAndRecentSwordArtStates()
         {
             GameObject playerObject = new GameObject("Player");
+            ManaComponent mana = playerObject.AddComponent<ManaComponent>();
             AttackDefinitionSO moonSeverAttack = CreateAttack("Moon Sever Cut", "SwordArt_MoonSever");
             SwordArtDefinitionSO moonSever = CreateSwordArt("Moon Sever", moonSeverAttack);
 
             try
             {
                 PlayerCombatController combatController = CreateCombatController(playerObject);
+                SetPrivateField(moonSever, "resourceCost", 12f);
                 SetPrivateField(combatController, "previewSwordArt", moonSever);
                 SetPrivateField(combatController, "previewSwordArtAttack", moonSeverAttack);
                 SetPrivateField(combatController, "previewSwordArtTimer", 0.6f);
+                mana.SetMax(100f, refillCurrent: true);
 
                 SwordArtHudPlan previewPlan = SwordArtHudUtility.Build(combatController);
 
                 Assert.AreEqual(SwordArtHudMode.Preview, previewPlan.Mode);
-                Assert.AreEqual("READY", previewPlan.Status);
+                Assert.AreEqual("READY 12 MP", previewPlan.Status);
                 Assert.AreEqual("Air dodge slash", previewPlan.Detail);
                 Assert.AreEqual("Air Dodge + Light", previewPlan.InputHint);
 
@@ -118,11 +124,43 @@ namespace CampusRPG.Tests.EditMode
 
                 Assert.AreEqual(SwordArtHudMode.Recent, recentPlan.Mode);
                 Assert.AreEqual("Moon Sever", recentPlan.Title);
-                Assert.AreEqual("RECENT", recentPlan.Status);
+                Assert.AreEqual("RECENT 12 MP", recentPlan.Status);
 
                 combatController.Tick(2f);
 
                 Assert.IsFalse(SwordArtHudUtility.Build(combatController).IsVisible);
+            }
+            finally
+            {
+                Object.DestroyImmediate(moonSever);
+                Object.DestroyImmediate(moonSeverAttack);
+                Object.DestroyImmediate(playerObject);
+            }
+        }
+
+        [Test]
+        public void Build_PreviewShowsMissingManaStatus_ForBlockedSwordArt()
+        {
+            GameObject playerObject = new GameObject("Player");
+            ManaComponent mana = playerObject.AddComponent<ManaComponent>();
+            AttackDefinitionSO moonSeverAttack = CreateAttack("Moon Sever Cut", "SwordArt_MoonSever");
+            SwordArtDefinitionSO moonSever = CreateSwordArt("Moon Sever", moonSeverAttack);
+
+            try
+            {
+                PlayerCombatController combatController = CreateCombatController(playerObject);
+                SetPrivateField(moonSever, "resourceCost", 12f);
+                SetPrivateField(combatController, "previewSwordArt", moonSever);
+                SetPrivateField(combatController, "previewSwordArtAttack", moonSeverAttack);
+                SetPrivateField(combatController, "previewSwordArtTimer", 0.6f);
+                mana.SetMax(100f, refillCurrent: true);
+                mana.SetCurrent(5f);
+
+                SwordArtHudPlan previewPlan = SwordArtHudUtility.Build(combatController);
+
+                Assert.AreEqual(SwordArtHudMode.Preview, previewPlan.Mode);
+                Assert.AreEqual("NEED 12 MP", previewPlan.Status);
+                Assert.AreEqual("Moon Sever", previewPlan.Title);
             }
             finally
             {

@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   cat >&2 <<'EOF'
-Usage: Tools/unity-cli/ty-new-final-gate [--startup-timeout <seconds>] [--results-dir <path>] [--skip-full]
+Usage: Tools/unity-cli/ty-new-final-gate [--startup-timeout <seconds>] [--wall-timeout <seconds>] [--results-dir <path>] [--skip-full]
 
 Runs the TY_NEW release-candidate validation gates through unity-run-tests.
 This script does not execute raw Unity -batchmode/-executeMethod commands.
@@ -14,6 +14,7 @@ EOF
 PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 RUN_TESTS="$PROJECT_ROOT/Tools/unity-cli/unity-run-tests"
 STARTUP_TIMEOUT=45
+WALL_TIMEOUT=1800
 RESULTS_DIR="/tmp"
 RUN_FULL=1
 
@@ -27,6 +28,11 @@ while [ $# -gt 0 ]; do
     --results-dir)
       [ $# -ge 2 ] || usage
       RESULTS_DIR=$2
+      shift 2
+      ;;
+    --wall-timeout)
+      [ $# -ge 2 ] || usage
+      WALL_TIMEOUT=$2
       shift 2
       ;;
     --skip-full)
@@ -61,25 +67,29 @@ run_gate() {
       --group-filter "$FILTER" \
       --use-temp-clone \
       --startup-timeout "$STARTUP_TIMEOUT" \
+      --wall-timeout "$WALL_TIMEOUT" \
       --results "$RESULTS_FILE" \
       --log "$LOG_FILE"
   else
     "$RUN_TESTS" "$MODE" \
       --use-temp-clone \
       --startup-timeout "$STARTUP_TIMEOUT" \
+      --wall-timeout "$WALL_TIMEOUT" \
       --results "$RESULTS_FILE" \
       --log "$LOG_FILE"
   fi
 }
 
 RELEASE_PREFLIGHT='^(CampusRPG\.Tests\.EditMode\.(ReleaseCandidatePreflightTests|BuildSettingsSceneOrderTests))$'
-P06_COMBAT='^(CampusRPG\.Tests\.(PlayerStateMachineLifecycleTests|PlayerCombatControllerTests)|CampusRPG\.Tests\.EditMode\.(DamageableReactionUtilityTests|PlayerCombatAnimationRelayTests|ThirdPersonCameraControllerRuntimeStateTests|CombatTestEnemyAssetWiringTests|CombatTestAnimationAssetWiringTests|CombatTestSwordArtAssetWiringTests|CameraObstacleResolverTests|PlayerCombatRuntimeUtilityTests))$'
-CHAPTER_BOSS='^(CampusRPG\.Tests\.EditMode\.(BossTestSceneWiringTests|BuildSettingsSceneOrderTests|Chapter01ProgressionSceneWiringTests|Chapter01ProgressionSceneFlowTests|Chapter01BossPresentationSceneWiringTests|BossPresentationRigTests|BossArenaStatusPresenterTests|BossCombatHintViewTests|ChapterCompleteViewTests|KeyItemBeaconViewTests))$'
+P06_COMBAT='^(CampusRPG\.Tests\.(PlayerStateMachineLifecycleTests|PlayerCombatControllerTests)|CampusRPG\.Tests\.EditMode\.(DamageableReactionUtilityTests|PlayerCombatAnimationRelayTests|ThirdPersonCameraControllerRuntimeStateTests|CombatTestEnemyAssetWiringTests|CombatTestAnimationAssetWiringTests|GuardBreakAnimationStateWiringTests|CombatTestSwordArtAssetWiringTests|CameraObstacleResolverTests|PlayerCombatRuntimeUtilityTests|GhostSamuraiCombatEnemyReadCaptureDriverTests))$'
+CHAPTER_BOSS='^(CampusRPG\.Tests\.EditMode\.(BossTestSceneWiringTests|BuildSettingsSceneOrderTests|Chapter01ProgressionSceneWiringTests|Chapter01ProgressionSceneFlowTests|Chapter01BossPresentationSceneWiringTests|GhostSamuraiBossReadCaptureDriverTests)|CampusRPG\.Tests\.(BossPresentationRigTests|BossArenaStatusPresenterTests|BossCombatHintViewTests|ChapterCompleteViewTests|KeyItemBeaconViewTests))$'
+CAMERA_RUNTIME='^(CampusRPG\.Tests\.PlayMode\.(LockOnTargetSelectorTests|ThirdPersonCameraControllerPlayModeTests))$'
 RUNTIME_SMOKE='^(CampusRPG\.Tests\.PlayMode\.(SmokeBootPlayModeTests|Chapter01RuntimeFlowPlayModeTests|BossTestRuntimeFlowPlayModeTests))$'
 
 run_gate EditMode release_preflight "$RELEASE_PREFLIGHT"
 run_gate EditMode p06_combat "$P06_COMBAT"
 run_gate EditMode chapter_boss "$CHAPTER_BOSS"
+run_gate PlayMode camera_runtime "$CAMERA_RUNTIME"
 run_gate PlayMode runtime_smoke "$RUNTIME_SMOKE"
 
 if [ "$RUN_FULL" -eq 1 ]; then

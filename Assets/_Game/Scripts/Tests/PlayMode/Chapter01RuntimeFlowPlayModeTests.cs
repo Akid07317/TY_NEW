@@ -15,6 +15,42 @@ namespace CampusRPG.Tests.PlayMode
     public sealed class Chapter01RuntimeFlowPlayModeTests
     {
         [UnityTest]
+        public IEnumerator Chapter01Combined_RitualCoreBeforeGatekeeper_DoesNotCompleteChapter()
+        {
+            yield return LoadSceneAndWait("Chapter01_Combined");
+
+            ChapterProgressService progressService = FindRequiredComponent<ChapterProgressService>("ChapterFlow");
+            PlayerCharacter player = FindRequiredComponent<PlayerCharacter>("Player");
+            ChapterCompleteView completeView = FindRequiredComponent<ChapterCompleteView>("ChapterCompleteView");
+            KeyItemPickup ritualCorePickup = FindRequiredComponent<KeyItemPickup>("Pickup_RitualCore");
+
+            SetPrivateField<CheckpointRestoreCoordinator>(progressService, "checkpointRestoreCoordinator", null);
+            progressService.RestoreFromSave(new ChapterSaveData
+            {
+                chapterId = Chapter01Ids.Chapter,
+                checkpointId = Chapter01Ids.Checkpoints.Start,
+                currentAreaId = Chapter01Ids.Areas.Entrance,
+                visitedAreaIds = new[] { Chapter01Ids.Areas.Entrance },
+                chapterCompleted = false,
+                playerHealth = player.Health != null ? player.Health.MaxValue : 100f,
+                playerMana = player.Mana != null ? player.Mana.MaxValue : 100f
+            });
+            ritualCorePickup.ResetForCheckpointRestore();
+
+            yield return null;
+
+            Collider playerCollider = player.GetComponentInChildren<Collider>();
+            Assert.IsNotNull(playerCollider);
+            Assert.IsTrue(ritualCorePickup.gameObject.activeSelf);
+            Assert.IsFalse(progressService.IsEncounterCleared(Chapter01Ids.Encounters.Gatekeeper));
+            Assert.IsFalse(ritualCorePickup.TryCollect(playerCollider));
+            Assert.IsFalse(progressService.HasKeyItem(Chapter01Ids.KeyItems.RitualCore));
+            Assert.IsFalse(progressService.IsChapterCompleted);
+            Assert.IsFalse(completeView.IsVisible);
+            Assert.IsTrue(ritualCorePickup.gameObject.activeSelf);
+        }
+
+        [UnityTest]
         public IEnumerator Chapter01Combined_BossKillAndRitualCorePickup_CompletesChapter()
         {
             yield return LoadSceneAndWait("Chapter01_Combined");

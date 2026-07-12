@@ -1122,6 +1122,69 @@ namespace CampusRPG.Tests
         }
 
         [Test]
+        public void PlayerStateMachine_AirDodgeLightInput_FallsBackToLightAttack_WhenMoonSeverCannotBeAfforded()
+        {
+            GameObject gameObject = new GameObject("Player");
+            AttackDefinitionSO lightAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+            AttackDefinitionSO moonSeverAttack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+            SwordArtDefinitionSO moonSever = ScriptableObject.CreateInstance<SwordArtDefinitionSO>();
+
+            try
+            {
+                gameObject.transform.position = Vector3.up * 3f;
+                gameObject.AddComponent<CharacterController>();
+                PlayerMotor motor = gameObject.AddComponent<PlayerMotor>();
+                ManaComponent mana = gameObject.AddComponent<ManaComponent>();
+                PlayerCharacter player = gameObject.AddComponent<PlayerCharacter>();
+                PlayerStateMachine stateMachine = gameObject.AddComponent<PlayerStateMachine>();
+                PlayerCombatController combatController = BuildCombatController(gameObject, lightAttack);
+                SetPrivateField(player, "motor", motor);
+                SetPrivateField(player, "mana", mana);
+                SetPrivateField(player, "stateMachine", stateMachine);
+                SetPrivateField(player, "combatController", combatController);
+                SetPrivateField(moonSever, "artId", "Moon_Sever");
+                SetPrivateField(moonSever, "displayName", "Moon Sever");
+                SetPrivateField(moonSever, "attackDefinition", moonSeverAttack);
+                SetPrivateField(moonSever, "triggerAction", SwordArtTriggerAction.LightAttack);
+                SetPrivateField(moonSever, "acceptedDirections", SwordArtDirectionMask.Any);
+                SetPrivateField(
+                    moonSever,
+                    "requiredContextTags",
+                    SwordArtContextTags.Airborne | SwordArtContextTags.AfterDodge | SwordArtContextTags.AfterAirDodge);
+                SetPrivateField(moonSever, "triggerWindowSeconds", 0.28f);
+                SetPrivateField(moonSever, "resourceCost", 12f);
+                SetPrivateField(combatController, "swordArts", new[] { moonSever });
+                mana.SetMax(100f, refillCurrent: true);
+                mana.SetCurrent(5f);
+
+                stateMachine.Initialize(player);
+                stateMachine.SwitchToAirDodge();
+                Assert.IsInstanceOf<PlayerDodgeState>(stateMachine.CurrentState);
+
+                InvokePrivateMethod(stateMachine, "OnLightAttackPressed");
+
+                Assert.IsInstanceOf<PlayerDodgeState>(stateMachine.CurrentState);
+                Assert.IsTrue(combatController.HasSwordArtPreview);
+                Assert.AreSame(moonSever, combatController.PreviewSwordArt);
+
+                stateMachine.Tick(0.35f);
+
+                Assert.IsInstanceOf<PlayerAttackState>(stateMachine.CurrentState);
+                Assert.AreSame(lightAttack, combatController.CurrentAttackDefinition);
+                Assert.IsFalse(combatController.HasCurrentSwordArt);
+                Assert.IsFalse(combatController.HasBufferedSwordArtCommand);
+                Assert.AreEqual(5f, mana.CurrentValue, 0.001f);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(moonSever);
+                UnityEngine.Object.DestroyImmediate(moonSeverAttack);
+                UnityEngine.Object.DestroyImmediate(lightAttack);
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
         public void PlayerStateMachine_AirDodgeHeavyInput_WithoutSwordArtReturnsToLocomotion()
         {
             GameObject gameObject = new GameObject("Player");
@@ -1365,9 +1428,11 @@ namespace CampusRPG.Tests
             AttackExecutor attackExecutor = gameObject.AddComponent<AttackExecutor>();
             HitboxController hitboxController = gameObject.AddComponent<HitboxController>();
             PlayerCombatController combatController = gameObject.AddComponent<PlayerCombatController>();
+            ManaComponent mana = gameObject.GetComponent<ManaComponent>();
             SetPrivateField(hitboxController, "attackExecutor", attackExecutor);
             SetPrivateField(combatController, "attackExecutor", attackExecutor);
             SetPrivateField(combatController, "hitboxController", hitboxController);
+            SetPrivateField(combatController, "mana", mana);
             SetPrivateField(combatController, "lightAttackCombo", new[] { lightAttack });
             SetPrivateField(lightAttack, "startupSeconds", 0.1f);
             SetPrivateField(lightAttack, "activeSeconds", 0.1f);

@@ -20,6 +20,30 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
+        public void ResolvePlan_KeepsChaseLocomotionInWalkBand_WhenSpeedSampleDrops()
+        {
+            EnemyCombatAnimationPlan plan = EnemyCombatAnimationPlanUtility.ResolvePlan(
+                EnemyArchetypeType.Melee,
+                nameof(EnemyChaseState),
+                0f);
+
+            Assert.AreEqual(EnemyCombatAnimationPlanUtility.LocomotionStateName, plan.StateName);
+            Assert.That(plan.GroundSpeedNormalized, Is.GreaterThan(0.3f).And.LessThan(0.5f));
+        }
+
+        [Test]
+        public void ResolvePlan_KeepsStrafeLocomotionInWalkBand_WhenSpeedSampleDrops()
+        {
+            EnemyCombatAnimationPlan plan = EnemyCombatAnimationPlanUtility.ResolvePlan(
+                EnemyArchetypeType.Mobile,
+                nameof(EnemyStrafeState),
+                0f);
+
+            Assert.AreEqual(EnemyCombatAnimationPlanUtility.LocomotionStateName, plan.StateName);
+            Assert.That(plan.GroundSpeedNormalized, Is.GreaterThan(0.2f).And.LessThan(0.35f));
+        }
+
+        [Test]
         public void ResolvePlan_KeepsStrafeLocomotionBelowFullSprint()
         {
             EnemyCombatAnimationPlan plan = EnemyCombatAnimationPlanUtility.ResolvePlan(

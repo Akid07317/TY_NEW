@@ -1,8 +1,32 @@
+using System;
 using CampusRPG.Combat;
 using UnityEngine;
 
 namespace CampusRPG.AI
 {
+    public readonly struct EnemyAttackCommit
+    {
+        public EnemyAttackCommit(
+            Transform target,
+            EnemyArchetypeSO archetype,
+            AttackDefinitionSO attack,
+            float damage)
+        {
+            Target = target;
+            Archetype = archetype;
+            Attack = attack;
+            Damage = damage;
+        }
+
+        public Transform Target { get; }
+
+        public EnemyArchetypeSO Archetype { get; }
+
+        public AttackDefinitionSO Attack { get; }
+
+        public float Damage { get; }
+    }
+
     public sealed class EnemyAttackController : MonoBehaviour
     {
         [SerializeField] private Transform attackOrigin;
@@ -13,6 +37,8 @@ namespace CampusRPG.AI
         private float cooldownTimer;
         private int nextAttackIndex;
         private int lastAttackIndex = -1;
+
+        public event Action<EnemyAttackCommit> AttackCommitted;
 
         private void Awake()
         {
@@ -129,6 +155,7 @@ namespace CampusRPG.AI
 
             cooldownTimer = archetype.AttackCooldown;
             AdvanceAttackIndex(archetype, selection.Index);
+            AttackCommitted?.Invoke(new EnemyAttackCommit(target, archetype, attack, damage));
             return true;
         }
 
@@ -139,6 +166,20 @@ namespace CampusRPG.AI
                 return;
             }
 
+            cooldownTimer = Mathf.Max(cooldownTimer, archetype.AttackCooldown);
+            AdvanceAttackIndex(archetype, selection.Index);
+        }
+
+        public void RegisterServerAuthoritativeCommit(Transform target, EnemyArchetypeSO archetype)
+        {
+            if (archetype == null)
+            {
+                return;
+            }
+
+            EnemyAttackSelection selection = target != null
+                ? PreviewAttackSelectionForTarget(target, archetype)
+                : EnemyAttackSelectionResolver.ResolveNextSelection(archetype, nextAttackIndex);
             cooldownTimer = Mathf.Max(cooldownTimer, archetype.AttackCooldown);
             AdvanceAttackIndex(archetype, selection.Index);
         }

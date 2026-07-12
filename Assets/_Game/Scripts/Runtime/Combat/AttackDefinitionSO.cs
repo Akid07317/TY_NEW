@@ -39,6 +39,13 @@ namespace CampusRPG.Combat
         [SerializeField] private float blockStunSeconds;
         [SerializeField] private float guardBreakHitStunSeconds = 0.12f;
         [SerializeField] private float forwardMovement = 0.5f;
+        [SerializeField] private float forwardMovementStartSeconds;
+        [SerializeField] private float forwardMovementDurationSeconds;
+        [SerializeField] private AnimationCurve forwardMovementCurve = new AnimationCurve(
+            new Keyframe(0f, 0f, 0.57f, 0.57f),
+            new Keyframe(0.35f, 0.2f, 0.57f, 1.7f),
+            new Keyframe(0.75f, 0.88f, 1.7f, 0.48f),
+            new Keyframe(1f, 1f, 0.48f, 0.48f));
         [SerializeField] private float movementSpeedScale = 0.65f;
         [SerializeField] private float range = 2f;
         [SerializeField] private float radius = 0.5f;
@@ -80,6 +87,15 @@ namespace CampusRPG.Combat
         public float GuardBreakHitStunSeconds => Mathf.Max(0f, guardBreakHitStunSeconds);
 
         public float ForwardMovement => forwardMovement;
+
+        public float ForwardMovementStartSeconds => Mathf.Max(0f, forwardMovementStartSeconds);
+
+        public float ForwardMovementDurationSeconds => Mathf.Max(0f, forwardMovementDurationSeconds);
+
+        public AnimationCurve ForwardMovementCurve => forwardMovementCurve;
+
+        public bool UsesDistributedForwardMovement =>
+            forwardMovement > 0f && ForwardMovementDurationSeconds > Mathf.Epsilon;
 
         public float MovementSpeedScale => movementSpeedScale > 0f ? Mathf.Clamp(movementSpeedScale, 0.1f, 1.25f) : 1f;
 

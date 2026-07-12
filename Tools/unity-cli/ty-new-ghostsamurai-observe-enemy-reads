@@ -1,0 +1,56 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads [debug|clean|scene|ranged-debug|ranged-clean|ranged-scene]
+
+Writes a request file that an open Unity GUI can pick up to start the
+GhostSamurai CombatTest enemy-read capture driver for melee/mobile/ranged
+local-preview observation without saving scene changes. Use the `ranged-*`
+modes to focus the bow anti-air / chase-roll / guard-break variant chain.
+EOF
+  exit 1
+}
+
+MODE=${1:-clean}
+
+case "$MODE" in
+  debug)
+    REQUEST="enemyread-debug"
+    ;;
+  clean)
+    REQUEST="enemyread-clean"
+    ;;
+  scene)
+    REQUEST="enemyread-scene"
+    ;;
+  ranged-debug)
+    REQUEST="enemyread-ranged-debug"
+    ;;
+  ranged-clean)
+    REQUEST="enemyread-ranged-clean"
+    ;;
+  ranged-scene)
+    REQUEST="enemyread-ranged-scene"
+    ;;
+  -h|--help)
+    usage
+    ;;
+  *)
+    echo "Unknown mode: $MODE" >&2
+    usage
+    ;;
+esac
+
+REQUEST_PATH="/tmp/TY_NEW_enemy_read_capture_driver.request"
+STAMP=$(date +%s)
+printf '%s %s\n' "$REQUEST" "$STAMP" > "$REQUEST_PATH"
+
+cat <<EOF
+GhostSamurai CombatTest enemy-read observation request written.
+- request: $REQUEST
+- stamp: $STAMP
+- file: $REQUEST_PATH
+- next: keep Unity GUI focused on CombatTest and wait for the driver to enter Play Mode
+EOF

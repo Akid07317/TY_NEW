@@ -30,6 +30,7 @@
   因此现在已经可以直接评估移动、格挡、闪避、受击和死亡的整体手感，而不只是静态壳子加命中事件
 - 当项目里已经导入兼容的 Humanoid 角色与动作资源时，你可以手动切到 local preview 模式，让玩家本地 `CombatTest` 动画片段重建成真实动作副本，并把玩家 prefab 切到导入的人物外观；详细规则见 [素材来源清单](Docs/Asset_Source_List.md)
 - 敌人 imported Avatar chain 目前不属于标准 build / repair 链；如果你要实验，只能走单独的 local preview 菜单。它会给 enemy root 挂单独的 `Animator + EnemyCombatAnimationRelay`，而不是再把 skinned humanoid 塞进旧 proxy 表现链。Gatekeeper `Sky Hook` / `Pursuit Slam` / `Gate Slam` 的 `ResponseRead` / `AntiAirRead` / `ChaseRollRead` / `GuardBreakRead` 会随 Startup / Advance / Recovery 渐入渐出；当前本地 `AC_Enemy_ImportedPreview_EnemyMelee/Mobile/Ranged.controller` 也已带 `Attack_AntiAir`、`Attack_ChaseRoll` 与 `Attack_GuardBreak` state，便于判断绑定动作是否有预备、出手和回收，而不是一进攻击态就满值弹姿态。
+- `CombatTest` 场景本身不实例化 `Gatekeeper`。如果要看 `Sky Hook / Pursuit Slam / Gate Slam`，请改到 `Assets/_Game/Scenes/BossTest.unity` 或含 `Boss_Gatekeeper` 的场景，并用 `CampusRPG/Setup/Local Preview/Start Boss Read Capture Driver/*` 或终端 `Tools/unity-cli/ty-new-ghostsamurai-observe-boss-reads` 触发运行时观察链；这条链会在当前 scene instance 上临时挂 imported enemy preview，不要求把场景保存成 local-preview 脏态。
 - 重建 `Assets/_Game/Scenes/CombatTest.unity`
 - 在场景内放入 `CombatDebugHUD` 与正式 `SwordArtHUD`；Debug HUD 会显示技能状态、当前/候选 SwordArt、玩家当前 Animator clip / normalized time / blend weight、锁定目标当前 Animator clip / normalized time / blend weight，以及 roll、air dodge、破防、反空和追滚的短反馈行，并按 Game 视图宽度收缩、在接近底部 `SwordArtHUD` 前停止继续下画；如果信息被折叠，最后一行会显示 `+N debug lines hidden`，避免绑定素材走查时左上调试层压住动作或静默吞掉状态。锁定目标的 `Target Anim` 会排在目标 HP、技能状态和操作帮助之前，短 Game 视图中优先保留敌人当前动画读招证据。当前攻击会显示 compact `Atk:` 行，例如 `Atk: MoonSever Act 0.25/0.72 hit .20-.32`，把 `Startup` / `Active` / `Recovery` / `Done` 与 hit window 直接暴露出来，方便逐招核对命中点和收招拖尾；短 Game 视图里会优先保留攻击阶段和 `Target Anim`，再显示较重复的 action cue。左上调试层会绘制半透明深色底板，避免白字压在浅天空、浅地面或本机预览素材上读不清；需要专心看角色身体、武器轨迹和敌人起手时，可按 `F1` 或反引号键 `` ` `` 折叠 Debug HUD，只保留一条小提示，正式 `SwordArtHUD` 仍会显示。`SwordArtHUD` 会在屏幕下方显示当前触发、最近触发、cancel 链接窗口和候选招式，优先覆盖 `Cross Step`、`Falling Star` 与 `Iron Gate Break`。当前玩家 roll / air dodge / 核心 SwordArt 与 Gatekeeper 反空/追滚 cue 会触发轻量 camera impulse；相机冲击带优先级，低优先级移动反馈不会覆盖 `Falling Star`、`Iron Gate Break`、GuardBreak 或 `Pursuit Slam` 这类更重要的读招/命中反馈。动作反馈同时会播放经过 `SO_AudioSettings` 全局 SFX 音量、per-cue cooldown、mix group、空间衰减和短暂 priority dominance 策略处理的程序生成 one-shot chirp；低优先级 roll / air dodge 声效不会在同一拍盖住 `Pursuit Slam`、`Falling Star`、`Iron Gate Break` 或 GuardBreak 这类更重要提示。Debug HUD 还会短暂显示最近一次 SFX 决策，例如 `SFX: PursuitSlam play p30 BossResponse`、`SFX: Roll held p30 0.07s` 或 `SFX: Roll cd 0.08s`，用于实听时判断声效是已播放、被冷却挡住，还是被高优先级读招压住；短屏下这行只是辅助信息，不会挤掉 `Atk`、`Target Anim`、`Tgt Atk` 这些核心走查证据。Debug HUD 里的 Boss 读招会使用 compact 行，例如 `Boss: RollCatch PursuitSlam - delay dodge`，短 Game 视图中会优先保留 `Atk` / `Target Anim` / `Tgt Atk` / compact Boss cue，内部 `State` 行可后移；顶部正式 Boss cue 仍保留完整解法文案。Boss 顶部 cue 会用响应式安全宽高显示短解法提示，并在短 Game 视图里与底部 `SwordArtHUD` 保持最小间距，方便在手感走查时判断动作层级和主解法是否读得出来
 - `Gate Slam` 破防现在也会进入 Boss 读招观察链：顶部正式 cue 会显示 `Guard Break Incoming`，左上 Debug HUD compact 行会显示 `Boss: GuardBreak GateSlam - dodge; guard breaks`，方便和 `Attack_GuardBreak`、`GuardBreakRead`、`Tgt Atk` 同屏核对。
@@ -66,7 +67,35 @@ P0 / P0.5 当前已经通过自动化合同回归，下一步不是继续盲目�
 2. 若只是做公开仓库安全基线走查，先执行 `CampusRPG/Setup/Repair CombatTest Prefab Wiring`，确认玩家和敌人都回到 proxy baseline。
 3. 若画面过曝或角色细节被洗掉，执行 `CampusRPG/Setup/Repair CombatTest Scene Lighting`。
 4. 只在需要判断本机 imported 预览动作时，才手动执行 local preview 菜单；走查结束后再执行 `Repair CombatTest Prefab Wiring` 回到 proxy baseline。
-5. 按 `Action_Game_Feel_Research.md` 的表格逐项填写 `观察结果` 和 `判定`，判定只用 `Pass` / `Tune P0.5` / `Open P0.6`。
+5. 如果当前正在走 `GhostSamurai` 本机研究线，刷新 preview 后可直接执行 `CampusRPG/Setup/Local Preview/Start Player SwordArt Capture Driver/Flank Reads/Clean HUD`，或在终端写入 `Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts flank-clean`，自动依次跑 `GroundDodge only`、`Sidewind Cut` 与 `Cross Step` 观察序列；若要继续看 `AirDodge + Light` 与 `AirDodge + Heavy`，执行 `CampusRPG/Setup/Local Preview/Start Player SwordArt Capture Driver/Clean HUD` 或终端 `Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts clean`；若这轮要专门对照空中 heavy 的两个分支，执行 `CampusRPG/Setup/Local Preview/Start Player SwordArt Capture Driver/Air Heavy Reads/Clean HUD`，或终端写入 `Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts airheavy-clean`，自动依次跑 `Rising Cleave` 与 `Falling Star` 的空中/空中闪避版本；若这轮要专门复核 `Iron Gate Break` 的挡架转攻和重击追接，再执行 `CampusRPG/Setup/Local Preview/Start Player SwordArt Capture Driver/Iron Gate Break/Clean HUD`，或在终端写入 `Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts irongate-clean`。若这轮要快速对照 `CombatTest` 里 melee / mobile / ranged 三类敌人的读招差异，执行 `CampusRPG/Setup/Local Preview/Start CombatTest Enemy Read Capture Driver/Clean HUD`，或在终端写入 `Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads clean`，驱动会依次触发 `EnemyMelee / Guard Swing`、`EnemyMobile / Feint Dash` 与 `EnemyRanged / Arc Bolt`，并在运行时临时挂 imported enemy preview，不要求把 `CombatTest` 场景保存成 local-preview 脏态。若这轮只想盯 Bow 三段读招，执行 `CampusRPG/Setup/Local Preview/Start CombatTest Enemy Read Capture Driver/Ranged Variants/Clean HUD`，或在终端写入 `Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads ranged-clean`；驱动会固定跑 `EnemyRanged / Anti-Air Shot`、`EnemyRanged / Chase Roll Shot` 与 `EnemyRanged / Guard Break Shot`，把 `Attack_Ranged_AntiAir`、`Attack_Ranged_ChaseRoll`、`Attack_Ranged_GuardBreak` 连成一条本机 Bow 观察链。
+6. 按 `Action_Game_Feel_Research.md` 的表格逐项填写 `观察结果` 和 `判定`，判定只用 `Pass` / `Tune P0.5` / `Open P0.6`。
+
+### C6 输入与镜头烟雾入口
+
+下面 3 组入口用于发布候选前的技术烟雾，不替代真人手感签字：
+
+- 普通 Guard：打开 `Assets/_Game/Scenes/CombatTest.unity`，执行 `CampusRPG/Setup/Local Preview/Start CombatTest Enemy Read Capture Driver/Guard Input Validation/Debug HUD`。驱动通过虚拟键盘的真实 `<Keyboard>/leftCtrl` 输入跑两拍，并且只接受目标为 Player、archetype 为 `EnemyMelee`、attack id 为 `Enemy_Melee`、damage 大于 0 的 `AttackCommitted`。2026-07-11 GUI 已得到 `[TY_NEW EnemyGuardInputDriver] PASS`：startup 拍 HP `100 -> 90`、Counter `0 -> 0`、`counterWindow=false`；active-guard 拍 HP `100 -> 100`、Counter `0 -> 20`、`counterWindow=true`，并观测到 startup、active guard 与 block stun。该结果证明当前 InputReader / 状态 / 伤害链，不等于物理 Ctrl 的主观手感
+- Boss Guard Break：打开 `Assets/_Game/Scenes/BossTest.unity`，执行 `CampusRPG/Setup/Local Preview/Start Boss Input Capture Driver/Gate Slam Guard/Debug HUD`。已取得的 GUI 技术证据为 HP `100 -> 74.4`，并同时看到 `attackCommitted=true`、`block=true`、`guardStartup=true`、`activeGuard=true`、`guardBreak=true`、`outcome=PASS`
+- Boss Dodge：同场景执行 `CampusRPG/Setup/Local Preview/Start Boss Input Capture Driver/Gate Slam Dodge/Debug HUD`。已取得的 GUI 技术证据为 HP `100 -> 100`、Agility `0 -> 25`、dodge alignment `1.00`，并同时看到 `attackCommitted=true`、`dodge=true`、`groundDodge=true`、`invulnerable=true`、`successfulDodge=true`、`outcome=PASS`
+- Chapter01 镜头障碍：打开 `Assets/_Game/Scenes/Chapter01_Combined.unity`，依次执行 `CampusRPG/Debug/Chapter01/Start Camera Obstacle Gauntlet`、每个案例后执行 `CampusRPG/Debug/Chapter01/Next Camera Obstacle Case`，最后执行 `CampusRPG/Debug/Chapter01/Stop Camera Obstacle Gauntlet`。5 个案例是 `wide-wall`、`pillar-orbit`、`narrow-hall`、`back-left-corner`、`mantle-edge`；该工具只布置玩家、目标和障碍并记录 obstruction、sidestep、retraction、camera motion、side flips、`targetInViewport` 与 owner hidden 等 telemetry，不注入战斗输入，也永远不会自动输出 PASS。2026-07-11 Game View 技术烟雾中五案均 `occupiedEver=false`，前四案 `staticSeen=true`，mantle 案见 `PlayerMantleState`；窄廊 `sideFlips=1` 混有刻意输入，只作观察量。Stop 后章节 save 已按 SHA-256 `2679d6163e71ca45cf640cbcc35c85ff4bf4a3a9bfca4ab3d822ce89598ac0d8` 逐字节恢复。`targetInViewport` 只表示视口范围，不表示无遮挡；仍需人工判断构图、跳边与晕动是否可接受
+
+上述 Boss / ordinary Guard 数值只证明指定设备路径、状态与结算合同在本轮 GUI 运行中闭环，不证明动作“好看”“自然”或手感已验收。镜头五案也只关闭技术烟雾，仍保留人工舒适度结论。`GhostSamuraiCombatEnemyReadCaptureDriverTests`、`GhostSamuraiBossReadCaptureDriverTests` 或 response-file compile 只能证明菜单/合同/程序集静态范围成立，不能替代 fresh Unity TestRunner XML，更不能替代 Game View 人工观察。
+
+如果当前主树故意保留在 local preview 脏态，但又要补一轮“repair 后 baseline 是否仍然健康”的自动化证据，不要直接在主树跑 baseline 测试。改用：
+
+```bash
+Tools/unity-cli/ty-new-ghostsamurai-baseline-check --startup-timeout 90
+```
+
+它会在临时克隆里先执行 `Repair CombatTest Prefab Wiring`，再跑 `CombatTestAnimationAssetWiringTests + ReleaseCandidatePreflightTests`，避免为了取证去动当前人工调试中的主工作树。
+
+如果这轮想先把 GhostSamurai 的 local-preview 研究线和 baseline 恢复线一起过一遍，再回 Unity GUI 做观察，直接跑：
+
+```bash
+Tools/unity-cli/ty-new-ghostsamurai-verify --startup-timeout 90
+```
+
+它会顺序串起 `ty-new-ghostsamurai-preview-check` 与 `ty-new-ghostsamurai-baseline-check`，并在终端最后打印下一组 `flank-clean / clean / airheavy-clean / irongate-clean / enemy-reads / boss-reads` 观察命令，作为本轮最短收尾入口。
 
 进入 `P0.6-NewActions` 前必须满足下面任一条件：
 
@@ -158,13 +187,21 @@ P0 / P0.5 当前已经通过自动化合同回归，下一步不是继续盲目�
 - `Repair CombatTest Prefab Wiring` 与 `Build CombatTest Scene` 的标准路径都会把玩家拉回 proxy baseline，而不是根据本机素材目录自动改正式输出
 - 如果你想做 local preview，先打开菜单 `CampusRPG/Setup/CombatTest/Prefer Imported Player Sources When Available`
 - 然后手动执行 `CampusRPG/Setup/Local Preview/Rebuild CombatTest Imported Player Animations`
-  当前这条 local preview 攻击链会优先尝试 `DoubleL` / `Kevin 1H` 的单手挥砍资源；只有在这些资源缺失时，才回退到 `2H / Polearm` 候选
+  当前这条 local preview 攻击链会优先尝试 `Assets/GhostSamurai_Animset/` 下的 katana / APose / Inplace 动作；如果本机没有这包，再回退到 `DoubleL` / `Kevin 1H` 的单手挥砍资源，最后才回退到 `2H / Polearm` 候选
 - 如需把当前玩家 prefab 切到导入角色，再执行 `CampusRPG/Setup/Local Preview/Apply Imported Player Visuals To CombatTest Player Prefab`
   当前会优先使用 `Assets/JC_LP_MedievalCharacters_LITE/Prefabs/SM_MedievalMaleLite_01.prefab`；若该资源不存在，再回退到 `Assets/Kevin Iglesias/` 下的兼容 Humanoid prefab
   如果首选角色材质仍指向 HDRP / 不受支持 shader，本地预览现在会自动在 `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/Materials/Player/` 下生成 built-in 兼容材质，避免玩家在 CombatTest 里整个人变成粉紫色
   如果角色材质已经正常但场景还是偏白，先执行一次 `CampusRPG/Setup/Repair CombatTest Scene Lighting` 再看 Game 视图，避免把“场景灯太亮”误判成“角色材质有问题”
   如果本机存在 `Assets/Free medieval weapons/Prefabs/Sword_OH.prefab`，同一步会优先把这把单手剑挂到 imported 右手骨；若缺失才回退到其他本地武器候选。应用后会自动隐藏 proxy 剑体，只留下前向标记方便读朝向
 - local preview 结束后，再执行一次 `Repair CombatTest Prefab Wiring`，把 prefab 恢复回 public-safe baseline
+
+如果目标是直接生成带 GhostSamurai 人物、Humanoid Avatar、刀和动作的内部 Mac 试玩包，不需要手工把主树停在 local-preview 脏态，使用：
+
+```bash
+Tools/unity-cli/ty-new-build-release art-mac --wall-timeout 1800
+```
+
+该入口只允许 `GhostSamurai_Animset` 同源人物/武器/动作，强制在临时克隆中应用 imported 绑定，输出到 `Builds/ReleaseCandidate/UserOwnedArt/Mac/TY_NEW.app`，随后销毁克隆。它不是 public-safe RC，也不能替代外发前的完整 EULA 核验。Windows 对应命令为 `art-windows`，当前机器仍受 Windows Build Support 缺失限制。
 
 `PlayerCharacter` 需要连接：
 
@@ -258,6 +295,7 @@ P0 / P0.5 当前已经通过自动化合同回归，下一步不是继续盲目�
 - 如果你手动执行 `CampusRPG/Setup/Local Preview/Apply Imported Enemy Avatar Chain To CombatTest Enemy Prefabs`，会在本机给敌人单独挂一条 `Animator / Avatar / EnemyCombatAnimationRelay` 预览链，但它不属于正式默认输出
 - 这条 local preview 会按 skinned mesh 的最低点自动补正 Y 偏移，避免敌人 imported 角色埋地
 - `EnemyCombatAnimationRelay` 现在会在每次重新进入攻击 / 受击 / 死亡状态时强制从头重播对应 clip，避免 attack 看起来没触发
+- 如果本机存在 `Assets/GhostSamurai_Animset/`，当前 enemy imported preview 控制器会优先改用 GhostSamurai 的 katana / Bow clip：近战 idle / walk / run 会优先走 `DefenseR_Loop`、`Strafe_Walk_F`、`Strafe_Run_F`，`Attack_AntiAir` 优先走 `Air_Attack03_Start`，`Attack_ChaseRoll` 优先走 `Slide_F`，`Attack_GuardBreak` 优先走 `SPAttack06`；远程 idle / walk / run / ranged attack 会优先走 `Bow_Idle`、`Bow_AimWalk_F`、`Bow_AimRun_F`、`Bow_Shoot_Start`。这条链仍然只服务本机读招研究，不改变正式章节默认基线。
 - 这条 local preview 会生成 `Assets/_Game/Animations/Characters/CombatTest/LocalPreview/AC_Enemy_ImportedPreview.controller` 之类的本地资产；该目录只服务预览，不应提交
 - 标准 `Repair` 会把 enemy root 上这条 Avatar 链拆掉，并重新启用 `EnemyVisualPresentationRelay`
 
@@ -327,10 +365,10 @@ P0 / P0.5 当前已经通过自动化合同回归，下一步不是继续盲目�
 
 这份骨架目前仍有几处是“主干已打通，但仍是第一版原型”：
 
-- 玩家攻击已接入可配置局部 Hitbox，并默认通过占位 `AnimatorController + AnimationEvent` 驱动；当前占位动画已经补上最小读招和出手方向提示，但仍缺正式角色动画资源和更细的手调
+- 玩家攻击已接入可配置局部 Hitbox；当前默认 attack SO 使用 `AttackHitboxActivationMode.TimedWindow` 在运行时按 startup/active/recovery 驱动命中，相关攻击 clip 会刻意不放 Hitbox `AnimationEvent`，避免 TimedWindow 与动画事件重复结算。占位动画已提供最小读招和出手方向提示，但仍缺正式角色动画资源与更细的人工手调
 - 如果项目里已导入兼容的 Humanoid 动作包，`CombatTest` 现在会优先使用真实近战动作来重建本地 clip；未导入时仍自动回退到占位动画
 - 玩家与三类敌人当前使用的是低成本代理可视外形，不是正式模型资产；它们的职责是帮助判断朝向、距离与战斗空间，不替代最终美术资源
-- 玩家格挡与成功闪避已有统一受击入口，但仍缺动画和表现层反馈
+- 玩家格挡、破防与成功闪避已接状态、proxy/local-preview 动画入口、HUD/SFX 和镜头反馈，并有 ordinary Guard / Gate Slam Guard / Gate Slam Dodge 技术驱动可核对状态与数值；仍缺的是正式资源、逐镜头润色与真人手感签字，不能再概括成“没有动画和表现层反馈”
 - 敌人当前已补出近战 / 机动 / 远程三类最小行为差异，远程兵已接最小投射物链路、弧线弹道、命中闪光、全局 SFX 音量和程序生成音效；Gatekeeper `Sky Hook` / `Pursuit Slam` / `Gate Slam` 也分别有 `AntiAirRead` / `ChaseRollRead` / `GuardBreakRead` 读招参数与 local-preview 起手 state，但仍缺更完整的资源化音频和专属 Boss 起手 clip
 - 技能现在已接入最小施法执行，`SpellBolt` 已接最小投射物链路、命中闪光、全局 SFX 音量和程序生成音效，但仍缺动画事件、正式弹道表现和完整特效
 

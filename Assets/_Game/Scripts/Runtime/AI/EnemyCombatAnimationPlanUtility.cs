@@ -265,11 +265,6 @@ namespace CampusRPG.AI
 
             float clampedMoveSpeed = Mathf.Clamp01(moveSpeedNormalized);
 
-            if (clampedMoveSpeed <= LocomotionDeadZone)
-            {
-                return 0f;
-            }
-
             if (string.Equals(currentStateName, nameof(EnemyChaseState), System.StringComparison.Ordinal))
             {
                 return Mathf.Lerp(ChaseMinGroundSpeed, ChaseMaxGroundSpeed, clampedMoveSpeed);
@@ -278,6 +273,11 @@ namespace CampusRPG.AI
             if (string.Equals(currentStateName, nameof(EnemyStrafeState), System.StringComparison.Ordinal))
             {
                 return Mathf.Lerp(StrafeMinGroundSpeed, StrafeMaxGroundSpeed, clampedMoveSpeed);
+            }
+
+            if (clampedMoveSpeed <= LocomotionDeadZone)
+            {
+                return 0f;
             }
 
             return clampedMoveSpeed;

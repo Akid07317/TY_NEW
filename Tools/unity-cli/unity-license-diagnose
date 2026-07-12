@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   cat >&2 <<'EOF'
-Usage: Tools/unity-cli/unity-license-diagnose [--log <path>] [--use-temp-clone] [--clone-root <path>] [--startup-timeout <seconds>] [--sandbox-home] [--fresh-sandbox-home] [--override-user <name>] [--override-hostname <name>] [--hostaliases-local] [--override-localdomain <value>] [--override-res-options <value>]
+Usage: Tools/unity-cli/unity-license-diagnose [--log <path>] [--use-temp-clone] [--clone-root <path>] [--startup-timeout <seconds>] [--sandbox-home] [--fresh-sandbox-home] [--keep-temp-clone] [--override-user <name>] [--override-hostname <name>] [--hostaliases-local] [--override-localdomain <value>] [--override-res-options <value>]
 EOF
   exit 1
 }
@@ -14,6 +14,7 @@ PROJECT_NAME=$(basename "$PROJECT_ROOT")
 PROJECT_ROOT_TO_RUN="$PROJECT_ROOT"
 USE_TEMP_CLONE=0
 CLONE_ROOT="${TMPDIR:-/tmp}"
+CLONE_PATH=""
 STARTUP_TIMEOUT=20
 LOG_FILE="/tmp/${PROJECT_NAME}_license_probe.log"
 UNITY_PID=""
@@ -28,6 +29,8 @@ METRICS_DB=""
 METRICS_WAL=""
 METRICS_SHM=""
 TMP_WRITE_PROBE_DIR="${TMPDIR:-/tmp}"
+SANDBOX_HOME=""
+KEEP_TEMP_CLONE=0
 OVERRIDE_USER=""
 FRESH_SANDBOX_HOME=0
 OVERRIDE_HOSTNAME=""
@@ -99,6 +102,29 @@ cleanup_child() {
   if [ -n "$HOSTALIASES_FILE" ] && [ -f "$HOSTALIASES_FILE" ]; then
     rm -f "$HOSTALIASES_FILE" >/dev/null 2>&1 || true
   fi
+}
+
+cleanup_temp_paths() {
+  if [ "$KEEP_TEMP_CLONE" -eq 1 ]; then
+    [ -n "$CLONE_PATH" ] && echo "Preserved temporary clone: $CLONE_PATH"
+    [ -n "$SANDBOX_HOME" ] && echo "Preserved sandbox HOME: $SANDBOX_HOME"
+    return 0
+  fi
+
+  if [ -n "$CLONE_PATH" ] && [ -d "$CLONE_PATH" ]; then
+    rm -rf "$CLONE_PATH" >/dev/null 2>&1 || true
+    echo "Removed temporary clone: $CLONE_PATH"
+  fi
+
+  if [ -n "$SANDBOX_HOME" ] && [ -d "$SANDBOX_HOME" ]; then
+    rm -rf "$SANDBOX_HOME" >/dev/null 2>&1 || true
+    echo "Removed sandbox HOME: $SANDBOX_HOME"
+  fi
+}
+
+cleanup_all() {
+  cleanup_child
+  cleanup_temp_paths
 }
 
 log_contains() {
@@ -1747,6 +1773,10 @@ while [ $# -gt 0 ]; do
       FRESH_SANDBOX_HOME=1
       shift
       ;;
+    --keep-temp-clone)
+      KEEP_TEMP_CLONE=1
+      shift
+      ;;
     --override-user)
       [ $# -ge 2 ] || usage
       OVERRIDE_USER=$2
@@ -1816,7 +1846,7 @@ print_write_probe_evidence
 print_home_db_inventory
 
 rm -f "$LOG_FILE"
-trap cleanup_child INT TERM EXIT
+trap cleanup_all INT TERM EXIT
 ACTIVE_USER_VALUE="${OVERRIDE_USER:-${USER:-}}"
 ACTIVE_LOGNAME_VALUE="${LOGNAME:-}"
 ACTIVE_HOSTNAME_VALUE="${OVERRIDE_HOSTNAME:-${HOSTNAME:-}}"
@@ -1838,8 +1868,8 @@ while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
       && ! log_contains "'com.unity.editor.headless' was not found."; then
       echo "STATUS: startup-ok"
       echo "DETAIL: Unity passed licensing and entered normal batchmode startup."
-      trap - INT TERM EXIT
       wait "$UNITY_PID"
+      UNITY_PID=""
       exit 0
     fi
   fi

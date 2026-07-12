@@ -1,0 +1,197 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-ghostsamurai-baseline-check [--startup-timeout <seconds>] [--repair-timeout <seconds>] [--results-dir <path>] [--clone-root <path>] [--chapter01] [--keep-temp-clone]
+
+Creates a temporary clone, repairs the public-safe baseline there, then runs the narrow
+CombatTest/Release preflight checks that prove GhostSamurai local preview changes are restorable.
+The temporary clone is removed by default; pass --keep-temp-clone when inspection is needed.
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+PROJECT_NAME=$(basename "$PROJECT_ROOT")
+PROJECT_VERSION_FILE="$PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
+CLONE_ROOT="${TMPDIR:-/tmp}"
+CLONE_PATH=""
+RESULTS_DIR="/tmp"
+STARTUP_TIMEOUT=90
+REPAIR_TIMEOUT=240
+RUN_CHAPTER01=0
+KEEP_TEMP_CLONE=0
+LOCAL_PREVIEW_EXCLUDES=$(cat <<'EOF'
+Assets/GhostSamurai_Animset/
+Assets/GhostSamurai_Animset.meta
+Assets/Kevin Iglesias/
+Assets/Kevin Iglesias.meta
+Assets/DoubleL/
+Assets/DoubleL.meta
+Assets/ithappy/
+Assets/ithappy.meta
+Assets/JC_LP_MedievalCharacters_LITE/
+Assets/JC_LP_MedievalCharacters_LITE.meta
+Assets/Free medieval weapons/
+Assets/Free medieval weapons.meta
+Assets/MYFG-Weapon Pack Lite/
+Assets/MYFG-Weapon Pack Lite.meta
+Assets/Polytope Studio/
+Assets/Polytope Studio.meta
+EOF
+)
+
+if [ ! -f "$PROJECT_VERSION_FILE" ]; then
+  echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
+  exit 1
+fi
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --startup-timeout)
+      [ $# -ge 2 ] || usage
+      STARTUP_TIMEOUT=$2
+      shift 2
+      ;;
+    --repair-timeout)
+      [ $# -ge 2 ] || usage
+      REPAIR_TIMEOUT=$2
+      shift 2
+      ;;
+    --results-dir)
+      [ $# -ge 2 ] || usage
+      RESULTS_DIR=$2
+      shift 2
+      ;;
+    --clone-root)
+      [ $# -ge 2 ] || usage
+      CLONE_ROOT=$2
+      shift 2
+      ;;
+    --chapter01)
+      RUN_CHAPTER01=1
+      shift
+      ;;
+    --keep-temp-clone)
+      KEEP_TEMP_CLONE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+if ! command -v rsync >/dev/null 2>&1; then
+  echo "rsync is required to create a temporary clone." >&2
+  exit 1
+fi
+
+cleanup_temp_clone() {
+  if [ "$KEEP_TEMP_CLONE" -eq 1 ]; then
+    [ -n "$CLONE_PATH" ] && echo "Preserved temporary clone: $CLONE_PATH"
+    return 0
+  fi
+
+  if [ -n "$CLONE_PATH" ] && [ -d "$CLONE_PATH" ]; then
+    rm -rf "$CLONE_PATH" >/dev/null 2>&1 || true
+    echo "Removed temporary clone: $CLONE_PATH"
+  fi
+}
+
+trap cleanup_temp_clone INT TERM EXIT
+
+UNITY_VERSION=$(sed -n 's/^m_EditorVersion: //p' "$PROJECT_VERSION_FILE" | head -n 1)
+UNITY_EDITOR="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/MacOS/Unity"
+
+if [ ! -x "$UNITY_EDITOR" ]; then
+  echo "Unity editor not found: $UNITY_EDITOR" >&2
+  exit 1
+fi
+
+mkdir -p "$CLONE_ROOT" "$RESULTS_DIR"
+STAMP=$(date +%Y%m%d_%H%M%S)
+CLONE_PATH=$(mktemp -d "$CLONE_ROOT/${PROJECT_NAME}_ghostsamurai_baseline_clone.XXXXXX")
+REPAIR_LOG="$RESULTS_DIR/TY_NEW_ghostsamurai_baseline_repair_${STAMP}.log"
+RESULTS_FILE="$RESULTS_DIR/TY_NEW_ghostsamurai_baseline_${STAMP}.xml"
+TEST_LOG="$RESULTS_DIR/TY_NEW_ghostsamurai_baseline_${STAMP}.log"
+
+set -- \
+  -a \
+  --exclude '.git/' \
+  --exclude 'Library/' \
+  --exclude 'Logs/' \
+  --exclude 'Temp/' \
+  --exclude 'obj/' \
+  --exclude '.DS_Store'
+
+while IFS= read -r exclude_path; do
+  [ -n "$exclude_path" ] || continue
+  set -- "$@" --exclude "$exclude_path"
+done <<EOF
+$LOCAL_PREVIEW_EXCLUDES
+EOF
+
+set -- "$@" "$PROJECT_ROOT/" "$CLONE_PATH/"
+rsync "$@"
+
+REPAIR_METHOD="CampusRPG.Editor.CombatTestSceneBuilder.RepairCombatTestPrefabWiring"
+ASSEMBLY_NAME="CampusRPG.Tests.EditMode"
+FILTER='CombatTestAnimationAssetWiringTests|ReleaseCandidatePreflightTests'
+
+if [ "$RUN_CHAPTER01" -eq 1 ]; then
+  REPAIR_METHOD="CampusRPG.Editor.Chapter01SceneBuilder.RepairChapter01BaselineAndTraversalWiring"
+  FILTER='CombatTestAnimationAssetWiringTests|ReleaseCandidatePreflightTests|Chapter01ProgressionSceneWiringTests|BuildSettingsSceneOrderTests'
+fi
+
+echo "Temporary clone: $CLONE_PATH"
+echo "Repair method: $REPAIR_METHOD"
+echo "Repair log: $REPAIR_LOG"
+echo "Excluded local-preview-only roots from clone:"
+while IFS= read -r exclude_path; do
+  [ -n "$exclude_path" ] || continue
+  printf '  - %s\n' "$exclude_path"
+done <<EOF
+$LOCAL_PREVIEW_EXCLUDES
+EOF
+
+python3 - <<'PY' "$UNITY_EDITOR" "$CLONE_PATH" "$REPAIR_METHOD" "$REPAIR_LOG" "$REPAIR_TIMEOUT"
+import subprocess
+import sys
+
+unity_editor, clone_path, repair_method, repair_log, repair_timeout = sys.argv[1:]
+cmd = [
+    unity_editor,
+    "-batchmode",
+    "-quit",
+    "-projectPath",
+    clone_path,
+    "-executeMethod",
+    repair_method,
+    "-logFile",
+    repair_log,
+]
+
+subprocess.run(cmd, check=True, timeout=int(repair_timeout))
+PY
+
+echo "Running baseline verification tests in repaired clone..."
+"$CLONE_PATH/Tools/unity-cli/unity-run-tests" EditMode \
+  --startup-timeout "$STARTUP_TIMEOUT" \
+  --assembly-names "$ASSEMBLY_NAME" \
+  --group-filter "$FILTER" \
+  --results "$RESULTS_FILE" \
+  --log "$TEST_LOG"
+
+cat <<EOF
+GhostSamurai baseline recovery proof completed.
+- clone: $([ "$KEEP_TEMP_CLONE" -eq 1 ] && printf '%s' "$CLONE_PATH" || printf 'cleaned after completion')
+- repair log: $REPAIR_LOG
+- test results: $RESULTS_FILE
+- test log: $TEST_LOG
+EOF

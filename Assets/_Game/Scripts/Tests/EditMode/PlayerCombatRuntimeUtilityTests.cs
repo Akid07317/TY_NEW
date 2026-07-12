@@ -196,6 +196,52 @@ namespace CampusRPG.Tests.EditMode
         }
 
         [Test]
+        public void ResolveAttackForwardMovementDelta_DistributesLungeAcrossFrames()
+        {
+            AttackDefinitionSO attack = ScriptableObject.CreateInstance<AttackDefinitionSO>();
+
+            try
+            {
+                SetPrivateField(attack, "forwardMovement", 0.5f);
+                SetPrivateField(attack, "forwardMovementStartSeconds", 0.04f);
+                SetPrivateField(attack, "forwardMovementDurationSeconds", 0.14f);
+                SetPrivateField(
+                    attack,
+                    "forwardMovementCurve",
+                    new AnimationCurve(
+                        new Keyframe(0f, 0f, 0.57f, 0.57f),
+                        new Keyframe(0.35f, 0.2f, 0.57f, 1.7f),
+                        new Keyframe(0.75f, 0.88f, 1.7f, 0.48f),
+                        new Keyframe(1f, 1f, 0.48f, 0.48f)));
+
+                float elapsed = 0f;
+                float totalDistance = 0f;
+                float maxFrameDelta = 0f;
+                float frameStep = 1f / 60f;
+
+                for (int i = 0; i < 30; i++)
+                {
+                    float nextElapsed = elapsed + frameStep;
+                    float frameDelta = PlayerCombatRuntimeUtility.ResolveAttackForwardMovementDelta(
+                        attack,
+                        elapsed,
+                        nextElapsed);
+                    totalDistance += frameDelta;
+                    maxFrameDelta = Mathf.Max(maxFrameDelta, frameDelta);
+                    elapsed = nextElapsed;
+                }
+
+                Assert.AreEqual(0f, PlayerCombatRuntimeUtility.ResolveAttackForwardMovementDelta(attack, 0f, 0.03f), 0.0001f);
+                Assert.AreEqual(0.5f, totalDistance, 0.0001f);
+                Assert.Less(maxFrameDelta, 0.12f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(attack);
+            }
+        }
+
+        [Test]
         public void ShouldSnapProxyWeaponFollow_ReturnsTrue_DuringImmediateFollowWindow()
         {
             bool shouldSnap = PlayerCombatRuntimeUtility.ShouldSnapProxyWeaponFollow(

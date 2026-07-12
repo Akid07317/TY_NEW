@@ -22,9 +22,17 @@
 - `unity-license-warmup`
 - `unity-license-diagnose`
 - `unity-run-tests`
+- `ty-new-ghostsamurai-preview-check`
+- `ty-new-ghostsamurai-baseline-check`
+- `ty-new-ghostsamurai-verify`
+- `ty-new-ghostsamurai-observe-swordarts`
+- `ty-new-ghostsamurai-observe-enemy-reads`
+- `ty-new-ghostsamurai-observe-boss-reads`
+- `ty-new-diff-audit`
 - `ty-new-final-gate`
 - `ty-new-v2-gate`
 - `ty-new-build-release`
+- `ty-new-build-dedicated-server`
 
 说明：
 
@@ -46,6 +54,27 @@ Tools/unity-cli/unity-run-tests PlayMode --assembly-names CampusRPG.Tests.PlayMo
 Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.EditMode\\.'
 Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.EditMode\\.Chapter01' --use-temp-clone
 Tools/unity-cli/unity-run-tests EditMode --group-filter '^CampusRPG\\.Tests\\.EditMode\\.Chapter01' --startup-timeout 20
+Tools/unity-cli/unity-run-tests PlayMode --group-filter '^CampusRPG\\.Tests\\.PlayMode\\.' --wall-timeout 1800
+Tools/unity-cli/ty-new-ghostsamurai-preview-check --startup-timeout 90
+Tools/unity-cli/ty-new-ghostsamurai-preview-check --results-dir /tmp/ty_new_ghostsamurai_preview
+Tools/unity-cli/ty-new-ghostsamurai-baseline-check --startup-timeout 90
+Tools/unity-cli/ty-new-ghostsamurai-baseline-check --chapter01 --results-dir /tmp/ty_new_ghostsamurai_baseline
+Tools/unity-cli/ty-new-ghostsamurai-verify --startup-timeout 90
+Tools/unity-cli/ty-new-ghostsamurai-verify --chapter01 --results-root /tmp/ty_new_ghostsamurai_verify
+Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts flank-clean
+Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts clean
+Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts airheavy-clean
+Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts irongate-clean
+Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts scene
+Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads clean
+Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads scene
+Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads ranged-clean
+Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads ranged-scene
+Tools/unity-cli/ty-new-ghostsamurai-observe-boss-reads clean
+Tools/unity-cli/ty-new-ghostsamurai-observe-boss-reads scene
+Tools/unity-cli/ty-new-diff-audit
+Tools/unity-cli/ty-new-diff-audit --top 20
+Tools/unity-cli/ty-new-diff-audit --fail-on-warning
 Tools/unity-cli/ty-new-final-gate --startup-timeout 45
 Tools/unity-cli/ty-new-final-gate --skip-full --results-dir /tmp/ty_new_gates
 Tools/unity-cli/ty-new-v2-gate --startup-timeout 45
@@ -53,6 +82,17 @@ Tools/unity-cli/ty-new-v2-gate --skip-full --results-dir /tmp/ty_new_v2_gates
 Tools/unity-cli/ty-new-build-release validate --use-temp-clone
 Tools/unity-cli/ty-new-build-release mac --use-temp-clone --wall-timeout 1800
 Tools/unity-cli/ty-new-build-release windows --use-temp-clone --wall-timeout 1800
+Tools/unity-cli/ty-new-build-release art-validate --wall-timeout 600
+Tools/unity-cli/ty-new-build-release art-mac --wall-timeout 1800
+Tools/unity-cli/ty-new-build-release art-mac --editor-mode --hub-licensing --licensing-ipc LicenseClient-don --wall-timeout 1800
+Tools/unity-cli/ty-new-build-release art-windows --wall-timeout 1800
+Tools/unity-cli/ty-new-build-dedicated-server scene
+Tools/unity-cli/ty-new-build-dedicated-server validate
+Tools/unity-cli/ty-new-build-dedicated-server smoke
+Tools/unity-cli/ty-new-build-dedicated-server smoke --editor-mode --hub-licensing --licensing-ipc LicenseClient-don --wall-timeout 300
+Tools/unity-cli/ty-new-build-dedicated-server linux --wall-timeout 1800
+./TYServer.x86_64 --port 7777 --health-port 7778 --health-bind-address 0.0.0.0
+printf '' | nc -w 1 127.0.0.1 7778
 ```
 
 ## 注意
@@ -100,18 +140,45 @@ Tools/unity-cli/ty-new-build-release windows --use-temp-clone --wall-timeout 180
 - `unity-license-diagnose` 还会输出 `HOME_DB_INVENTORY`：列出当前 HOME 下 Unity 相关目录里实际可见的 `db/sqlite/lock` 文件数量。若 sandbox-home 已可写，但这里仍是 `0` 且 Unity 依旧报 `readonly database`，说明当前报错大概率不在临时 HOME 内这些常见数据库文件上
 - `unity-license-diagnose` 还会输出 `LOG_CONTEXT_SUMMARY`：给出 batchmode 实际连接的 Licensing channel、notification channel、客户端最近处理过的 license 路径，以及 `readonly database` 日志是否自带路径提示。若 sandbox-home 下仍显示 `SANDBOX_HOME_SHARED_USER_CHANNEL: yes`，说明 Unity 仍连着按原用户命名的授权通道，而不是一条随临时 HOME 隔离的新通道
 - 若同项目已有 Unity Editor 打开，`unity-run-tests` 会自动把工程复制到临时克隆目录后再跑批处理，避免 `Library` 与项目锁冲突
-- 若你想主动隔离本次回归，可显式追加 `--use-temp-clone`；临时克隆默认创建在 `${TMPDIR:-/tmp}`，也可通过 `--clone-root <path>` 指定
+- 若你想主动隔离本次回归，可显式追加 `--use-temp-clone`；临时克隆默认创建在 `${TMPDIR:-/tmp}`，也可通过 `--clone-root <path>` 指定。`unity-run-tests`、`unity-license-diagnose`、`ty-new-build-release` 与 GhostSamurai baseline/preview 检查默认会在退出时清理临时克隆；需要保留现场时显式传 `--keep-temp-clone`
 - 不要直接裸跑无超时的 Unity `-batchmode -executeMethod`。这类命令不会享受 `unity-run-tests` 的启动监控，若同项目 GUI Editor 已打开，可能长时间卡在 licensing / project lock / Package Manager 之前。必须执行编辑器方法时，先退出同项目 GUI Editor，或在临时克隆里执行，并给外层自动化设置明确墙钟上限；超过上限就记录日志和 PID，停止等待。
+- `unity-run-tests` 的 `--wall-timeout` 默认是 `1800s`，从 Unity 子进程启动开始计时，覆盖启动监控、导入和实际 TestRunner 全程；超时返回 `124`。清理时先发送 `SIGTERM`，最多等待 `10s`，仍不退出才发送 `SIGKILL`，且只处理脚本自己启动的 Unity 子进程
 - `unity-run-tests` 现在会在每次启动前删除旧的 `/tmp/*tests.log` 与结果 XML，避免启动监控误读上一次残留的 entitlement / readonly 错误日志；如果你看到“秒失败”现象，先确认是不是旧版脚本
 - `unity-run-tests` 会在启动阶段监控日志；若 Unity 长时间没进入 `Package Manager` / `COMMAND LINE ARGUMENTS`，或已经出现 `0 entitlement groups`、`com.unity.editor.headless was not found`，脚本会尽快中止并给出更明确的环境诊断；`attempt to write a readonly database` 仍会被保留在输出里，但不会再抢在更明确的 entitlement / headless 失败前把根因盖掉
 - 当 `unity-run-tests` 明确提示 entitlement / headless / readonly database 启动阻塞时，优先执行一次 `Tools/unity-cli/unity-license-warmup`，再重跑 `unity-license-diagnose` 或 `unity-run-tests`；本项目已重复验证过“先正常拉起 GUI 编辑器热授权，再退掉 Unity Hub”的恢复路径
 - `unity-run-tests` 故意不传 `-quit`；当前 `com.unity.test-framework@1.6.0` 会在测试完成后自行退出，额外附带 `-quit` 会导致测试不启动也不产出结果文件
 - `unity-run-tests` 的 `--group-filter` 会原样转发到 Unity `-testFilter`，更适合按命名空间 / Fixture 正则过滤，而不是按单个测试方法名过滤
-- `ty-new-final-gate` 是 TY_NEW 发布候选的最后统一回归入口，会按顺序执行 release preflight、P0.6/Combat、Chapter/Boss、runtime smoke，以及默认的全量 EditMode / PlayMode。它只调用 `unity-run-tests --use-temp-clone --startup-timeout`，不会裸跑 Unity `-batchmode -executeMethod`
+- `unity-run-tests` 现在还会拒绝“退出码是 0，但结果 XML `total=0` 或日志里写着 `No tests were executed.`”这类假绿灯；若筛选条件没命中，脚本会直接报错，避免把 0-test 结果误当成通过
+- `ty-new-ghostsamurai-preview-check` 是 GhostSamurai 本机研究预览线的窄门包装。它会先执行 `python3 Tools/ghostsamurai/generate_catalog.py --check`，确认当前清单 markdown 没有脱离 `clip_mappings.json` 与本机 `Assets/GhostSamurai_Animset/` 扫描结果；随后在临时克隆里运行 `GhostSamuraiCatalogManifestTests`、`CombatImportedPlayerAnimationSelectionTests`、`CombatImportedPlayerVisualUtilityTests`、`CombatImportedEnemyAvatarPreviewTests`、`PlayerCombatAnimationRelayTests`、`PlayerCombatControllerTests`、`PlayerCombatRuntimeUtilityTests` 与 `SwordArtResolverTests`。它故意不带 `CombatTestAnimationAssetWiringTests` 这类 public-safe baseline 断言，因为主工作树可能正故意停在 imported/local-preview 脏态
+- `ty-new-ghostsamurai-preview-check` 现在还会顺手包含 `CombatTestIronGateBreakContractTests`、`CombatTestMoonSeverContractTests`、`CombatTestAirHeavySwordArtContractTests`、`CombatTestFlankSwordArtContractTests`、`CombatTestPlayerLungeCaptureDriverTests`、`GhostSamuraiCombatEnemyReadCaptureDriverTests` 与 `GhostSamuraiBossReadCaptureDriverTests`，把 `Iron Gate Break`、`Moon Sever`、`Rising Cleave / Falling Star`、`Sidewind Cut / Cross Step`、`CombatTest` 三类敌人读招观察入口和 `Gatekeeper` 读招观察入口一起绑进同一条 local-preview 研究门
+- `ty-new-ghostsamurai-preview-check` 与 `ty-new-ghostsamurai-baseline-check` 现在都会显式锁到 `CampusRPG.Tests.EditMode` 测试程序集，再用 fixture 关键词筛选，避免完整限定名 regex 在当前 Unity Test Framework 下偶发匹配成 `0 tests`
+- `ty-new-ghostsamurai-baseline-check` 会先在临时克隆里排除 `GhostSamurai`、`DoubleL`、`Kevin Iglesias`、`ithappy`、`JC_LP_MedievalCharacters_LITE` 等 local-preview-only raw asset roots，再执行 `Repair CombatTest Prefab Wiring`，最后跑 `CombatTestAnimationAssetWiringTests + ReleaseCandidatePreflightTests`；它的作用是证明“当前主树虽然在做 local preview 研究，但 repair 路径仍能把 GhostSamurai / imported source 脏态拉回 public-safe proxy baseline”，同时避免 fresh clone 先导入整包本地预览素材把 proof 自己拖慢到超时
+- `ty-new-ghostsamurai-verify` 会把 `preview-check` 与 `baseline-check` 顺序串成一条命令，并直接从结果 XML 提取 `passed/total/failed` 摘要，再打印下一组 `observe-swordarts` / `observe-enemy-reads` / `observe-boss-reads` 手动观察命令。适合每轮先做“双线都绿了吗”的自动化收尾，再切回 Unity GUI 看动作身体语言
+- `ty-new-ghostsamurai-observe-swordarts` 不会改工程资产；它只会往 `/tmp/TY_NEW_lunge_capture_driver.request` 写入带时间戳的新请求，让已经打开的 Unity GUI 触发 `CampusRPG/Setup/Local Preview/Start Player SwordArt Capture Driver/*` 这条观察序列。`flank-clean` 用于 `GroundDodge only`、`Sidewind Cut` 与 `Cross Step` 的 flank 对比走查；默认 `clean` 用于 `AirDodge only`、`Moon Sever` 与 `Falling Star` 的对比走查；`airheavy-clean` 会改为专门跑 `Rising Cleave` 与 `Falling Star` 的空中 heavy 对照；`irongate-clean` 会改为跑 `Iron Gate Break` 的 `AfterBlock` / `AfterHeavy` 观察链；`scene` / `airheavy-scene` / `flank-scene` / `irongate-scene` 会额外聚焦 Scene View
+- `ty-new-ghostsamurai-observe-enemy-reads` 会往 `/tmp/TY_NEW_enemy_read_capture_driver.request` 写入带时间戳的新请求，让已经打开的 Unity GUI 触发 `CampusRPG/Setup/Local Preview/Start CombatTest Enemy Read Capture Driver/*`。默认 `clean` / `scene` 模式优先服务 `CombatTest`，会在运行时把 imported enemy preview 临时挂到 melee / mobile / ranged 三类敌人实例上，再依次触发 `Guard Swing`、`Feint Dash` 与 `Arc Bolt`，用于核对 `Tgt Atk:`、敌人身体语言和三类 archetype 的读招差异；`ranged-clean` / `ranged-scene` 则固定跑 `EnemyRanged / Anti-Air Shot`、`EnemyRanged / Chase Roll Shot` 与 `EnemyRanged / Guard Break Shot`，把 Bow 的 `Attack_Ranged_AntiAir`、`Attack_Ranged_ChaseRoll`、`Attack_Ranged_GuardBreak` 做成单独观察链
+- `ty-new-ghostsamurai-observe-boss-reads` 会往 `/tmp/TY_NEW_boss_read_capture_driver.request` 写入带时间戳的新请求，让已经打开的 Unity GUI 触发 `CampusRPG/Setup/Local Preview/Start Boss Read Capture Driver/*`。它优先服务 `BossTest` 或其他已存在 `Boss_Gatekeeper` 的场景，并会在运行时把 imported enemy preview 临时挂到当前 boss 实例上，再依次触发 `Sky Hook`、`Pursuit Slam` 与 `Gate Slam`，用于核对 `Boss cue`、`Tgt Atk:` 和 GhostSamurai 身体语言是否一致
+- `ty-new-diff-audit` 是只读的工作区工程纪律体检入口。它会按代码、Runtime、Editor、测试、文档、Unity 序列化资产和 `CombatTest` 动画 YAML 分层统计当前 Git diff，并列出最大的 Unity YAML 改动、未跟踪文件类别、local-preview-only 目录状态和提交前警告。它不会修改工程，适合每轮开始、提交前、清理前和判断“为什么 Git 统计这么大”时先跑
+- `ty-new-ghostsamurai-baseline-check --chapter01` 会改为执行 `Repair Chapter01 Baseline And Traversal Wiring`，并把 `Chapter01ProgressionSceneWiringTests` 一起纳入同一轮隔离副本验证；适合本轮动作研究已经碰到章节 prefab / 场景时使用
+- `ty-new-final-gate` 是 TY_NEW 发布候选的最后统一回归入口。它先顺序执行 5 条定向 lane：`release_preflight`、`p06_combat`、`chapter_boss`、`camera_runtime`、`runtime_smoke`，随后默认再跑全量 EditMode / PlayMode；`--skip-full` 只跳过后两条全量 lane。`camera_runtime` 当前覆盖 `LockOnTargetSelectorTests + ThirdPersonCameraControllerPlayModeTests`；`p06_combat` 已显式包含 `GhostSamuraiCombatEnemyReadCaptureDriverTests + GuardBreakAnimationStateWiringTests`，`chapter_boss` 已显式包含 `GhostSamuraiBossReadCaptureDriverTests`，所以 ordinary Guard、Boss input driver 与 GuardBreak 接线不会再从定向门漏掉。该入口只调用 `unity-run-tests --use-temp-clone --startup-timeout --wall-timeout`，不会裸跑 Unity `-batchmode -executeMethod`
 - `ty-new-v2-gate` 是 TY_NEW V2 野心路线图的集中回归入口，会按顺序执行 release preflight、P0.7 动作表达、P1.5 地图表达、P2.5 招式表达、P5.5 表现反馈、P6.5 敌人回应、runtime smoke，以及默认的全量 EditMode / PlayMode。它只调用 `unity-run-tests --use-temp-clone --startup-timeout`，不会裸跑 Unity `-batchmode -executeMethod`
-- `ty-new-build-release` 是 TY_NEW 发布候选包的安全构建入口，支持 `validate`、`mac`、`windows` 三个动作。它会给 Unity `-executeMethod` 外层套明确墙钟上限、独立 log 和可选临时克隆；如果同项目 GUI Editor 已打开，会自动改用临时克隆，避免主工程 `Library` / 项目锁冲突
-- `ty-new-build-release validate` 只调用 `ReleaseCandidateBuildUtility.ValidateReleaseCandidateBuildInputs`，用于最终回归前检查 Build Settings、场景路径和输出路径；`mac` / `windows` 才会真正产出 `Builds/ReleaseCandidate/Mac/TY_NEW.app` 或 `Builds/ReleaseCandidate/Windows/TY_NEW.exe`
-- `ty-new-build-release` 默认不会删除临时克隆或构建产物；失败时保留目录和 log，方便继续排查。若命令超时，它只会结束自己启动的 Unity 子进程并返回 `124`
+- `ty-new-build-release` 是 TY_NEW 发布候选包的安全构建入口，支持 `validate`、`mac`、`windows`、`art-validate`、`art-mac`、`art-windows`。它会给 Unity `-executeMethod` 外层套明确墙钟上限、独立 log 和可选临时克隆；如果同项目 GUI Editor 已打开，会自动改用临时克隆，避免主工程 `Library` / 项目锁冲突
+- `ty-new-build-release validate` 只调用 `ReleaseCandidateBuildUtility.ValidateReleaseCandidateBuildInputs`，用于最终回归前检查项目身份、Built-in/HDRP 基线、精确 5 场景顺序与 GUID、release scene 的 local-preview-only 依赖、输出路径，以及 macOS / Windows 目标模块是否实际安装；同一套 public-safe 输入检查也会在真实 build 前执行。validate 本身仍不会构建 player，`mac` / `windows` 才会真正产出 `Builds/ReleaseCandidate/Mac/TY_NEW.app` 或 `Builds/ReleaseCandidate/Windows/TY_NEW.exe`
+- `art-validate` / `art-mac` / `art-windows` 会强制使用临时克隆，并把玩家与 melee / mobile / ranged 三类敌人的人物、Humanoid Avatar、真实武器、严格材质和动作全部锁在用户自有 `GhostSamurai_Animset` 单一来源。玩家继续验证 7 个确定性 Built-in 色块材质、13 个 locomotion motion、格挡/三类闪避/受击/破防/死亡/轻三连/重击；敌人门额外要求 melee / mobile 共享已授权 `Model_Unity_Ver1 + SM_Katana01@Weapon_r`，ranged 使用 `WM_Master_Unity_Bow2` 内置 `SK_Bow_02 + SM_Arrow_01@arrow`，每类具备三段不同 locomotion、Hit、Death 和对应 attack state，且所有身体 / Katana / Bow / Arrow 槽位都进入角色专属严格调色板。门禁拒绝非 GhostSamurai Humanoid、`__preview__` 临时片段、proxy 曲线、primitive 武器标记或其他素材根的静默回退；完成后恢复 public-safe proxy baseline。`art-mac` / `art-windows` 输出位于 `Builds/ReleaseCandidate/UserOwnedArt/`。这些档位用于内部人工验收，不放宽 public-safe RC，也不等同于完整 EULA 已核准的外发包
+- 当前 macOS / Unity `6000.4.2f1` 环境运行 `art-validate` / `art-mac` 前应先保存并关闭主工程 Unity Editor。实测同项目 Editor 打开时，第二个 Hub GUI Editor 会在 Domain Reload 超过 420 秒不推进，标准 batchmode 的 Licensing Client 会抛 `ObjectDisposedException`；临时克隆只隔离项目文件，不能消除授权进程冲突
+- GhostSamurai 自带人物、Katana、Bow 与 Arrow 没有 PNG/TGA/JPG 贴图，只有纯色内嵌材质；内部候选会为玩家生成 7 个 Standard 材质，并为三类敌人的身体和武器槽位生成红 / 青 / 金棕角色调色板，不应描述为“已恢复正式贴图”。动作技术接线由 `art-validate` 负责；玩家与敌人的动作自然度、脚滑、武器对位、读招和总体手感只由项目所有者填写 `Docs/User_Owned_Art_Candidate_Profile.md` 的验收表
+- 当普通 batchmode 卡在 versioned/default licensing channel 时，release wrapper 可与 Dedicated Server wrapper 一样使用 `--editor-mode --hub-licensing --licensing-ipc LicenseClient-don`，通过 Hub 持有的 GUI 授权会话执行同一个 Editor build method；这三个参数必须一起出现
+- `ty-new-build-release` 默认会在退出时删除临时克隆；只有显式传 `--keep-temp-clone` 才保留。临时克隆中的 `mac` / `windows` 构建成功后，会先把 `Builds/ReleaseCandidate/` 同步回主工作树再清理克隆；失败时保留独立 log，但不会把失败产物冒充 RC。超时返回 `124`，并且只终止自己启动的 Unity 子进程：先发送 `SIGTERM`、等待最多 `10s`，仍不退出才发送 `SIGKILL`
+- 当前 `6000.4.2f1` 本机安装已核到 `MacStandaloneSupport`，并在 Editor 安装根目录下具备 `LinuxStandaloneSupport` 与 `WebGLSupport`；未发现 Windows Standalone Support。因此本机可做 Mac、Linux 和 WebGL 目标验证，`validate` 现会明确报 `StandaloneWindows64 is not installed`，`ty-new-build-release windows` 仍是缺模块的外部环境边界；即使将来 validate 成功，也只表示输入与模块齐备，不表示 Windows player 已产出或已在真机启动
+- `ty-new-build-dedicated-server` 是 Dedicated Server 骨架的构建入口，支持 `scene`、`validate`、`smoke`、`linux` 四个动作。`smoke` 会在 Unity Editor 内检查 ServerBoot 场景、Linux Server build options、服务端命令行参数 clamp、TCP health 响应格式，以及 ServerBoot 不依赖客户端相机/音频/InputReader
+- Dedicated Server 运行时默认使用 `--port 7777` 作为后续 gameplay server 端口占位，使用 `--health-port 7778 --health-bind-address 0.0.0.0` 暴露纯 TCP 探活；探活连接会返回一行 `TY_NEW_SERVER status=ok ... connectionsAccepted=... activeConnections=...`，可用 `nc` 做最小连通性检查
+- 运行时可传 `--disable-health-server` 关闭探活，或传 `--health-server-enabled=false` 显式禁用；这只影响 P1 health 端口，不代表已经实现多人战斗同步
+- 若 batchmode 授权仍卡在 versioned `LicenseClient-*-6000.4.2` 通道，但 Unity Hub 已经有有效的 `LicenseClient-don` 会话，可用 `ty-new-build-dedicated-server smoke --editor-mode --hub-licensing --licensing-ipc LicenseClient-don` 走普通 Editor 验证；在 Codex 沙盒内需要提升权限执行，普通终端不需要
+- `ty-new-build-dedicated-server linux` 需要当前 Unity 安装包含 Linux Dedicated Server / Linux Standalone 支持模块；当前 `6000.4.2f1` 的 Editor 安装根目录下已存在 `PlaybackEngines/LinuxStandaloneSupport`，但实际 server player 仍须以一次成功构建和运行时 smoke 为准
+
+## 证据边界
+
+- `unity-csc` response-file 编译、`sh -n`、脚本自身退出码和 fixture 源码检查，只能证明当前脚本/程序集在相应静态范围内可解析；它们不等于一次 fresh Unity TestRunner 回归
+- 只有本轮新生成、`total > 0` 且失败数为 `0` 的结果 XML，连同对应 Unity log，才能作为 current-tree 自动回归证据。若 licensing / headless entitlement 在产出 XML 前失败，应记录为外部环境阻塞，不能用 response compile 或历史绿灯替代
 
 ## 已验证恢复链路
 

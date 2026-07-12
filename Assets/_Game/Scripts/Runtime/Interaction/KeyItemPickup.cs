@@ -9,6 +9,7 @@ namespace CampusRPG.Interaction
     public sealed class KeyItemPickup : MonoBehaviour, ICheckpointRestoreParticipant
     {
         [SerializeField] private string keyItemId = string.Empty;
+        [SerializeField] private string requiredEncounterId = string.Empty;
         [SerializeField] private bool completeChapterOnPickup;
         [SerializeField] private ChapterProgressService chapterProgressService;
 
@@ -69,6 +70,11 @@ namespace CampusRPG.Interaction
             ResolveReferences();
 
             if (chapterProgressService == null || string.IsNullOrWhiteSpace(keyItemId))
+            {
+                return false;
+            }
+
+            if (!chapterProgressService.MeetsRequirements(string.Empty, requiredEncounterId, string.Empty))
             {
                 return false;
             }

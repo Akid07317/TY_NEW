@@ -1,0 +1,118 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-ghostsamurai-verify [--startup-timeout <seconds>] [--results-root <path>] [--chapter01]
+
+Runs the GhostSamurai local-preview verification lane and the public-safe baseline
+recovery lane back to back, then prints a compact summary plus the next manual
+observation commands for CombatTest and BossTest.
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+STARTUP_TIMEOUT=90
+RUN_CHAPTER01=0
+RESULTS_ROOT=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --startup-timeout)
+      [ $# -ge 2 ] || usage
+      STARTUP_TIMEOUT=$2
+      shift 2
+      ;;
+    --results-root)
+      [ $# -ge 2 ] || usage
+      RESULTS_ROOT=$2
+      shift 2
+      ;;
+    --chapter01)
+      RUN_CHAPTER01=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+if command -v pgrep >/dev/null 2>&1 && pgrep -f "/Applications/Unity Hub.app/Contents/MacOS/Unity Hub" >/dev/null 2>&1; then
+  echo "Unity Hub is still running. Quit Unity Hub before GhostSamurai batch verification." >&2
+  exit 2
+fi
+
+STAMP=$(date +%Y%m%d_%H%M%S)
+
+if [ -z "$RESULTS_ROOT" ]; then
+  RESULTS_ROOT="/tmp/ty_new_ghostsamurai_verify_${STAMP}"
+fi
+
+PREVIEW_DIR="$RESULTS_ROOT/preview"
+BASELINE_DIR="$RESULTS_ROOT/baseline"
+mkdir -p "$PREVIEW_DIR" "$BASELINE_DIR"
+
+find_latest_file() {
+  find "$1" -maxdepth 1 -type f -name "$2" -print | sort | tail -n 1
+}
+
+extract_counts() {
+  xml_path=$1
+  sed -n '2{s/.*total="\([0-9][0-9]*\)".*passed="\([0-9][0-9]*\)".*failed="\([0-9][0-9]*\)".*/\1 \2 \3/p;q;}' "$xml_path"
+}
+
+"$PROJECT_ROOT/Tools/unity-cli/ty-new-ghostsamurai-preview-check" \
+  --startup-timeout "$STARTUP_TIMEOUT" \
+  --results-dir "$PREVIEW_DIR"
+
+if [ "$RUN_CHAPTER01" -eq 1 ]; then
+  "$PROJECT_ROOT/Tools/unity-cli/ty-new-ghostsamurai-baseline-check" \
+    --chapter01 \
+    --startup-timeout "$STARTUP_TIMEOUT" \
+    --results-dir "$BASELINE_DIR"
+  BASELINE_LABEL="chapter01 baseline"
+else
+  "$PROJECT_ROOT/Tools/unity-cli/ty-new-ghostsamurai-baseline-check" \
+    --startup-timeout "$STARTUP_TIMEOUT" \
+    --results-dir "$BASELINE_DIR"
+  BASELINE_LABEL="combat baseline"
+fi
+
+PREVIEW_XML=$(find_latest_file "$PREVIEW_DIR" 'TY_NEW_ghostsamurai_preview_*.xml')
+BASELINE_XML=$(find_latest_file "$BASELINE_DIR" 'TY_NEW_ghostsamurai_baseline_*.xml')
+
+[ -n "$PREVIEW_XML" ] || { echo "Preview results XML not found in $PREVIEW_DIR" >&2; exit 1; }
+[ -n "$BASELINE_XML" ] || { echo "Baseline results XML not found in $BASELINE_DIR" >&2; exit 1; }
+
+set -- $(extract_counts "$PREVIEW_XML")
+PREVIEW_TOTAL=${1:-0}
+PREVIEW_PASSED=${2:-0}
+PREVIEW_FAILED=${3:-0}
+
+set -- $(extract_counts "$BASELINE_XML")
+BASELINE_TOTAL=${1:-0}
+BASELINE_PASSED=${2:-0}
+BASELINE_FAILED=${3:-0}
+
+cat <<EOF
+GhostSamurai dual verification completed.
+- results root: $RESULTS_ROOT
+- preview lane: $PREVIEW_PASSED/$PREVIEW_TOTAL passed (failed: $PREVIEW_FAILED)
+- preview xml: $PREVIEW_XML
+- $BASELINE_LABEL: $BASELINE_PASSED/$BASELINE_TOTAL passed (failed: $BASELINE_FAILED)
+- baseline xml: $BASELINE_XML
+- next CombatTest observations:
+  - Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts flank-clean
+  - Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts clean
+  - Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts airheavy-clean
+  - Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts irongate-clean
+  - Tools/unity-cli/ty-new-ghostsamurai-observe-enemy-reads clean
+- next BossTest observation:
+  - Tools/unity-cli/ty-new-ghostsamurai-observe-boss-reads clean
+EOF

@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   cat >&2 <<'EOF'
-Usage: Tools/unity-cli/unity-run-tests <EditMode|PlayMode> [--group-filter <regex>] [--assembly-names <name1,name2>] [--results <path>] [--log <path>] [--use-temp-clone] [--clone-root <path>] [--startup-timeout <seconds>] [--sandbox-home] [--fresh-sandbox-home]
+Usage: Tools/unity-cli/unity-run-tests <EditMode|PlayMode> [--group-filter <regex>] [--assembly-names <name1,name2>] [--results <path>] [--log <path>] [--use-temp-clone] [--clone-root <path>] [--startup-timeout <seconds>] [--wall-timeout <seconds>] [--sandbox-home] [--fresh-sandbox-home] [--keep-temp-clone]
 EOF
   exit 1
 }
@@ -14,15 +14,19 @@ PROJECT_NAME=$(basename "$PROJECT_ROOT")
 PROJECT_ROOT_TO_RUN="$PROJECT_ROOT"
 USE_TEMP_CLONE=0
 CLONE_ROOT="${TMPDIR:-/tmp}"
+CLONE_PATH=""
 CAN_INSPECT_PROCESSES=1
 STARTUP_TIMEOUT=45
+WALL_TIMEOUT=1800
 UNITY_PID=""
 USE_SANDBOX_HOME=0
 FRESH_SANDBOX_HOME=0
+KEEP_TEMP_CLONE=0
 ORIGINAL_HOME="$HOME"
 ACTIVE_HOME="$HOME"
 TMP_WRITE_ROOT="${TMPDIR:-/tmp}"
 ACTIVE_TMPDIR="${TMPDIR:-/tmp}"
+SANDBOX_HOME=""
 ACTIVE_XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 ACTIVE_XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 ORIGINAL_METRICS_DIR="$ORIGINAL_HOME/Library/Application Support/Unity"
@@ -65,6 +69,14 @@ RESULTS_FILE="/tmp/$(basename "$PROJECT_ROOT")_${MODE_KEY}_tests.xml"
 LOG_FILE="/tmp/$(basename "$PROJECT_ROOT")_${MODE_KEY}_tests.log"
 GROUP_FILTER=""
 ASSEMBLY_NAMES=""
+
+extract_total_from_results() {
+  if [ ! -f "$RESULTS_FILE" ]; then
+    return 1
+  fi
+
+  sed -n '2{s/.*total="\([0-9][0-9]*\)".*/\1/p;q;}' "$RESULTS_FILE"
+}
 
 create_temp_clone() {
   mkdir -p "$CLONE_ROOT"
@@ -114,8 +126,42 @@ create_sandbox_home() {
 cleanup_child() {
   if [ -n "$UNITY_PID" ] && kill -0 "$UNITY_PID" >/dev/null 2>&1; then
     kill "$UNITY_PID" >/dev/null 2>&1 || true
+    CLEANUP_WAITED=0
+
+    while kill -0 "$UNITY_PID" >/dev/null 2>&1 && [ "$CLEANUP_WAITED" -lt 10 ]; do
+      sleep 1
+      CLEANUP_WAITED=$((CLEANUP_WAITED + 1))
+    done
+
+    if kill -0 "$UNITY_PID" >/dev/null 2>&1; then
+      kill -9 "$UNITY_PID" >/dev/null 2>&1 || true
+    fi
+
     wait "$UNITY_PID" >/dev/null 2>&1 || true
   fi
+}
+
+cleanup_temp_paths() {
+  if [ "$KEEP_TEMP_CLONE" -eq 1 ]; then
+    [ -n "$CLONE_PATH" ] && echo "Preserved temporary clone: $CLONE_PATH"
+    [ -n "$SANDBOX_HOME" ] && echo "Preserved sandbox HOME: $SANDBOX_HOME"
+    return 0
+  fi
+
+  if [ -n "$CLONE_PATH" ] && [ -d "$CLONE_PATH" ]; then
+    rm -rf "$CLONE_PATH" >/dev/null 2>&1 || true
+    echo "Removed temporary clone: $CLONE_PATH"
+  fi
+
+  if [ -n "$SANDBOX_HOME" ] && [ -d "$SANDBOX_HOME" ]; then
+    rm -rf "$SANDBOX_HOME" >/dev/null 2>&1 || true
+    echo "Removed sandbox HOME: $SANDBOX_HOME"
+  fi
+}
+
+cleanup_all() {
+  cleanup_child
+  cleanup_temp_paths
 }
 
 log_contains() {
@@ -130,7 +176,7 @@ startup_initialized() {
 }
 
 print_startup_failure() {
-  echo "Unity batchmode startup failed before TestRunner initialized." >&2
+  echo "Unity batchmode failed before a usable TestRunner run initialized." >&2
   echo "Log: $LOG_FILE" >&2
 
   if log_contains "Found 0 entitlement groups and 0 free entitlements"; then
@@ -139,6 +185,14 @@ print_startup_failure() {
 
   if log_contains "'com.unity.editor.headless' was not found."; then
     echo "Detected missing headless entitlement for the current licensing session." >&2
+  fi
+
+  if log_contains "Licensing initialization failed"; then
+    echo "Detected Unity LicensingClient initialization failure before TestRunner startup." >&2
+  fi
+
+  if log_contains "waiting for channel: \"LicenseClient-don\""; then
+    echo "Detected missing shared LicenseClient-don IPC channel." >&2
   fi
 
   if log_contains "attempt to write a readonly database"; then
@@ -211,6 +265,11 @@ while [ $# -gt 0 ]; do
       STARTUP_TIMEOUT=$2
       shift 2
       ;;
+    --wall-timeout)
+      [ $# -ge 2 ] || usage
+      WALL_TIMEOUT=$2
+      shift 2
+      ;;
     --sandbox-home)
       USE_SANDBOX_HOME=1
       shift
@@ -218,6 +277,10 @@ while [ $# -gt 0 ]; do
     --fresh-sandbox-home)
       USE_SANDBOX_HOME=1
       FRESH_SANDBOX_HOME=1
+      shift
+      ;;
+    --keep-temp-clone)
+      KEEP_TEMP_CLONE=1
       shift
       ;;
     *)
@@ -281,6 +344,7 @@ echo "Running $TEST_PLATFORM tests for $PROJECT_ROOT_TO_RUN"
 echo "Results: $RESULTS_FILE"
 echo "Log: $LOG_FILE"
 echo "Startup timeout: ${STARTUP_TIMEOUT}s"
+echo "Wall timeout: ${WALL_TIMEOUT}s"
 echo "Note: unity-run-tests intentionally omits -quit because com.unity.test-framework exits the editor after the run, and -quit prevents the test run from starting."
 echo "Note: --group-filter forwards Unity's -testFilter regex, which matches groups/fixtures rather than individual test methods."
 print_preflight_metrics_warning
@@ -288,7 +352,7 @@ print_preflight_metrics_warning
 # Clear previous batch artifacts so startup monitors do not trip on stale failures.
 rm -f "$LOG_FILE" "$RESULTS_FILE"
 
-trap cleanup_child INT TERM EXIT
+trap cleanup_all INT TERM EXIT
 env HOME="$ACTIVE_HOME" TMPDIR="$ACTIVE_TMPDIR" XDG_CACHE_HOME="$ACTIVE_XDG_CACHE_HOME" XDG_CONFIG_HOME="$ACTIVE_XDG_CONFIG_HOME" "$@" &
 UNITY_PID=$!
 START_TIME=$(date +%s)
@@ -298,12 +362,22 @@ while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
     break
   fi
 
-  if log_contains "Found 0 entitlement groups and 0 free entitlements" || log_contains "'com.unity.editor.headless' was not found."; then
+  if log_contains "Found 0 entitlement groups and 0 free entitlements" \
+    || log_contains "'com.unity.editor.headless' was not found." \
+    || log_contains "Licensing initialization failed"; then
     print_startup_failure
     exit 1
   fi
 
   NOW=$(date +%s)
+
+  if [ $((NOW - START_TIME)) -ge "$WALL_TIMEOUT" ]; then
+    echo "Unity $TEST_PLATFORM test run timed out after ${WALL_TIMEOUT}s during startup." >&2
+    echo "Results: $RESULTS_FILE" >&2
+    echo "Log: $LOG_FILE" >&2
+    exit 124
+  fi
+
   if [ $((NOW - START_TIME)) -ge "$STARTUP_TIMEOUT" ]; then
     if log_contains "attempt to write a readonly database"; then
       print_startup_failure
@@ -317,12 +391,49 @@ while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
   sleep 2
 done
 
-trap - INT TERM EXIT
+while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
+  if log_contains "Found 0 entitlement groups and 0 free entitlements" \
+    || log_contains "'com.unity.editor.headless' was not found."; then
+    print_startup_failure
+    cleanup_child
+    UNITY_PID=""
+    exit 1
+  fi
+
+  NOW=$(date +%s)
+
+  if [ $((NOW - START_TIME)) -ge "$WALL_TIMEOUT" ]; then
+    echo "Unity $TEST_PLATFORM test run timed out after ${WALL_TIMEOUT}s." >&2
+    echo "Results: $RESULTS_FILE" >&2
+    echo "Log: $LOG_FILE" >&2
+    cleanup_child
+    UNITY_PID=""
+    exit 124
+  fi
+
+  sleep 5
+done
+
+set +e
 wait "$UNITY_PID"
 EXIT_CODE=$?
+set -e
+UNITY_PID=""
 
 if [ "$EXIT_CODE" -ne 0 ] && ! startup_initialized; then
   print_startup_failure
+fi
+
+if [ "$EXIT_CODE" -eq 0 ]; then
+  TEST_TOTAL=$(extract_total_from_results || true)
+
+  if [ "${TEST_TOTAL:-0}" -eq 0 ] || log_contains "No tests were executed."; then
+    echo "Unity batchmode completed without executing any tests." >&2
+    echo "This usually means the current --group-filter/--assembly-names selection matched nothing." >&2
+    echo "Results: $RESULTS_FILE" >&2
+    echo "Log: $LOG_FILE" >&2
+    exit 3
+  fi
 fi
 
 exit "$EXIT_CODE"

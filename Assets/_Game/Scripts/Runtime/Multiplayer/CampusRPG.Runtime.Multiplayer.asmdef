@@ -1,0 +1,18 @@
+{
+  "name": "CampusRPG.Runtime.Multiplayer",
+  "rootNamespace": "CampusRPG.Multiplayer",
+  "references": [
+    "CampusRPG.Runtime",
+    "Unity.Netcode.Runtime",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

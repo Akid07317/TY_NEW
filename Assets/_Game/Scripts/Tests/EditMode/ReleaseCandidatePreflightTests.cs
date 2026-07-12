@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using CampusRPG.Editor;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.Build;
 
 namespace CampusRPG.Tests.EditMode
 {
@@ -32,6 +34,7 @@ namespace CampusRPG.Tests.EditMode
             "Assets/ithappy",
             "Assets/JC_LP_MedievalCharacters_LITE",
             "Assets/Free medieval weapons",
+            "Assets/GhostSamurai_Animset",
             "Assets/MYFG-Weapon Pack Lite",
             "Assets/Polytope Studio",
             "Assets/LocalPreviewTools",
@@ -127,12 +130,122 @@ namespace CampusRPG.Tests.EditMode
             CollectionAssert.AreEqual(RequiredReleaseScenePaths, windowsOptions.scenes);
             Assert.AreEqual(BuildTarget.StandaloneOSX, macOptions.target);
             Assert.AreEqual(BuildTarget.StandaloneWindows64, windowsOptions.target);
+            Assert.AreEqual((int)StandaloneBuildSubtarget.Player, macOptions.subtarget);
+            Assert.AreEqual((int)StandaloneBuildSubtarget.Player, windowsOptions.subtarget);
             Assert.AreEqual(BuildOptions.None, macOptions.options);
             Assert.AreEqual(BuildOptions.None, windowsOptions.options);
             Assert.AreEqual(ReleaseCandidateBuildUtility.MacOutputPath, NormalizePath(macOptions.locationPathName));
             Assert.AreEqual(ReleaseCandidateBuildUtility.WindowsOutputPath, NormalizePath(windowsOptions.locationPathName));
             Assert.IsTrue(NormalizePath(macOptions.locationPathName).StartsWith(ReleaseCandidateBuildUtility.ReleaseBuildRoot + "/", StringComparison.Ordinal));
             Assert.IsTrue(NormalizePath(windowsOptions.locationPathName).StartsWith(ReleaseCandidateBuildUtility.ReleaseBuildRoot + "/", StringComparison.Ordinal));
+        }
+
+        [Test]
+        public void UserOwnedArtBuildOptions_UseIsolatedCandidateOutputRoot()
+        {
+            BuildPlayerOptions macOptions = ReleaseCandidateBuildUtility.CreateBuildOptions(
+                BuildTarget.StandaloneOSX,
+                ReleaseCandidateArtProfile.UserOwnedGhostSamurai);
+            BuildPlayerOptions windowsOptions = ReleaseCandidateBuildUtility.CreateBuildOptions(
+                BuildTarget.StandaloneWindows64,
+                ReleaseCandidateArtProfile.UserOwnedGhostSamurai);
+
+            Assert.AreEqual(
+                ReleaseCandidateBuildUtility.UserOwnedArtMacOutputPath,
+                NormalizePath(macOptions.locationPathName));
+            Assert.AreEqual(
+                ReleaseCandidateBuildUtility.UserOwnedArtWindowsOutputPath,
+                NormalizePath(windowsOptions.locationPathName));
+            Assert.IsTrue(
+                NormalizePath(macOptions.locationPathName).StartsWith(
+                    ReleaseCandidateBuildUtility.UserOwnedArtBuildRoot + "/",
+                    StringComparison.Ordinal));
+            Assert.IsTrue(
+                NormalizePath(windowsOptions.locationPathName).StartsWith(
+                    ReleaseCandidateBuildUtility.UserOwnedArtBuildRoot + "/",
+                    StringComparison.Ordinal));
+        }
+
+        [Test]
+        public void UserOwnedArtDependencyPolicy_AllowsOnlyGhostSamuraiProfileAssets()
+        {
+            const string ghostModel = "Assets/GhostSamurai_Animset/Model/Model_Unity_Ver1.FBX";
+            const string generatedPreviewMaterial =
+                "Assets/_Game/Animations/Characters/CombatTest/LocalPreview/Materials/Player/Body.mat";
+            const string unrelatedImportedModel =
+                "Assets/JC_LP_MedievalCharacters_LITE/Models/SM_MedievalMaleLite_01.fbx";
+            const string publicGameAsset = "Assets/_Game/Prefabs/Characters/PF_Player_CombatTest.prefab";
+
+            Assert.IsFalse(
+                ReleaseCandidateBuildUtility.IsSceneDependencyAllowedForArtProfile(
+                    ghostModel,
+                    ReleaseCandidateArtProfile.PublicSafe));
+            Assert.IsTrue(
+                ReleaseCandidateBuildUtility.IsSceneDependencyAllowedForArtProfile(
+                    ghostModel,
+                    ReleaseCandidateArtProfile.UserOwnedGhostSamurai));
+            Assert.IsTrue(
+                ReleaseCandidateBuildUtility.IsSceneDependencyAllowedForArtProfile(
+                    generatedPreviewMaterial,
+                    ReleaseCandidateArtProfile.UserOwnedGhostSamurai));
+            Assert.IsFalse(
+                ReleaseCandidateBuildUtility.IsSceneDependencyAllowedForArtProfile(
+                    unrelatedImportedModel,
+                    ReleaseCandidateArtProfile.UserOwnedGhostSamurai));
+            Assert.IsTrue(
+                ReleaseCandidateBuildUtility.IsSceneDependencyAllowedForArtProfile(
+                    publicGameAsset,
+                ReleaseCandidateArtProfile.PublicSafe));
+        }
+
+        [Test]
+        public void UserOwnedArtTechnicalGate_CoversOwnerAcceptanceMatrixAndRejectsProxyCurves()
+        {
+            FieldInfo requiredStatesField = typeof(ReleaseCandidateBuildUtility).GetField(
+                "UserOwnedGhostSamuraiRequiredCoreStateNames",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            FieldInfo enemyProfilesField = typeof(ReleaseCandidateBuildUtility).GetField(
+                "UserOwnedGhostSamuraiEnemyProfiles",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo validateEnemiesMethod = typeof(ReleaseCandidateBuildUtility).GetMethod(
+                "ValidatePreparedUserOwnedGhostSamuraiEnemies",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo proxyCurveMethod = typeof(ReleaseCandidateBuildUtility).GetMethod(
+                "IsCombatProxyCurvePath",
+                BindingFlags.NonPublic | BindingFlags.Static);
+
+            Assert.IsNotNull(requiredStatesField);
+            Assert.IsNotNull(enemyProfilesField);
+            Assert.IsNotNull(validateEnemiesMethod);
+            Assert.IsNotNull(proxyCurveMethod);
+
+            System.Array enemyProfiles = enemyProfilesField.GetValue(null) as System.Array;
+            Assert.IsNotNull(enemyProfiles);
+            Assert.AreEqual(3, enemyProfiles.Length);
+
+            string[] requiredStates = requiredStatesField.GetValue(null) as string[];
+            Assert.IsNotNull(requiredStates);
+            CollectionAssert.IsSubsetOf(
+                new[]
+                {
+                    "Block",
+                    "Dodge",
+                    "CombatRoll",
+                    "AirDodge",
+                    "Hit",
+                    "GuardBreak",
+                    "Death",
+                    "Light_01",
+                    "Light_02",
+                    "Light_03",
+                    "Heavy_01"
+                },
+                requiredStates);
+
+            Assert.IsTrue((bool)proxyCurveMethod.Invoke(null, new object[] { "CombatProxyVisualRoot" }));
+            Assert.IsTrue((bool)proxyCurveMethod.Invoke(null, new object[] { "CombatProxyVisualRoot/WeaponGrip" }));
+            Assert.IsFalse((bool)proxyCurveMethod.Invoke(null, new object[] { string.Empty }));
+            Assert.IsFalse((bool)proxyCurveMethod.Invoke(null, new object[] { "Armature/Hips" }));
         }
 
         private static string NormalizePath(string path)

@@ -6,6 +6,7 @@ using CampusRPG.Combat;
 using CampusRPG.Composition;
 using CampusRPG.Core;
 using CampusRPG.Input;
+using CampusRPG.Multiplayer;
 using CampusRPG.Save;
 using CampusRPG.Skills;
 using CampusRPG.UI;
@@ -28,6 +29,7 @@ namespace CampusRPG.Editor
         private const string RepairSceneLightingMenu = "CampusRPG/Setup/Repair CombatTest Scene Lighting";
         private const string ApplyImportedVisualMenu = "CampusRPG/Setup/Local Preview/Apply Imported Player Visuals To CombatTest Player Prefab";
         private const string ApplyImportedEnemyVisualMenu = "CampusRPG/Setup/Local Preview/Apply Imported Enemy Avatar Chain To CombatTest Enemy Prefabs";
+        private const string RefreshScenePrefabInstancesMenu = "CampusRPG/Setup/Local Preview/Refresh CombatTest Scene Prefab Instances From Sources";
         private const string ScenePath = "Assets/_Game/Scenes/CombatTest.unity";
         private const string PlayerPrefabPath = "Assets/_Game/Prefabs/Characters/PF_Player_CombatTest.prefab";
         private const string EnemyMeleePrefabPath = "Assets/_Game/Prefabs/Characters/PF_Enemy_Melee_CombatTest.prefab";
@@ -54,6 +56,17 @@ namespace CampusRPG.Editor
         private const float EnemyAgentBaseOffset = 0f;
         private const float EnemyAttackRangePadding = 0.08f;
         private const float EnemyAttackMaxHitAngle = 45f;
+        private static readonly string[] LocalPreviewOnlySourceRoots =
+        {
+            "Assets/GhostSamurai_Animset/",
+            "Assets/Kevin Iglesias/",
+            "Assets/DoubleL/",
+            "Assets/ithappy/",
+            "Assets/JC_LP_MedievalCharacters_LITE/",
+            "Assets/Free medieval weapons/",
+            "Assets/MYFG-Weapon Pack Lite/",
+            "Assets/Polytope Studio/"
+        };
         private const string HeavyPath = "Assets/_Game/Data/Combat/SO_Attack_Heavy_01.asset";
         private const string DodgeFollowUpPath = "Assets/_Game/Data/Combat/SO_Attack_DodgeFollowUp.asset";
         private const string CounterPath = "Assets/_Game/Data/Combat/SO_Attack_Counter.asset";
@@ -217,7 +230,6 @@ namespace CampusRPG.Editor
 
                 ConfigurePlayerAnimator(animator, playerAnimatorController);
                 CombatProxyVisualUtility.Apply(player, CombatProxyVisualKind.Player);
-                CombatImportedPlayerVisualUtility.SyncImportedWeaponPreview(player, animator);
                 ConfigurePlayerCombatAnimationRelay(
                     animationRelay,
                     playerCharacter,
@@ -226,7 +238,7 @@ namespace CampusRPG.Editor
                     playerMotor,
                     animator);
                 SetFloat(damageableReceiver, "playerHitStunSeconds", PlayerHitStunSeconds);
-                ConfigurePlayerWeaponPresentation(animationRelay, player);
+                ConfigurePlayerWeaponPresentation(animationRelay, player, syncImportedWeaponPreview: true);
 
                 PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             }
@@ -275,6 +287,41 @@ namespace CampusRPG.Editor
             }
 
             Debug.Log("Applied imported enemy Avatar chain to CombatTest enemy prefabs for local preview. Standard Build/Repair paths will restore the proxy baseline.");
+        }
+
+        [MenuItem(RefreshScenePrefabInstancesMenu)]
+        public static void RefreshCombatTestScenePrefabInstancesFromSources()
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+            {
+                Debug.LogWarning("CombatTest scene prefab instance refresh skipped because the scene asset does not exist yet.");
+                return;
+            }
+
+            Scene scene = EditorSceneManager.GetActiveScene();
+
+            if (!scene.IsValid() || scene.path != ScenePath)
+            {
+                scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            }
+
+            bool refreshedAnyInstance = false;
+            refreshedAnyInstance |= RefreshScenePrefabInstanceFromSource("Player", PlayerPrefabPath);
+            refreshedAnyInstance |= RefreshScenePrefabInstanceFromSource("Enemy_Melee_A", EnemyMeleePrefabPath);
+            refreshedAnyInstance |= RefreshScenePrefabInstanceFromSource("Enemy_Mobile_A", EnemyMobilePrefabPath);
+            refreshedAnyInstance |= RefreshScenePrefabInstanceFromSource("Enemy_Ranged_A", EnemyRangedPrefabPath);
+
+            if (!refreshedAnyInstance)
+            {
+                Debug.LogWarning("CombatTest scene prefab instance refresh found no matching player or enemy prefab instances.");
+                return;
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, ScenePath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("CombatTest scene prefab instances refreshed from their source prefabs while preserving scene names and transforms.");
         }
 
         public static void EnsureCombatTestContent()
@@ -431,6 +478,7 @@ namespace CampusRPG.Editor
             PlayerMotor playerMotor = player.AddComponent<PlayerMotor>();
             PlayerMovementProbe playerMovementProbe = player.AddComponent<PlayerMovementProbe>();
             PlayerStateMachine playerStateMachine = player.AddComponent<PlayerStateMachine>();
+            NetworkPlayerDeathStateBridge deathStateBridge = player.AddComponent<NetworkPlayerDeathStateBridge>();
             PlayerCombatController playerCombatController = player.AddComponent<PlayerCombatController>();
             SkillController skillController = player.AddComponent<SkillController>();
             LockOnTargetSelector lockOnTargetSelector = player.AddComponent<LockOnTargetSelector>();
@@ -460,6 +508,8 @@ namespace CampusRPG.Editor
             SetObjectReference(playerCharacter, "lockOnTargetSelector", lockOnTargetSelector);
             SetObjectReference(playerMotor, "lockOnTargetSelector", lockOnTargetSelector);
             SetObjectReference(playerMovementProbe, "probeOrigin", mantleProbeOrigin);
+            SetObjectReference(deathStateBridge, "health", health);
+            SetObjectReference(deathStateBridge, "stateMachine", playerStateMachine);
 
             SetObjectReference(playerCombatController, "balance", AssetDatabase.LoadAssetAtPath<CombatBalanceSO>(CombatBalancePath));
             SetObjectReference(playerCombatController, "attackExecutor", attackExecutor);
@@ -496,7 +546,7 @@ namespace CampusRPG.Editor
             SetObjectReference(damageableReceiver, "playerCharacter", playerCharacter);
             SetFloat(damageableReceiver, "playerHitStunSeconds", PlayerHitStunSeconds);
             RestorePlayerVisualBaseline(player, animator);
-            ConfigurePlayerWeaponPresentation(animationRelay, player);
+            ConfigurePlayerWeaponPresentation(animationRelay, player, syncImportedWeaponPreview: false);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(player, PlayerPrefabPath);
             Object.DestroyImmediate(player);
@@ -570,6 +620,7 @@ namespace CampusRPG.Editor
                 PlayerCharacter playerCharacter = EnsureSingleComponent<PlayerCharacter>(player, ref changed);
                 PlayerMotor playerMotor = EnsureSingleComponent<PlayerMotor>(player, ref changed);
                 PlayerStateMachine playerStateMachine = EnsureSingleComponent<PlayerStateMachine>(player, ref changed);
+                NetworkPlayerDeathStateBridge deathStateBridge = EnsureSingleComponent<NetworkPlayerDeathStateBridge>(player, ref changed);
                 PlayerCombatController playerCombatController = EnsureSingleComponent<PlayerCombatController>(player, ref changed);
                 SkillController skillController = EnsureSingleComponent<SkillController>(player, ref changed);
                 LockOnTargetSelector lockOnTargetSelector = EnsureSingleComponent<LockOnTargetSelector>(player, ref changed);
@@ -597,6 +648,8 @@ namespace CampusRPG.Editor
                 SetObjectReference(playerCharacter, "lockOnTargetSelector", lockOnTargetSelector);
                 SetObjectReference(playerMotor, "lockOnTargetSelector", lockOnTargetSelector);
                 SetObjectReference(playerMovementProbe, "probeOrigin", mantleProbeOrigin);
+                SetObjectReference(deathStateBridge, "health", health);
+                SetObjectReference(deathStateBridge, "stateMachine", playerStateMachine);
 
                 SetObjectReference(playerCombatController, "attackExecutor", attackExecutor);
                 SetObjectReference(playerCombatController, "hitboxController", hitboxController);
@@ -616,7 +669,7 @@ namespace CampusRPG.Editor
                 SetFloat(damageableReceiver, "playerHitStunSeconds", PlayerHitStunSeconds);
                 ConfigurePlayerAnimator(animator, playerAnimatorController);
                 changed |= RestorePlayerVisualBaseline(player, animator);
-                ConfigurePlayerWeaponPresentation(animationRelay, player);
+                ConfigurePlayerWeaponPresentation(animationRelay, player, syncImportedWeaponPreview: false);
 
                 PrefabUtility.SaveAsPrefabAsset(player, prefabPath);
                 return true;
@@ -873,6 +926,7 @@ namespace CampusRPG.Editor
 
             bool changed = false;
             Animator animator = enemy.GetComponent<Animator>();
+            changed |= RemoveImportedEnemyPreviewInstanceRoots(enemy);
             changed |= CombatImportedEnemyVisualUtility.RemoveImportedVisual(enemy, animator);
 
             EnemyCombatAnimationRelay importedAnimationRelay = enemy.GetComponent<EnemyCombatAnimationRelay>();
@@ -899,6 +953,92 @@ namespace CampusRPG.Editor
             }
 
             return changed;
+        }
+
+        private static bool RemoveImportedEnemyPreviewInstanceRoots(GameObject enemy)
+        {
+            Transform[] transforms = enemy.GetComponentsInChildren<Transform>(true);
+            List<GameObject> instanceRootsToRemove = new List<GameObject>();
+
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                Transform transform = transforms[i];
+
+                if (transform == null || transform == enemy.transform)
+                {
+                    continue;
+                }
+
+                GameObject candidate = transform.gameObject;
+                if (!ShouldRemoveImportedEnemyPreviewObject(candidate))
+                {
+                    continue;
+                }
+
+                GameObject instanceRoot = PrefabUtility.GetNearestPrefabInstanceRoot(candidate);
+                if (instanceRoot == null || instanceRoot == enemy)
+                {
+                    instanceRoot = candidate;
+                }
+
+                if (instanceRoot == enemy || instanceRootsToRemove.Contains(instanceRoot))
+                {
+                    continue;
+                }
+
+                instanceRootsToRemove.Add(instanceRoot);
+            }
+
+            for (int i = 0; i < instanceRootsToRemove.Count; i++)
+            {
+                Object.DestroyImmediate(instanceRootsToRemove[i]);
+            }
+
+            return instanceRootsToRemove.Count > 0;
+        }
+
+        private static bool ShouldRemoveImportedEnemyPreviewObject(GameObject candidate)
+        {
+            if (candidate == null)
+            {
+                return false;
+            }
+
+            if (candidate.name.StartsWith(
+                    CombatImportedEnemyVisualUtility.ImportedVisualRootName,
+                    System.StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            string sourceAssetPath = GetPrefabSourceAssetPath(candidate);
+            if (string.IsNullOrEmpty(sourceAssetPath))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < LocalPreviewOnlySourceRoots.Length; i++)
+            {
+                if (sourceAssetPath.StartsWith(LocalPreviewOnlySourceRoots[i], System.StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string GetPrefabSourceAssetPath(GameObject candidate)
+        {
+            if (candidate == null)
+            {
+                return string.Empty;
+            }
+
+            Object sourceObject = PrefabUtility.GetCorrespondingObjectFromSource(candidate);
+            return sourceObject != null
+                ? AssetDatabase.GetAssetPath(sourceObject)
+                : string.Empty;
         }
 
         private static bool TryApplyImportedEnemyAvatarPreview(
@@ -957,6 +1097,59 @@ namespace CampusRPG.Editor
             {
                 PrefabUtility.UnloadPrefabContents(enemy);
             }
+        }
+
+        private static bool RefreshScenePrefabInstanceFromSource(string instanceName, string sourcePrefabPath)
+        {
+            GameObject instance = GameObject.Find(instanceName);
+
+            if (instance == null)
+            {
+                Debug.LogWarning($"CombatTest scene prefab instance refresh could not find {instanceName}.");
+                return false;
+            }
+
+            GameObject instanceRoot = PrefabUtility.GetNearestPrefabInstanceRoot(instance);
+
+            if (instanceRoot == null)
+            {
+                Debug.LogWarning($"CombatTest scene object {instanceName} is not a prefab instance.");
+                return false;
+            }
+
+            string actualSourcePath = GetPrefabSourceAssetPath(instanceRoot);
+
+            if (!string.Equals(actualSourcePath, sourcePrefabPath, System.StringComparison.Ordinal))
+            {
+                Debug.LogWarning(
+                    $"CombatTest scene object {instanceName} points to {actualSourcePath}, not expected source prefab {sourcePrefabPath}.");
+                return false;
+            }
+
+            string sceneName = instanceRoot.name;
+            Transform sceneTransform = instanceRoot.transform;
+            Transform parent = sceneTransform.parent;
+            int siblingIndex = sceneTransform.GetSiblingIndex();
+            Vector3 localPosition = sceneTransform.localPosition;
+            Quaternion localRotation = sceneTransform.localRotation;
+            Vector3 localScale = sceneTransform.localScale;
+            bool activeSelf = instanceRoot.activeSelf;
+
+            PrefabUtility.RevertPrefabInstance(instanceRoot, InteractionMode.AutomatedAction);
+
+            instanceRoot.name = sceneName;
+            sceneTransform = instanceRoot.transform;
+            sceneTransform.SetParent(parent);
+            sceneTransform.SetSiblingIndex(siblingIndex);
+            sceneTransform.localPosition = localPosition;
+            sceneTransform.localRotation = localRotation;
+            sceneTransform.localScale = localScale;
+            instanceRoot.SetActive(activeSelf);
+            EditorUtility.SetDirty(instanceRoot);
+            EditorUtility.SetDirty(sceneTransform);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(instanceRoot);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(sceneTransform);
+            return true;
         }
 
         private static Transform CreateChild(Transform parent, string name, Vector3 localPosition)
@@ -1168,14 +1361,21 @@ namespace CampusRPG.Editor
             return changed;
         }
 
-        private static void ConfigurePlayerWeaponPresentation(PlayerCombatAnimationRelay animationRelay, GameObject player)
+        private static void ConfigurePlayerWeaponPresentation(
+            PlayerCombatAnimationRelay animationRelay,
+            GameObject player,
+            bool syncImportedWeaponPreview)
         {
             if (animationRelay == null || player == null)
             {
                 return;
             }
 
-            CombatImportedPlayerVisualUtility.SyncImportedWeaponPreview(player, player.GetComponent<Animator>());
+            if (syncImportedWeaponPreview)
+            {
+                CombatImportedPlayerVisualUtility.SyncImportedWeaponPreview(player, player.GetComponent<Animator>());
+            }
+
             SetObjectReference(animationRelay, "proxyWeaponGrip", PlayerCombatAnimationRelay.FindDefaultProxyWeaponGrip(player.transform));
             SetObjectReference(animationRelay, "importedWeaponAnchor", PlayerCombatAnimationRelay.FindDefaultImportedWeaponAnchor(player.transform));
         }

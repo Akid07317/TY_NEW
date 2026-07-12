@@ -124,6 +124,35 @@ namespace CampusRPG.Character
                 - attackDefinition.ActiveSeconds;
         }
 
+        public static float ResolveAttackForwardMovementDelta(
+            AttackDefinitionSO attackDefinition,
+            float previousElapsedSeconds,
+            float currentElapsedSeconds)
+        {
+            if (attackDefinition == null || !attackDefinition.UsesDistributedForwardMovement)
+            {
+                return 0f;
+            }
+
+            float previousDistance = ResolveAttackForwardMovementDistance(attackDefinition, previousElapsedSeconds);
+            float currentDistance = ResolveAttackForwardMovementDistance(attackDefinition, currentElapsedSeconds);
+            return Mathf.Max(0f, currentDistance - previousDistance);
+        }
+
+        public static float ResolveAttackForwardMovementDistance(AttackDefinitionSO attackDefinition, float elapsedSeconds)
+        {
+            if (attackDefinition == null || !attackDefinition.UsesDistributedForwardMovement)
+            {
+                return 0f;
+            }
+
+            float movementStartSeconds = attackDefinition.ForwardMovementStartSeconds;
+            float movementDurationSeconds = attackDefinition.ForwardMovementDurationSeconds;
+            float normalizedTime = Mathf.Clamp01((elapsedSeconds - movementStartSeconds) / movementDurationSeconds);
+            float movementRatio = ResolveForwardMovementCurveRatio(attackDefinition.ForwardMovementCurve, normalizedTime);
+            return Mathf.Max(0f, attackDefinition.ForwardMovement) * movementRatio;
+        }
+
         public static float TickWindow(float currentTimer, float deltaTime)
         {
             return Mathf.Max(0f, currentTimer - Mathf.Max(0f, deltaTime));
@@ -186,6 +215,41 @@ namespace CampusRPG.Character
             }
 
             return 0.08f;
+        }
+
+        private static float ResolveForwardMovementCurveRatio(AnimationCurve curve, float normalizedTime)
+        {
+            if (normalizedTime <= 0f)
+            {
+                return 0f;
+            }
+
+            if (normalizedTime >= 1f)
+            {
+                return 1f;
+            }
+
+            if (curve == null || curve.length == 0)
+            {
+                return ResolveDefaultForwardMovementCurveRatio(normalizedTime);
+            }
+
+            return Mathf.Clamp01(curve.Evaluate(normalizedTime));
+        }
+
+        private static float ResolveDefaultForwardMovementCurveRatio(float normalizedTime)
+        {
+            if (normalizedTime <= 0.35f)
+            {
+                return Mathf.Lerp(0f, 0.2f, normalizedTime / 0.35f);
+            }
+
+            if (normalizedTime <= 0.75f)
+            {
+                return Mathf.Lerp(0.2f, 0.88f, (normalizedTime - 0.35f) / 0.4f);
+            }
+
+            return Mathf.Lerp(0.88f, 1f, (normalizedTime - 0.75f) / 0.25f);
         }
 
         private static float ResolveMinimumVisibleAttackDuration(AttackDefinitionSO attackDefinition)

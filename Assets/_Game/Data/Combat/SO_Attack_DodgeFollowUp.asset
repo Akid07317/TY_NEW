@@ -25,6 +25,50 @@ MonoBehaviour:
   blockStunSeconds: 0
   guardBreakHitStunSeconds: 0.12
   forwardMovement: 0.5
+  forwardMovementStartSeconds: 0
+  forwardMovementDurationSeconds: 0
+  forwardMovementCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0.57
+      outSlope: 0.57
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.35
+      value: 0.2
+      inSlope: 0.57
+      outSlope: 1.7
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.75
+      value: 0.88
+      inSlope: 1.7
+      outSlope: 0.48
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0.48
+      outSlope: 0.48
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   movementSpeedScale: 0.82
   range: 2
   radius: 0.62

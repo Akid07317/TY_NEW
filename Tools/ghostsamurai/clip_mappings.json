@@ -1,0 +1,727 @@
+{
+  "try_first": [
+    {
+      "category": "Attack",
+      "clips": [
+        "GhostSamurai_APose_Attack01_1_ALL_Inplace",
+        "GhostSamurai_APose_Attack04_Inplace",
+        "GhostSamurai_APose_SPAttack02_Inplace",
+        "GhostSamurai_APose_Attack03_4_ALL_Inplace",
+        "GhostSamurai_APose_SPAttack03_Inplace",
+        "GhostSamurai_APose_SPAttack05_Inplace",
+        "GhostSamurai_APose_SPAttack06_Inplace",
+        "GhostSamurai_APose_JumpAttack04_Inplace"
+      ]
+    },
+    {
+      "category": "Defense",
+      "clips": [
+        "GhostSamurai_DefenseR_Loop_Inplace",
+        "GhostSamurai_DefenseL_Loop_Inplace",
+        "GhostSamurai_DefenseR_Broken_Inplace",
+        "GhostSamurai_DefenseL_Broken_Inplace",
+        "GhostSamurai_DefenseR_Parry_Up_Execution_Inplace"
+      ]
+    },
+    {
+      "category": "Deflect",
+      "clips": [
+        "GhostSamurai_LAttack_DeflectR_CounterExecution_Inplace",
+        "GhostSamurai_RAttack_DeflectL_CounterExecution_Inplace",
+        "GhostSamurai_RAttack_DeflectR90_Inplace",
+        "GhostSamurai_LAttack_DeflectL90_Inplace"
+      ]
+    },
+    {
+      "category": "Dodge",
+      "clips": [
+        "GhostSamurai_APose_Dodge_F_Inplace",
+        "GhostSamurai_APose_Slide_F_Inplace",
+        "GhostSamurai_APose_Avoid_F_1_Inplace",
+        "GhostSamurai_APose_Dodge_Attack_F_Inplace",
+        "GhostSamurai_APose_Dodge_Attack_B_Inplace"
+      ]
+    },
+    {
+      "category": "Movement",
+      "clips": [
+        "GhostSamurai_APose_Idle",
+        "GhostSamurai_APose_Strafe_Walk_F_Loop_Inplace",
+        "GhostSamurai_APose_Strafe_Run_F_Loop_Inplace",
+        "GhostSamurai_APose_Strafe_Run_FL_Inplace",
+        "GhostSamurai_APose_Strafe_Run_FR_Inplace",
+        "GhostSamurai_APose_Jump_Loop_Inplace",
+        "GhostSamurai_Common_Walk_Loop_Inplace"
+      ]
+    },
+    {
+      "category": "Hit",
+      "clips": [
+        "GhostSamurai_APose_Hit_F_Inplace",
+        "GhostSamurai_APose_Large_Hit_1_Inplace",
+        "GhostSamurai_APose_Large_Hit_2_Inplace",
+        "GhostSamurai_APose_Air_Hit_Inplace"
+      ]
+    },
+    {
+      "category": "Die",
+      "clips": [
+        "GhostSamurai_APose_Die01_Inplace",
+        "GhostSamurai_APose_Die03_Inplace",
+        "GhostSamurai_APose_Die05_Inplace"
+      ]
+    },
+    {
+      "category": "Execution",
+      "clips": [
+        "GhostSamurai_Execution01_Root",
+        "GhostSamurai_Execution06_Inplace",
+        "GhostSamurai_Ambush01_Root",
+        "GhostSamurai_Executed01_Inplace",
+        "GhostSamurai_Ambushed03_Inplace"
+      ]
+    },
+    {
+      "category": "Bow",
+      "clips": [
+        "GhostSamurai_Bow_Idle_Inplace",
+        "GhostSamurai_Bow_AimWalk_F_Inplace",
+        "GhostSamurai_Bow_Shoot_Start_Inplace",
+        "GhostSamurai_Bow_AirShoot_Start_Inplace",
+        "GhostSamurai_Bow_CrouchShoot_Start_Inplace",
+        "GhostSamurai_Bow_Dodge_F_Inplace",
+        "GhostSamurai_Bow_Large_Hit_Inplace"
+      ]
+    }
+  ],
+  "execution_research": [
+    {
+      "action": "Execution_Attacker",
+      "role": "攻击方终结",
+      "match_label": "ExecutionXX",
+      "stem_regex": "^GhostSamurai_Execution\\d+_(Root|Inplace|Sample)$",
+      "lead_candidates": ["GhostSamurai_Execution01_Root", "GhostSamurai_Execution06_Inplace"],
+      "preferred_usage": "先用 Root 看推进轨迹，再用 Inplace 看原地收势。",
+      "goal": "未来近身终结研究里的攻击方主体姿态。"
+    },
+    {
+      "action": "Executed_Victim",
+      "role": "受体被终结",
+      "match_label": "ExecutedXX",
+      "stem_regex": "^GhostSamurai_Executed\\d+_(Root|Inplace|Sample)$",
+      "lead_candidates": ["GhostSamurai_Executed01_Inplace", "GhostSamurai_Executed05_Root"],
+      "preferred_usage": "先用 Inplace 看单体倒伏读感，再用 Root 看双人配对位移。",
+      "goal": "未来终结受体侧的失衡、跪倒和落地姿态。"
+    },
+    {
+      "action": "Ambush_Attacker",
+      "role": "伏击方起手",
+      "match_label": "AmbushXX",
+      "stem_regex": "^GhostSamurai_Ambush\\d+_(Root|Inplace|Sample)$",
+      "lead_candidates": ["GhostSamurai_Ambush01_Root", "GhostSamurai_Ambush03_Inplace"],
+      "preferred_usage": "先用 Root 看扑进和站位交换，再用 Inplace 看原地伏击定格。",
+      "goal": "未来背刺、处决起手或偷袭提示的攻击方姿态。"
+    },
+    {
+      "action": "Ambushed_Victim",
+      "role": "伏击受体",
+      "match_label": "AmbushedXX",
+      "stem_regex": "^GhostSamurai_Ambushed\\d+_(Root|Inplace|Sample)$",
+      "lead_candidates": ["GhostSamurai_Ambushed03_Inplace", "GhostSamurai_Ambushed02_Root"],
+      "preferred_usage": "先用 Inplace 看受体塌陷和失守，再用 Root 看双人位移是否可靠。",
+      "goal": "未来伏击受体侧的被抓取、失衡和收尾姿态。"
+    }
+  ],
+  "mapping_sections": [
+    {
+      "title": "玩家基础与移动",
+      "entries": [
+        {
+          "action": "Idle",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Idle"],
+          "goal": "稳定站姿与持刀重心",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedIdleClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Idle.anim"]
+        },
+        {
+          "action": "Walk_Forward",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Walk_F_Loop_Inplace"],
+          "goal": "锁定前压姿态清楚",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedWalkForwardClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_F_InPlace.anim"]
+        },
+        {
+          "action": "Walk_Backward",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Walk_B_Inplace"],
+          "goal": "后撤不再滑冰",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedWalkBackwardClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_B_InPlace.anim"]
+        },
+        {
+          "action": "Walk_Left",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Walk_L_Inplace"],
+          "goal": "侧向解招时保持朝向",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedWalkLeftClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_L_InPlace.anim"]
+        },
+        {
+          "action": "Walk_Right",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Walk_R_Inplace"],
+          "goal": "侧向解招时保持朝向",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedWalkRightClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Walk_R_InPlace.anim"]
+        },
+        {
+          "action": "Run_Forward",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Run_F_Loop_Inplace"],
+          "goal": "推进时仍保留持刀压迫",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedRunForwardClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Run_F_InPlace.anim"]
+        },
+        {
+          "action": "Run_Backward",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Run_B_Inplace"],
+          "goal": "后撤跑不丢刀手姿态",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedRunBackwardClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Run_B_InPlace.anim"]
+        },
+        {
+          "action": "Run_Left",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Run_L_Inplace"],
+          "goal": "锁定横移读向更清楚",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedRunLeftClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Run_L_InPlace.anim"]
+        },
+        {
+          "action": "Run_Right",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Run_R_Inplace"],
+          "goal": "锁定横移读向更清楚",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedRunRightClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Run_R_InPlace.anim"]
+        },
+        {
+          "action": "Run_ForwardLeft",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Run_FL_Inplace"],
+          "goal": "左前切线读招更清楚",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedRunForwardLeftClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_ForwardLeft.fbx"]
+        },
+        {
+          "action": "Run_ForwardRight",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Run_FR_Inplace"],
+          "goal": "右前切线读招更清楚",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedRunForwardRightClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_ForwardRight.fbx"]
+        },
+        {
+          "action": "Run_BackwardLeft",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Run_BL_Inplace"],
+          "goal": "左后退避轨迹更清楚",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedRunBackwardLeftClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_BackwardLeft.fbx"]
+        },
+        {
+          "action": "Run_BackwardRight",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Run_BR_Inplace"],
+          "goal": "右后退避轨迹更清楚",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedRunBackwardRightClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Strafe/StrafeRun/HumanM@StrafeRun01_BackwardRight.fbx"]
+        },
+        {
+          "action": "Airborne",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Jump_Loop_Inplace"],
+          "goal": "空中停留与追击入口可见",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAirborneClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Fall01.fbx"]
+        }
+      ]
+    },
+    {
+      "title": "玩家防御与受击",
+      "entries": [
+        {
+          "action": "Block",
+          "category": "Defense",
+          "candidates": ["GhostSamurai_DefenseR_Loop_Inplace", "GhostSamurai_DefenseL_Loop_Inplace"],
+          "goal": "格挡架势一眼可读",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedBlockClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Shield_Block_Idle.anim"]
+        },
+        {
+          "action": "Dodge",
+          "category": "Dodge",
+          "candidates": ["GhostSamurai_APose_Dodge_F_Inplace", "GhostSamurai_APose_Avoid_F_Inplace"],
+          "goal": "短闪短而清楚",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedDodgeClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx"]
+        },
+        {
+          "action": "CombatRoll",
+          "category": "Dodge",
+          "candidates": ["GhostSamurai_APose_Slide_F_Inplace", "GhostSamurai_APose_Slide_Start_Inplace"],
+          "goal": "长位移与高承诺分开",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedCombatRollClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Jump_B_InPlace.anim"]
+        },
+        {
+          "action": "AirDodge",
+          "category": "Dodge",
+          "candidates": ["GhostSamurai_APose_Avoid_F_1_Inplace", "GhostSamurai_APose_Avoid_B_1_Inplace"],
+          "goal": "空中规避与下砸入口拆开",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAirDodgeClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Movement/Jump/HumanM@Jump01 - Begin.fbx"]
+        },
+        {
+          "action": "Hit",
+          "category": "Hit",
+          "candidates": ["GhostSamurai_APose_Hit_F_Inplace", "GhostSamurai_APose_Large_Hit_1_Inplace"],
+          "goal": "普通受击短促不拖拍",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedHitClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/Hit_F_1_InPlace.anim"]
+        },
+        {
+          "action": "GuardBreak",
+          "category": "Defense",
+          "candidates": ["GhostSamurai_DefenseR_Broken_Inplace", "GhostSamurai_DefenseL_Broken_Inplace", "GhostSamurai_APose_Large_Hit_2_Inplace"],
+          "goal": "破防必须读出硬挡失败",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedGuardBreakClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Shield_Block_Hit_1_InPlace.anim"]
+        },
+        {
+          "action": "Death",
+          "category": "Die",
+          "candidates": ["GhostSamurai_APose_Die01_Inplace", "GhostSamurai_APose_Die03_Inplace"],
+          "goal": "死亡先选稳且不飘的版本",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedDeathClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/HumanM@Death01.fbx"]
+        }
+      ]
+    },
+    {
+      "title": "玩家攻击与反击",
+      "entries": [
+        {
+          "action": "Light_01",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_Attack01_1_ALL_Inplace", "GhostSamurai_APose_Attack02_1_ALL_Inplace"],
+          "goal": "基础快速起手",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["Light_01"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim"]
+        },
+        {
+          "action": "Light_02",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_Attack04_Inplace", "GhostSamurai_APose_Attack02_5_ALL_Inplace", "GhostSamurai_APose_Attack01_2_ALL_Inplace", "GhostSamurai_APose_Attack02_2_Inplace"],
+          "goal": "二段改用跨族前切动作，先保证肉眼读感和第一刀分开",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["Light_02"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim"]
+        },
+        {
+          "action": "Light_03",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_SPAttack02_Inplace", "GhostSamurai_APose_Attack06_Inplace", "GhostSamurai_APose_Attack01_3_ALL_Inplace", "GhostSamurai_APose_Attack03_3_ALL_Inplace", "GhostSamurai_APose_Attack03_3_Inplace"],
+          "goal": "三段改用特殊大收尾动作，优先解决三连击同质问题",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["Light_03"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim"]
+        },
+        {
+          "action": "Heavy_01",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_Attack03_4_ALL_Inplace", "GhostSamurai_APose_Attack06_Inplace"],
+          "goal": "重击保持大幅挥砍承诺",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["Heavy_01"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim"]
+        },
+        {
+          "action": "DodgeFollowUp",
+          "category": "Dodge",
+          "candidates": ["GhostSamurai_APose_Dodge_Attack_F_Inplace", "GhostSamurai_APose_Attack02_1_ALL_Inplace"],
+          "goal": "成功闪避后的前切奖励",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["DodgeFollowUp"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim"]
+        },
+        {
+          "action": "DodgeFollowUp_Enhanced",
+          "category": "Dodge",
+          "candidates": ["GhostSamurai_APose_Dodge_Attack_B_Inplace", "GhostSamurai_APose_Attack02_2_ALL_Inplace"],
+          "goal": "绕身后的回身切",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["DodgeFollowUp_Enhanced"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim"]
+        },
+        {
+          "action": "Counter",
+          "category": "Deflect",
+          "candidates": ["GhostSamurai_LAttack_DeflectR_CounterExecution_Inplace", "GhostSamurai_DefenseR_Parry_Up_Execution_Inplace"],
+          "goal": "成功弹反后的短处决感",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["Counter"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_B_1_InPlace.anim"]
+        },
+        {
+          "action": "Counter_Enhanced",
+          "category": "Deflect",
+          "candidates": ["GhostSamurai_RAttack_DeflectL_CounterExecution_Inplace", "GhostSamurai_APose_SPAttack06_Inplace"],
+          "goal": "高收益反击维持高承诺",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["Counter_Enhanced"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim"]
+        }
+      ]
+    },
+    {
+      "title": "玩家 SwordArt",
+      "entries": [
+        {
+          "action": "Sidewind Cut",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_Dodge_Attack_F_Inplace", "GhostSamurai_APose_Attack02_1_ALL_Inplace"],
+          "goal": "闪后横切，表达侧向收益",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["SwordArt_SidewindCut"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_1_InPlace.anim"]
+        },
+        {
+          "action": "Cross Step",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_Attack02_4_ALL_Inplace", "GhostSamurai_APose_Attack02_4_Inplace"],
+          "goal": "roll 后穿步斩，强调位移终点",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["SwordArt_CrossStep"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim"]
+        },
+        {
+          "action": "Rising Cleave",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_Attack03_4_ALL_Inplace", "GhostSamurai_APose_Attack06_Inplace"],
+          "goal": "前推重斩，不变成无脑压制",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["SwordArt_RisingCleave"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim"]
+        },
+        {
+          "action": "Iron Gate Break",
+          "category": "Defense",
+          "candidates": ["GhostSamurai_DefenseR_Parry_Up_Execution_Inplace", "GhostSamurai_APose_SPAttack06_Inplace", "GhostSamurai_APose_Attack03_4_ALL_Inplace"],
+          "goal": "防反破门招，先亮挡架再转攻",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["SwordArt_IronGateBreak"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim"]
+        },
+        {
+          "action": "Falling Star",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_JumpAttack04_Inplace", "GhostSamurai_APose_Air_Attack03_Start_Inplace"],
+          "goal": "空中下砸并保留落地 recovery",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["SwordArt_FallingStar"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_3_InPlace.anim"]
+        },
+        {
+          "action": "Moon Sever",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_SPAttack03_Inplace", "GhostSamurai_APose_SPAttack05_Inplace"],
+          "goal": "空中 dodge 后横向大斩",
+          "resolver_owner": "CombatTestAssetGenerator",
+          "resolver_method": "ResolveImportedAttackClipCandidatePaths",
+          "resolver_arguments": ["SwordArt_MoonSever"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Demo/Anim/OneHand_Up_Attack_2_InPlace.anim"]
+        }
+      ]
+    },
+    {
+      "title": "敌人与 Boss 读招预览",
+      "entries": [
+        {
+          "action": "EnemyMelee_Idle",
+          "category": "Defense",
+          "candidates": ["GhostSamurai_DefenseR_Loop_Inplace", "GhostSamurai_APose_Idle"],
+          "goal": "近战敌人先站出持刀压迫",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetIdleClipCandidatePaths",
+          "resolver_arguments": ["OneHanded"],
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/1H/HumanM@CombatIdle1H01.fbx"]
+        },
+        {
+          "action": "EnemyMelee_Walk",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Walk_F_Loop_Inplace"],
+          "goal": "推进姿态不像默认 dummy 漫步",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetWalkClipCandidatePaths",
+          "resolver_arguments": ["OneHanded"],
+          "tracked_fallback_paths": ["Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_InPlace.fbx"]
+        },
+        {
+          "action": "EnemyMelee_Run",
+          "category": "Movement",
+          "candidates": ["GhostSamurai_APose_Strafe_Run_F_Loop_Inplace"],
+          "goal": "追击时仍保持持刀身体语言",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetRunClipCandidatePaths",
+          "resolver_arguments": ["OneHanded"],
+          "tracked_fallback_paths": ["Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_InPlace.fbx"]
+        },
+        {
+          "action": "Attack_Melee",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_Attack01_1_ALL_Inplace", "GhostSamurai_APose_Attack02_2_ALL_Inplace"],
+          "goal": "普通近战起手短且可挡",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetMeleeAttackClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"]
+        },
+        {
+          "action": "Attack_Mobile",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_Attack03_4_ALL_Inplace", "GhostSamurai_APose_Attack03_4_Inplace"],
+          "goal": "机动敌人保持更重前压",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetMobileAttackClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx"]
+        },
+        {
+          "action": "Attack_AntiAir",
+          "category": "Attack",
+          "candidates": ["GhostSamurai_APose_Air_Attack03_Start_Inplace", "GhostSamurai_APose_JumpAttack03_Inplace", "GhostSamurai_APose_JumpAttack04_Inplace"],
+          "goal": "Sky Hook 先读出抬刀反空",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetAntiAirAttackClipCandidatePaths",
+          "resolver_arguments": ["OneHanded"],
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx"]
+        },
+        {
+          "action": "Read_AntiAir",
+          "category": "Defense",
+          "candidates": ["GhostSamurai_DefenseR_Parry_Up_Execution_Inplace", "GhostSamurai_RAttack_DeflectR90_Inplace", "GhostSamurai_LAttack_DeflectL90_Inplace"],
+          "goal": "反空前先抬刀亮出上段读招，而不是直接跳到出手帧",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetAntiAirReadClipCandidatePaths",
+          "resolver_arguments": ["OneHanded"],
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx"]
+        },
+        {
+          "action": "Attack_ChaseRoll",
+          "category": "Dodge",
+          "candidates": ["GhostSamurai_APose_Slide_F_Inplace", "GhostSamurai_APose_Attack03_4_ALL_Inplace"],
+          "goal": "Pursuit Slam 先读成前压追上来",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetChaseRollAttackClipCandidatePaths",
+          "resolver_arguments": ["OneHanded"],
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx"]
+        },
+        {
+          "action": "Read_ChaseRoll",
+          "category": "Dodge",
+          "candidates": ["GhostSamurai_APose_Slide_Start_Inplace", "GhostSamurai_APose_Dodge_Attack_F_Inplace", "GhostSamurai_APose_Slide_F_Inplace"],
+          "goal": "追滚前先压低身体、亮出追身意图，而不是一进 attack 就砸下去",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetChaseRollReadClipCandidatePaths",
+          "resolver_arguments": ["OneHanded"],
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx"]
+        },
+        {
+          "action": "Attack_GuardBreak",
+          "category": "Defense",
+          "candidates": ["GhostSamurai_APose_SPAttack06_Inplace", "GhostSamurai_DefenseR_Parry_Up_Execution_Inplace", "GhostSamurai_APose_Attack03_4_ALL_Inplace"],
+          "goal": "Gate Slam 必须读成不能硬挡",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetGuardBreakAttackClipCandidatePaths",
+          "resolver_arguments": ["OneHanded"],
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"]
+        },
+        {
+          "action": "Read_GuardBreak",
+          "category": "Deflect",
+          "candidates": ["GhostSamurai_RAttack_DeflectL_CounterExecution_Inplace", "GhostSamurai_APose_SPAttack06_Inplace", "GhostSamurai_DefenseR_Parry_Up_Execution_Inplace"],
+          "goal": "破防重招先给出大承诺蓄势，帮助玩家读出“不能硬挡”",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetGuardBreakReadClipCandidatePaths",
+          "resolver_arguments": ["OneHanded"],
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"]
+        },
+        {
+          "action": "EnemyRanged_Idle",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_Idle_Inplace", "GhostSamurai_Bow_Common_Idle_Inplace"],
+          "goal": "弓兵静止先有拉弓架势",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetIdleClipCandidatePaths",
+          "resolver_arguments": ["Ranged"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Bow/Movement/Idle/Idle/Bow_Idle_B.fbx"]
+        },
+        {
+          "action": "EnemyRanged_Walk",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_AimWalk_F_Inplace", "GhostSamurai_Bow_Common_StrafeWalkF_Inplace"],
+          "goal": "弓兵边走边压制",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetWalkClipCandidatePaths",
+          "resolver_arguments": ["Ranged"],
+          "tracked_fallback_paths": ["Assets/DoubleL/One Hand Up/Movement/Walk/Base/InPlace/1Hand_Up_Walk_A_F_InPlace.fbx"]
+        },
+        {
+          "action": "EnemyRanged_Run",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_AimRun_F_Inplace", "GhostSamurai_Bow_Common_StrafeRun_F_Inplace"],
+          "goal": "弓兵 reposition 时不退回近战姿态",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetRunClipCandidatePaths",
+          "resolver_arguments": ["Ranged"],
+          "tracked_fallback_paths": ["Assets/DoubleL/One Hand Up/Movement/Run/Base/InPlace/1Hand_Up_Run_A_F_InPlace.fbx"]
+        },
+        {
+          "action": "Attack_Ranged",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_Shoot_Start_Inplace", "GhostSamurai_Bow_Shoot_Loop_Inplace"],
+          "goal": "远程起手先看见拉弓",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetRangedAttackClipCandidatePaths",
+          "tracked_fallback_paths": ["Assets/DoubleL/Bow/Attack B/Bow_Attack_B_1_All.fbx"]
+        },
+        {
+          "action": "Attack_Ranged_AntiAir",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_AirShoot_Start_Inplace", "GhostSamurai_Bow_AirShoot_Loop_Inplace"],
+          "goal": "空中目标有独立抬手逻辑",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetAntiAirAttackClipCandidatePaths",
+          "resolver_arguments": ["Ranged"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Bow/Attack B/Bow_Attack_B_1_All.fbx"]
+        },
+        {
+          "action": "Read_Ranged_AntiAir",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_AirShoot_Start_Inplace", "GhostSamurai_Bow_AirShoot_Loop_Inplace"],
+          "goal": "弓兵打空中目标前先抬弓，而不是和地面射击完全同帧起手",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetAntiAirReadClipCandidatePaths",
+          "resolver_arguments": ["Ranged"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Bow/Attack B/Bow_Attack_B_1_All.fbx"]
+        },
+        {
+          "action": "Attack_Ranged_ChaseRoll",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_Dodge_F_Inplace", "GhostSamurai_Bow_Shoot_SP01_Inplace"],
+          "goal": "弓兵也保留规避/追击读招",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetChaseRollAttackClipCandidatePaths",
+          "resolver_arguments": ["Ranged"],
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Polearm/HumanM@AttackPolearm01.fbx"]
+        },
+        {
+          "action": "Read_Ranged_ChaseRoll",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_Dodge_F_Inplace", "GhostSamurai_Bow_Shoot_SP01_Inplace"],
+          "goal": "弓兵追滚前先侧身压步，和普通射击 body language 分开",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetChaseRollReadClipCandidatePaths",
+          "resolver_arguments": ["Ranged"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Bow/Attack B/Bow_Attack_B_1_All.fbx"]
+        },
+        {
+          "action": "Attack_Ranged_GuardBreak",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_Shoot_SP04_Inplace", "GhostSamurai_Bow_Large_Hit_2_Inplace"],
+          "goal": "远程重招保留更重身体语言",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetGuardBreakAttackClipCandidatePaths",
+          "resolver_arguments": ["Ranged"],
+          "tracked_fallback_paths": ["Assets/Kevin Iglesias/Human Animations/Animations/Male/Combat/Shield/HumanM@AttackShield01.fbx"]
+        },
+        {
+          "action": "Read_Ranged_GuardBreak",
+          "category": "Bow",
+          "candidates": ["GhostSamurai_Bow_Shoot_SP04_Inplace", "GhostSamurai_Bow_Large_Hit_2_Inplace"],
+          "goal": "远程重招先亮出大动作蓄势，不再只靠 HUD 说明这是重压制",
+          "resolver_owner": "CombatImportedEnemyVisualUtility",
+          "resolver_method": "GetGuardBreakReadClipCandidatePaths",
+          "resolver_arguments": ["Ranged"],
+          "tracked_fallback_paths": ["Assets/DoubleL/Bow/Attack B/Bow_Attack_B_1_All.fbx"]
+        }
+      ]
+    },
+    {
+      "title": "处决研究候选",
+      "entries": [
+        {
+          "action": "Execution_Attacker",
+          "category": "Execution",
+          "candidates": ["GhostSamurai_Execution01_Root", "GhostSamurai_Execution06_Inplace"],
+          "goal": "攻击方终结研究：先看 Root 推进，再看 Inplace 定格"
+        },
+        {
+          "action": "Executed_Victim",
+          "category": "Execution",
+          "candidates": ["GhostSamurai_Executed01_Inplace", "GhostSamurai_Executed05_Root"],
+          "goal": "受体终结研究：先看单体倒伏，再看双人配对位移"
+        },
+        {
+          "action": "Ambush_Attacker",
+          "category": "Execution",
+          "candidates": ["GhostSamurai_Ambush01_Root", "GhostSamurai_Ambush03_Inplace"],
+          "goal": "伏击起手研究：区分扑进位移和原地定格"
+        },
+        {
+          "action": "Ambushed_Victim",
+          "category": "Execution",
+          "candidates": ["GhostSamurai_Ambushed03_Inplace", "GhostSamurai_Ambushed02_Root"],
+          "goal": "伏击受体研究：验证被抓取后的失衡和收尾"
+        }
+      ]
+    }
+  ]
+}

@@ -6408,6 +6408,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Interaction.KeyItemPickup
   keyItemId: KeyItem_GateSigil
+  requiredEncounterId: EN_A03_INTERIOR
   completeChapterOnPickup: 0
   chapterProgressService: {fileID: 0}
 --- !u!23 &1436777710
@@ -12753,6 +12754,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: CampusRPG.Runtime::CampusRPG.Interaction.KeyItemPickup
   keyItemId: KeyItem_RitualCore
+  requiredEncounterId: EN_A04_GATEKEEPER
   completeChapterOnPickup: 1
   chapterProgressService: {fileID: 0}
 --- !u!23 &2011737284

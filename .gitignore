@@ -35,6 +35,10 @@ sysinfo.txt
 .consulo/
 ExportedObj/
 
+# Language/tool caches
+__pycache__/
+*.pyc
+
 # Test and coverage output
 TestResults/
 coverage/
@@ -49,9 +53,32 @@ coverage/
 # Local analysis exports
 Exports/
 
+# Unity crash recovery and Netcode editor-generated local artifacts
+mono_crash.*.json
+Assets/_Recovery/
+Assets/_Recovery.meta
+Assets/Resources/
+Assets/Resources.meta
+Assets/DefaultNetworkPrefabs.asset
+Assets/DefaultNetworkPrefabs.asset.meta
+
 # Local preview generated assets
 Assets/_Game/Animations/Characters/CombatTest/LocalPreview/
 Assets/_Game/Animations/Characters/CombatTest/LocalPreview.meta
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_Counter_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_Counter_Enhanced_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_DodgeFollowUp_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_DodgeFollowUp_Enhanced_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_Heavy_01_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_Light_01_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_Light_02_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_Light_03_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_SwordArt_CrossStep_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_SwordArt_FallingStar_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_SwordArt_IronGateBreak_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_SwordArt_MoonSever_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_SwordArt_RisingCleave_[0-9][0-9]_CombatTest.anim*
+Assets/_Game/Animations/Characters/CombatTest/AN_Player_SwordArt_SidewindCut_[0-9][0-9]_CombatTest.anim*
 
 # Local-only third-party preview/import sources
 Assets/Free medieval weapons/

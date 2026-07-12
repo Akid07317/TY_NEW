@@ -123,3 +123,41 @@ Unity 菜单：
 - 如果要新增 Encounter，先决定它是否应该进入存档边界
 - 如果要替换守门者 Boss，实现层优先替换 prefab / archetype，不先改流程 ID
 - 若要加入真实掉落和奖励，优先挂在 Encounter 完成或关键物品拾取后，不要把章节推进散落到多个零散触发器
+
+## 8. 关键物品硬门禁
+
+门和提示物不是关键物品的唯一安全边界。`KeyItemPickup` 自身必须校验 `requiredEncounterId`，即使碰撞体因为侧路、传送或场景几何缺口被提前触发，也不能越权写入章节进度。
+
+| 关键物品 | 拾取器硬前置 |
+|---|---|
+| `Pickup_GateSigil` | `EN_A03_INTERIOR` 已清空 |
+| `Pickup_RitualCore` | `EN_A04_GATEKEEPER` 已清空 |
+
+用于复核这条边界的 Editor-only 菜单：
+
+- `CampusRPG/Debug/Chapter01/Teleport Player To Ritual Core`
+- `CampusRPG/Debug/Chapter01/Teleport Player To Current Objective`
+- `CampusRPG/Debug/Chapter01/Defeat Active Encounter Through Damage`
+- `CampusRPG/Debug/Chapter01/Log Walkthrough State`
+
+它只在 Play Mode 内把玩家移动到 RitualCore 拾取点，不修改场景资产，也不替玩家补进度。Gatekeeper 未清时，预期结果必须是：不获得 `KeyItem_RitualCore`、不显示章节完成卡、拾取物保持可用；Gatekeeper 已清时才允许完成章节。
+
+其余三个入口用于重复整章走查：当前目标传送和状态日志都不直接写 `ChapterProgressService`；遭遇战击杀入口会先按正式 `EncounterController` 激活遭遇战，再通过 `HealthComponent.ReceiveDamage` 对活动成员造成致死伤害，章节推进仍由既有敌人死亡事件完成。它们只解决自动化环境不能持续按住 WASD / Block 的输入限制，不能作为绕过遭遇战进度合同的捷径。
+
+## 9. 2026-07-10 GUI 通关验收记录
+
+| 检查项 | 结果 |
+|---|---|
+| 存档隔离 | 先把既有完成存档改名备份；fresh Play 正常从 `CP01 / Area01_Entrance` 进入，原用户进度未覆盖 |
+| 修复前负向复现 | 四场 Encounter 全未清时直接触碰 RitualCore，错误显示 `Chapter 01 Cleared`；复现存档只有 `KeyItem_RitualCore`、`clearedEncounterIds=[]`，确认是拾取器缺硬前置，不是 Boss 结算链误报 |
+| 最小修复 | `KeyItemPickup` 新增 `requiredEncounterId` 校验；场景与 builder 同步配置 GateSigil=`EN_A03_INTERIOR`、RitualCore=`EN_A04_GATEKEEPER` |
+| 回归保护 | `KeyItemPickupTests` 增两条前置拒绝/清场后放行测试；`Chapter01ProgressionSceneWiringTests` 锁定两个场景字段；`Chapter01RuntimeFlowPlayModeTests` 增 RitualCore 越权负向场景测试 |
+| 编译 | Unity Bee/Roslyn 直接编译 Runtime、Editor、EditMode、PlayMode 四个程序集均为 exit 0；仅有工作区既有 obsolete API 警告 |
+| 修后 GUI 负向复验 | fresh `CP01` 状态执行 `Teleport Player To Ritual Core` 后仍停留在 `Entrance Tutorial`，数帧内没有章节完成卡，也没有获得 RitualCore，越权结算已被硬门禁拒绝 |
+| 完整 GUI 主线 | 从入口重新走到结算：A01 / A02 使用真实 LMB、Q、E 输入清场；CP02 正常恢复生命 / 法力；A03 和 Gatekeeper 因 Computer Use 无法持续按住移动 / 防御键，使用正式激活 + `HealthComponent.ReceiveDamage` 死亡链完成；随后实体拾取 GateSigil、进入 Area04、击败 Gatekeeper、实体拾取 RitualCore，最终显示 `Chapter 01 Cleared` |
+| 最终章节状态 | 四个区域均已访问、四场 Encounter 均清空、GateSigil 与 RitualCore 均持有、`chapterCompleted=true`；原用户存档随后再次恢复，活动文件与备份 SHA-256 均为 `2679d6163e71ca45cf640cbcc35c85ff4bf4a3a9bfca4ab3d822ce89598ac0d8` |
+| Unity 定向回归 | GUI Test Runner：`KeyItemPickupTests 4/4`、`Chapter01ProgressionSceneWiringTests 28/28`、`Chapter01RuntimeFlowPlayModeTests 2/2`，均为 `0 failed`；PlayMode XML：`/tmp/ty_new_chapter01_gui_20260710/TY_NEW_Chapter01RuntimeFlowPlayMode_2Passed.xml` |
+| public-safe 主树夹具 | GUI Test Runner：`CombatTestAnimationAssetWiringTests 17/17`、`ReleaseCandidatePreflightTests 5/5`、`BuildSettingsSceneOrderTests 1/1`，加上 Chapter01 scene wiring 后为 `51/51`；`python3 Tools/ghostsamurai/generate_catalog.py --check` 通过 |
+| 临时克隆完整门禁边界 | `ty-new-ghostsamurai-baseline-check --chapter01` 已复跑，但在 clone repair 阶段、测试前被 `attempt to write a readonly database` 和 Licensing IPC channel 连接失败阻断；日志为 `/tmp/ty_new_chapter01_baseline_20260710_final/TY_NEW_ghostsamurai_baseline_repair_20260710_214729.log`，没有 XML，不能把“主树 51/51”冒充成“临时克隆修复证明通过” |
+
+本轮已完成首个 P0 修复和入口到结算的真实 GUI 闭环。A03 侧路与 Boss 终门几何仍可被绕到物品附近，但拾取器硬门禁已证明会拒绝越权进度，因此它不再阻断第一章主流程收口；剩余验证债仅是当前机器授权 / 数据库环境下无法产出“临时克隆修复后”的完整门禁 XML。

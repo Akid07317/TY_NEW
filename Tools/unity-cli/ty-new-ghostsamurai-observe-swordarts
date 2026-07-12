@@ -1,0 +1,72 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-ghostsamurai-observe-swordarts [debug|clean|scene|airheavy-debug|airheavy-clean|airheavy-scene|flank-debug|flank-clean|flank-scene|irongate-debug|irongate-clean|irongate-scene]
+
+Writes a request file that an open Unity GUI can pick up to start the
+GhostSamurai SwordArt capture driver in CombatTest.
+EOF
+  exit 1
+}
+
+MODE=${1:-clean}
+
+case "$MODE" in
+  debug)
+    REQUEST="swordart-debug"
+    ;;
+  clean)
+    REQUEST="swordart-clean"
+    ;;
+  scene)
+    REQUEST="swordart-scene"
+    ;;
+  airheavy-debug)
+    REQUEST="swordart-airheavy-debug"
+    ;;
+  airheavy-clean)
+    REQUEST="swordart-airheavy-clean"
+    ;;
+  airheavy-scene)
+    REQUEST="swordart-airheavy-scene"
+    ;;
+  flank-debug)
+    REQUEST="swordart-flank-debug"
+    ;;
+  flank-clean)
+    REQUEST="swordart-flank-clean"
+    ;;
+  flank-scene)
+    REQUEST="swordart-flank-scene"
+    ;;
+  irongate-debug)
+    REQUEST="swordart-irongate-debug"
+    ;;
+  irongate-clean)
+    REQUEST="swordart-irongate-clean"
+    ;;
+  irongate-scene)
+    REQUEST="swordart-irongate-scene"
+    ;;
+  -h|--help)
+    usage
+    ;;
+  *)
+    echo "Unknown mode: $MODE" >&2
+    usage
+    ;;
+esac
+
+REQUEST_PATH="/tmp/TY_NEW_lunge_capture_driver.request"
+STAMP=$(date +%s)
+printf '%s %s\n' "$REQUEST" "$STAMP" > "$REQUEST_PATH"
+
+cat <<EOF
+GhostSamurai SwordArt observation request written.
+- request: $REQUEST
+- stamp: $STAMP
+- file: $REQUEST_PATH
+- next: keep Unity GUI focused on CombatTest and wait for the driver to enter Play Mode
+EOF

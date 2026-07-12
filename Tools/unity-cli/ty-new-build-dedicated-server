@@ -1,0 +1,239 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: Tools/unity-cli/ty-new-build-dedicated-server <scene|validate|smoke|linux> [--wall-timeout <seconds>] [--log <path>] [--licensing-ipc <name>] [--hub-licensing] [--editor-mode]
+
+Runs the TY_NEW dedicated-server editor methods with an outer wall-clock
+timeout. Use scene to create/repair ServerBoot, validate to check dedicated
+server inputs, smoke to run the editor smoke verification, and linux to build
+the Linux Dedicated Server player. Use --editor-mode with --hub-licensing and
+--licensing-ipc to run through a Hub-owned GUI licensing session when batchmode
+cannot create its versioned channel.
+EOF
+  exit 1
+}
+
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+PROJECT_VERSION_FILE="$PROJECT_ROOT/ProjectSettings/ProjectVersion.txt"
+PROJECT_NAME=$(basename "$PROJECT_ROOT")
+STAMP=$(date +%Y%m%d_%H%M%S)
+LOG_FILE=""
+LICENSING_IPC=${UNITY_LICENSING_IPC:-}
+HUB_LICENSING=0
+EDITOR_MODE=0
+UNITY_PID=""
+
+if [ $# -lt 1 ]; then
+  usage
+fi
+
+ACTION=$1
+shift
+
+case "$ACTION" in
+  scene)
+    EXECUTE_METHOD="CampusRPG.Editor.DedicatedServerBuildUtility.CreateOrRepairServerBootScene"
+    DEFAULT_TIMEOUT=240
+    ;;
+  validate)
+    EXECUTE_METHOD="CampusRPG.Editor.DedicatedServerBuildUtility.ValidateLinuxDedicatedServerBuildInputs"
+    DEFAULT_TIMEOUT=240
+    ;;
+  smoke)
+    EXECUTE_METHOD="CampusRPG.Editor.DedicatedServerBuildUtility.RunDedicatedServerSmokeVerification"
+    DEFAULT_TIMEOUT=240
+    ;;
+  linux)
+    EXECUTE_METHOD="CampusRPG.Editor.DedicatedServerBuildUtility.BuildLinuxDedicatedServer"
+    DEFAULT_TIMEOUT=1800
+    ;;
+  -h|--help)
+    usage
+    ;;
+  *)
+    echo "Unknown dedicated server build action: $ACTION" >&2
+    usage
+    ;;
+esac
+
+WALL_TIMEOUT=$DEFAULT_TIMEOUT
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --wall-timeout)
+      [ $# -ge 2 ] || usage
+      WALL_TIMEOUT=$2
+      shift 2
+      ;;
+    --log)
+      [ $# -ge 2 ] || usage
+      LOG_FILE=$2
+      shift 2
+      ;;
+    --licensing-ipc)
+      [ $# -ge 2 ] || usage
+      LICENSING_IPC=$2
+      shift 2
+      ;;
+    --hub-licensing)
+      HUB_LICENSING=1
+      shift
+      ;;
+    --editor-mode)
+      EDITOR_MODE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+if [ ! -f "$PROJECT_VERSION_FILE" ]; then
+  echo "ProjectVersion.txt not found: $PROJECT_VERSION_FILE" >&2
+  exit 1
+fi
+
+if [ -z "$LOG_FILE" ]; then
+  LOG_FILE="/tmp/${PROJECT_NAME}_dedicated_server_${ACTION}_${STAMP}.log"
+fi
+
+UNITY_VERSION=$(sed -n 's/^m_EditorVersion: //p' "$PROJECT_VERSION_FILE" | head -n 1)
+UNITY_EDITOR="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/MacOS/Unity"
+
+if [ ! -x "$UNITY_EDITOR" ]; then
+  echo "Unity editor not found: $UNITY_EDITOR" >&2
+  exit 1
+fi
+
+cleanup_child() {
+  if [ -n "$UNITY_PID" ] && kill -0 "$UNITY_PID" >/dev/null 2>&1; then
+    kill "$UNITY_PID" >/dev/null 2>&1 || true
+    wait "$UNITY_PID" >/dev/null 2>&1 || true
+  fi
+}
+
+trap cleanup_child INT TERM EXIT
+
+mkdir -p "$(dirname "$LOG_FILE")"
+: > "$LOG_FILE"
+
+echo "Running dedicated server action: $ACTION"
+echo "Project: $PROJECT_ROOT"
+echo "Log: $LOG_FILE"
+echo "Timeout: ${WALL_TIMEOUT}s"
+if [ -n "$LICENSING_IPC" ]; then
+  echo "Licensing IPC: $LICENSING_IPC"
+fi
+if [ "$HUB_LICENSING" -eq 1 ]; then
+  echo "Hub licensing: enabled"
+fi
+if [ "$EDITOR_MODE" -eq 1 ]; then
+  echo "Editor mode: enabled"
+fi
+
+if [ "$EDITOR_MODE" -eq 1 ] && [ "$HUB_LICENSING" -eq 1 ] && [ -n "$LICENSING_IPC" ]; then
+  "$UNITY_EDITOR" \
+    -quit \
+    -useHub \
+    -hubIPC \
+    -cloudEnvironment production \
+    -licensingIpc "$LICENSING_IPC" \
+    -projectPath "$PROJECT_ROOT" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+elif [ "$EDITOR_MODE" -eq 1 ] && [ "$HUB_LICENSING" -eq 1 ]; then
+  "$UNITY_EDITOR" \
+    -quit \
+    -useHub \
+    -hubIPC \
+    -cloudEnvironment production \
+    -projectPath "$PROJECT_ROOT" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+elif [ "$EDITOR_MODE" -eq 1 ] && [ -n "$LICENSING_IPC" ]; then
+  "$UNITY_EDITOR" \
+    -quit \
+    -licensingIpc "$LICENSING_IPC" \
+    -projectPath "$PROJECT_ROOT" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+elif [ "$EDITOR_MODE" -eq 1 ]; then
+  "$UNITY_EDITOR" \
+    -quit \
+    -projectPath "$PROJECT_ROOT" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+elif [ "$HUB_LICENSING" -eq 1 ] && [ -n "$LICENSING_IPC" ]; then
+  "$UNITY_EDITOR" \
+    -batchmode \
+    -quit \
+    -useHub \
+    -hubIPC \
+    -cloudEnvironment production \
+    -licensingIpc "$LICENSING_IPC" \
+    -projectPath "$PROJECT_ROOT" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+elif [ "$HUB_LICENSING" -eq 1 ]; then
+  "$UNITY_EDITOR" \
+    -batchmode \
+    -quit \
+    -useHub \
+    -hubIPC \
+    -cloudEnvironment production \
+    -projectPath "$PROJECT_ROOT" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+elif [ -n "$LICENSING_IPC" ]; then
+  "$UNITY_EDITOR" \
+    -batchmode \
+    -quit \
+    -licensingIpc "$LICENSING_IPC" \
+    -projectPath "$PROJECT_ROOT" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+else
+  "$UNITY_EDITOR" \
+    -batchmode \
+    -quit \
+    -projectPath "$PROJECT_ROOT" \
+    -executeMethod "$EXECUTE_METHOD" \
+    -logFile "$LOG_FILE" &
+fi
+
+UNITY_PID=$!
+ELAPSED=0
+
+while kill -0 "$UNITY_PID" >/dev/null 2>&1; do
+  if [ "$ELAPSED" -ge "$WALL_TIMEOUT" ]; then
+    echo "Unity dedicated server action timed out after ${WALL_TIMEOUT}s." >&2
+    echo "Log: $LOG_FILE" >&2
+    cleanup_child
+    exit 124
+  fi
+
+  sleep 1
+  ELAPSED=$((ELAPSED + 1))
+done
+
+set +e
+wait "$UNITY_PID"
+STATUS=$?
+set -e
+UNITY_PID=""
+
+if [ "$STATUS" -ne 0 ]; then
+  echo "Unity dedicated server action failed with exit code $STATUS." >&2
+  echo "Log: $LOG_FILE" >&2
+  exit "$STATUS"
+fi
+
+echo "Dedicated server action completed: $ACTION"
+echo "Log: $LOG_FILE"
